@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: passpass
-      POSTGRES_DB: pim_oms
+      POSTGRES_DB: my_pim_oms
     volumes:
       - pgdata:/var/lib/postgresql/data
   maildev:
