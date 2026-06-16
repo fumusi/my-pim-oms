@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: passpass
+      POSTGRES_DB: pim_oms
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  maildev:
+    image: maildev/maildev:2.2.1
+    ports:
+      - 1025:1025
+      - 1080:1080
+volumes:
+  pgdata:
