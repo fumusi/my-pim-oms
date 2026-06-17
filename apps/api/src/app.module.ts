@@ -28,7 +28,7 @@ import { RedisModule } from './redis/redis.module';
     HealthModule,
   ],
   providers: [
-    { provide: APP_GUARD, useExisting: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
