@@ -1,10 +1,13 @@
 import {
   Body, Controller, Get, HttpCode, HttpStatus,
-  Post, Req, Res,
+  Post, Req, Res, UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response, CookieOptions } from 'express';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
+import type { GithubProfile } from './strategies/github.strategy';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -23,7 +26,10 @@ const cookieOptions = (): CookieOptions => ({
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post('register')
   @Public()
@@ -72,6 +78,23 @@ export class AuthController {
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto);
     return { message: 'Password reset successfully.' };
+  }
+
+  @Get('github')
+  @Public()
+  @UseGuards(AuthGuard('github'))
+  github() {}
+
+  @Get('github/callback')
+  @Public()
+  @UseGuards(AuthGuard('github'))
+  async githubCallback(
+    @Req() req: Request & { user: GithubProfile },
+    @Res() res: Response,
+  ) {
+    const { accessToken, refreshToken } = await this.authService.findOrCreateGithubUser(req.user);
+    res.cookie(REFRESH_COOKIE, refreshToken, cookieOptions());
+    res.redirect(`${this.config.get('APP_URL')}/auth/callback?token=${accessToken}`);
   }
 
   @Post('logout')

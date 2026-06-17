@@ -13,9 +13,10 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
+import type { GithubProfile } from './strategies/github.strategy';
 
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
-const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -53,8 +54,27 @@ export class AuthService {
   async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersRepository.findOneBy({ email: dto.email });
 
-    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
+    if (!user || !user.password || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.issueTokens(user);
+  }
+
+  async findOrCreateGithubUser(profile: GithubProfile): Promise<{ accessToken: string; refreshToken: string }> {
+    let user = await this.usersRepository.findOneBy({ email: profile.email });
+
+    if (!user) {
+      user = await this.usersRepository.save(
+        this.usersRepository.create({
+          email: profile.email,
+          password: null,
+          role: Role.User,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          avatarUrl: profile.avatarUrl,
+        }),
+      );
     }
 
     return this.issueTokens(user);
@@ -89,7 +109,6 @@ export class AuthService {
       }
     }
 
-    // Invalidate the refresh token
     if (refreshToken) {
       const userId = this.extractUserIdFromRefreshToken(refreshToken);
       await this.redisService.del(`rt:${userId}`);
