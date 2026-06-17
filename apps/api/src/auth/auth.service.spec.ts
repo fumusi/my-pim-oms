@@ -1,8 +1,8 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -260,6 +260,48 @@ describe('AuthService', () => {
       const ttlMs = patch.resetTokenExpiresAt.getTime();
       expect(ttlMs).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
       expect(ttlMs).toBeLessThanOrEqual(after + 15 * 60 * 1000);
+    });
+  });
+
+  describe('resetPassword', () => {
+    const rawToken = 'valid-token-abc123';
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const dto = { token: rawToken, newPassword: 'NewPass1', confirmPassword: 'NewPass1' };
+
+    it('throws 400 when token not found', async () => {
+      usersRepo.findOneBy.mockResolvedValue(null);
+      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws 400 when token is expired', async () => {
+      const expiredUser = {
+        ...savedUser,
+        resetToken: tokenHash,
+        resetTokenExpiresAt: new Date(Date.now() - 1000),
+      } as User;
+      usersRepo.findOneBy.mockResolvedValue(expiredUser);
+      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('hashes new password, clears reset token, and invalidates refresh token', async () => {
+      const userWithToken = {
+        ...savedUser,
+        resetToken: tokenHash,
+        resetTokenExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      } as User;
+      usersRepo.findOneBy.mockResolvedValue(userWithToken);
+      usersRepo.update.mockResolvedValue(undefined);
+      redisService.del.mockResolvedValue(undefined);
+
+      await service.resetPassword(dto);
+
+      const [id, patch] = usersRepo.update.mock.calls[0];
+      expect(id).toBe(savedUser.id);
+      expect(patch.password).not.toBe(dto.newPassword);
+      await expect(bcrypt.compare(dto.newPassword, patch.password)).resolves.toBe(true);
+      expect(patch.resetToken).toBeNull();
+      expect(patch.resetTokenExpiresAt).toBeNull();
+      expect(redisService.del).toHaveBeenCalledWith(`rt:${savedUser.id}`);
     });
   });
 });

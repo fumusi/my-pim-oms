@@ -94,21 +94,6 @@ export class AuthService {
     }
   }
 
-  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
-    const user = await this.usersRepository.findOneBy({ email: dto.email });
-    if (!user) return;
-
-    const rawToken = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
-
-    await this.usersRepository.update(user.id, {
-      resetToken: this.hashToken(rawToken),
-      resetTokenExpiresAt: expiresAt,
-    });
-
-    await this.mailService.sendPasswordResetEmail(user.email, rawToken);
-  }
-
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
     const tokenHash = this.hashToken(dto.token);
     const user = await this.usersRepository.findOneBy({ resetToken: tokenHash });
@@ -124,6 +109,23 @@ export class AuthService {
       resetToken: null,
       resetTokenExpiresAt: null,
     });
+
+    await this.redisService.del(`rt:${user.id}`);
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const user = await this.usersRepository.findOneBy({ email: dto.email });
+    if (!user) return;
+
+    const rawToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await this.usersRepository.update(user.id, {
+      resetToken: this.hashToken(rawToken),
+      resetTokenExpiresAt: expiresAt,
+    });
+
+    await this.mailService.sendPasswordResetEmail(user.email, rawToken);
   }
 
   private async issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
