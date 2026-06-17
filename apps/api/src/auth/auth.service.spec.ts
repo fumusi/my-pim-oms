@@ -1,4 +1,5 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -227,7 +228,7 @@ describe('AuthService', () => {
       expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
 
-    it('generates token, stores it with expiry, and sends reset email', async () => {
+    it('stores token hash in DB and sends raw token in email', async () => {
       usersRepo.findOneBy.mockResolvedValue(savedUser);
       usersRepo.update.mockResolvedValue(undefined);
       mailService.sendPasswordResetEmail.mockResolvedValue(undefined);
@@ -236,15 +237,14 @@ describe('AuthService', () => {
 
       const [id, patch] = usersRepo.update.mock.calls[0];
       expect(id).toBe(savedUser.id);
-      expect(typeof patch.resetToken).toBe('string');
-      expect(patch.resetToken).toHaveLength(64); // 32 bytes hex
       expect(patch.resetTokenExpiresAt).toBeInstanceOf(Date);
       expect(patch.resetTokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
 
-      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
-        savedUser.email,
-        patch.resetToken,
-      );
+      const [emailTo, rawToken] = mailService.sendPasswordResetEmail.mock.calls[0];
+      expect(emailTo).toBe(savedUser.email);
+      expect(rawToken).toHaveLength(64); // 32 bytes hex
+      expect(patch.resetToken).not.toBe(rawToken); // DB stores hash, not raw
+      expect(patch.resetToken).toBe(createHash('sha256').update(rawToken).digest('hex'));
     });
 
     it('token expires in ~15 minutes', async () => {
