@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
@@ -11,13 +12,15 @@ export class HealthController {
   ) {}
 
   @Get()
-  async check() {
+  async check(@Res({ passthrough: true }) res: Response) {
     const [db, redis] = await Promise.all([
       this.checkDb(),
       this.checkRedis(),
     ]);
 
     const healthy = db && redis;
+
+    if (!healthy) res.status(HttpStatus.SERVICE_UNAVAILABLE);
 
     return {
       status: healthy ? 'ok' : 'degraded',

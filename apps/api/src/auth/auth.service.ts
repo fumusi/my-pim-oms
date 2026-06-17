@@ -40,7 +40,7 @@ export class AuthService {
 
     const saved = await this.usersRepository.save(user);
 
-    this.mailService.sendConfirmationEmail(saved.email);
+    await this.mailService.sendConfirmationEmail(saved.email);
 
     return { id: saved.id, email: saved.email };
   }
@@ -77,10 +77,11 @@ export class AuthService {
   }
 
   async logout(user: JwtPayload, refreshToken: string | undefined): Promise<void> {
-    // Blacklist the access token until it naturally expires
     if (user.exp) {
       const ttl = user.exp - Math.floor(Date.now() / 1000);
-      await this.redisService.set(`bl:${user.jti}`, '1', ttl);
+      if (ttl > 0) {
+        await this.redisService.set(`bl:${user.jti}`, '1', ttl);
+      }
     }
 
     // Invalidate the refresh token
@@ -111,7 +112,9 @@ export class AuthService {
   }
 
   private extractUserIdFromRefreshToken(token: string): number {
-    return parseInt(token.split(':')[0], 10);
+    const userId = parseInt(token.split(':')[0], 10);
+    if (isNaN(userId)) throw new UnauthorizedException();
+    return userId;
   }
 
   private hashToken(token: string): string {
