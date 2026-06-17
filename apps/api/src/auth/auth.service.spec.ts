@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -260,6 +260,44 @@ describe('AuthService', () => {
       const ttlMs = patch.resetTokenExpiresAt.getTime();
       expect(ttlMs).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
       expect(ttlMs).toBeLessThanOrEqual(after + 15 * 60 * 1000);
+    });
+  });
+
+  describe('resetPassword', () => {
+    const dto = { token: 'valid-token', newPassword: 'NewPass1', confirmPassword: 'NewPass1' };
+
+    it('throws 400 when token not found', async () => {
+      usersRepo.findOneBy.mockResolvedValue(null);
+      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws 400 when token is expired', async () => {
+      const expiredUser = {
+        ...savedUser,
+        resetToken: 'valid-token',
+        resetTokenExpiresAt: new Date(Date.now() - 1000),
+      } as User;
+      usersRepo.findOneBy.mockResolvedValue(expiredUser);
+      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('hashes new password and clears reset token on success', async () => {
+      const userWithToken = {
+        ...savedUser,
+        resetToken: 'valid-token',
+        resetTokenExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      } as User;
+      usersRepo.findOneBy.mockResolvedValue(userWithToken);
+      usersRepo.update.mockResolvedValue(undefined);
+
+      await service.resetPassword(dto);
+
+      const [id, patch] = usersRepo.update.mock.calls[0];
+      expect(id).toBe(savedUser.id);
+      expect(patch.password).not.toBe(dto.newPassword);
+      await expect(bcrypt.compare(dto.newPassword, patch.password)).resolves.toBe(true);
+      expect(patch.resetToken).toBeNull();
+      expect(patch.resetTokenExpiresAt).toBeNull();
     });
   });
 });
