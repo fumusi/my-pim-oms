@@ -21,6 +21,18 @@ export class User {
   @Column({ type: 'enum', enum: Role, default: Role.User })
   role!: Role;
 
+  @Column({ type: 'varchar', nullable: true, name: 'first_name' })
+  firstName!: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'last_name' })
+  lastName!: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'phone_number' })
+  phoneNumber!: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'avatar_url' })
+  avatarUrl!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 
