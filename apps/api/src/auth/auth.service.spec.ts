@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, UnauthorizedException } from '@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -227,7 +228,7 @@ describe('AuthService', () => {
       expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
 
-    it('generates token, stores it with expiry, and sends reset email', async () => {
+    it('stores token hash in DB and sends raw token in email', async () => {
       usersRepo.findOneBy.mockResolvedValue(savedUser);
       usersRepo.update.mockResolvedValue(undefined);
       mailService.sendPasswordResetEmail.mockResolvedValue(undefined);
@@ -236,15 +237,14 @@ describe('AuthService', () => {
 
       const [id, patch] = usersRepo.update.mock.calls[0];
       expect(id).toBe(savedUser.id);
-      expect(typeof patch.resetToken).toBe('string');
-      expect(patch.resetToken).toHaveLength(64); // 32 bytes hex
       expect(patch.resetTokenExpiresAt).toBeInstanceOf(Date);
       expect(patch.resetTokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
 
-      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
-        savedUser.email,
-        patch.resetToken,
-      );
+      const [emailTo, rawToken] = mailService.sendPasswordResetEmail.mock.calls[0];
+      expect(emailTo).toBe(savedUser.email);
+      expect(rawToken).toHaveLength(64); // 32 bytes hex
+      expect(patch.resetToken).not.toBe(rawToken); // DB stores hash, not raw
+      expect(patch.resetToken).toBe(createHash('sha256').update(rawToken).digest('hex'));
     });
 
     it('token expires in ~15 minutes', async () => {
@@ -264,7 +264,9 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
-    const dto = { token: 'valid-token', newPassword: 'NewPass1', confirmPassword: 'NewPass1' };
+    const rawToken = 'valid-token-abc123';
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const dto = { token: rawToken, newPassword: 'NewPass1', confirmPassword: 'NewPass1' };
 
     it('throws 400 when token not found', async () => {
       usersRepo.findOneBy.mockResolvedValue(null);
@@ -274,21 +276,22 @@ describe('AuthService', () => {
     it('throws 400 when token is expired', async () => {
       const expiredUser = {
         ...savedUser,
-        resetToken: 'valid-token',
+        resetToken: tokenHash,
         resetTokenExpiresAt: new Date(Date.now() - 1000),
       } as User;
       usersRepo.findOneBy.mockResolvedValue(expiredUser);
       await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
     });
 
-    it('hashes new password and clears reset token on success', async () => {
+    it('hashes new password, clears reset token, and invalidates refresh token', async () => {
       const userWithToken = {
         ...savedUser,
-        resetToken: 'valid-token',
+        resetToken: tokenHash,
         resetTokenExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
       } as User;
       usersRepo.findOneBy.mockResolvedValue(userWithToken);
       usersRepo.update.mockResolvedValue(undefined);
+      redisService.del.mockResolvedValue(undefined);
 
       await service.resetPassword(dto);
 
@@ -298,6 +301,7 @@ describe('AuthService', () => {
       await expect(bcrypt.compare(dto.newPassword, patch.password)).resolves.toBe(true);
       expect(patch.resetToken).toBeNull();
       expect(patch.resetTokenExpiresAt).toBeNull();
+      expect(redisService.del).toHaveBeenCalledWith(`rt:${savedUser.id}`);
     });
   });
 });
