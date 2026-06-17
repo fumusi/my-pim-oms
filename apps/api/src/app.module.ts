@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 
@@ -20,7 +24,12 @@ import { RedisModule } from './redis/redis.module';
     }),
     RedisModule,
     AuthModule,
+    AdminModule,
     HealthModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

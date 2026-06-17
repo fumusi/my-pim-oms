@@ -1,4 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import type { ExecutionContext } from '@nestjs/common';
@@ -10,6 +11,8 @@ const payload = { sub: 1, email: 'test@example.com', role: Role.User, jti: 'test
 
 function mockContext(authHeader?: string): ExecutionContext {
   return {
+    getHandler: () => ({}),
+    getClass: () => ({}),
     switchToHttp: () => ({
       getRequest: () => ({ headers: { authorization: authHeader }, user: undefined }),
     }),
@@ -20,16 +23,19 @@ describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
   let jwtService: { verify: jest.Mock };
   let redisService: { exists: jest.Mock };
+  let reflector: { getAllAndOverride: jest.Mock };
 
   beforeEach(async () => {
     jwtService = { verify: jest.fn() };
     redisService = { exists: jest.fn().mockResolvedValue(false) };
+    reflector = { getAllAndOverride: jest.fn().mockReturnValue(false) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JwtAuthGuard,
         { provide: JwtService, useValue: jwtService },
         { provide: RedisService, useValue: redisService },
+        { provide: Reflector, useValue: reflector },
       ],
     }).compile();
 
@@ -40,11 +46,19 @@ describe('JwtAuthGuard', () => {
     jwtService.verify.mockReturnValue(payload);
     const request = { headers: { authorization: 'Bearer valid-token' }, user: undefined };
     const ctx = {
+      getHandler: () => ({}),
+      getClass: () => ({}),
       switchToHttp: () => ({ getRequest: () => request }),
     } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(request.user).toEqual(payload);
+  });
+
+  it('returns true without checking token when route is @Public()', async () => {
+    reflector.getAllAndOverride.mockReturnValue(true);
+    await expect(guard.canActivate(mockContext())).resolves.toBe(true);
+    expect(jwtService.verify).not.toHaveBeenCalled();
   });
 
   it('throws 401 when Authorization header is missing', async () => {

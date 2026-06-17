@@ -1,4 +1,5 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import { Public } from '../common/decorators/public.decorator';
 import type { Response } from 'express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -12,6 +13,7 @@ export class HealthController {
   ) {}
 
   @Get()
+  @Public()
   async check(@Res({ passthrough: true }) res: Response) {
     const [db, redis] = await Promise.all([
       this.checkDb(),

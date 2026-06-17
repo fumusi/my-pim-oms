@@ -7,13 +7,13 @@ import { User } from '../users/entities/user.entity';
 import { MailModule } from '../mail/mail.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
     MailModule,
     JwtModule.registerAsync({
+      global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
@@ -24,7 +24,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
-  exports: [JwtAuthGuard],
+  providers: [AuthService],
 })
 export class AuthModule {}

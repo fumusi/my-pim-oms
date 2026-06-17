@@ -1,12 +1,14 @@
 import {
   Body, Controller, Get, HttpCode, HttpStatus,
-  Post, Req, Res, UseGuards,
+  Post, Req, Res,
 } from '@nestjs/common';
 import type { Request, Response, CookieOptions } from 'express';
+import { Public } from '../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const REFRESH_COOKIE = 'refreshToken';
@@ -16,7 +18,7 @@ const cookieOptions = (): CookieOptions => ({
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax',
   path: '/api/auth',
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in ms
+  maxAge: 30 * 24 * 60 * 60 * 1000,
 });
 
 @Controller('auth')
@@ -24,12 +26,14 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Public()
   @HttpCode(HttpStatus.CREATED)
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Post('login')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
@@ -41,6 +45,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() req: Request,
@@ -53,9 +58,24 @@ export class AuthController {
     return { accessToken };
   }
 
+  @Post('forgot-password')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto);
+    return { message: 'If that email is registered, a reset link has been sent.' };
+  }
+
+  @Post('reset-password')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto);
+    return { message: 'Password reset successfully.' };
+  }
+
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
   async logout(
     @Req() req: Request & { user: JwtPayload },
     @Res({ passthrough: true }) res: Response,
@@ -66,7 +86,6 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   me(@Req() req: Request & { user: JwtPayload }) {
     const { sub, email, role } = req.user;
     return { id: sub, email, role };
