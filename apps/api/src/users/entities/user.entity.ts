@@ -33,6 +33,9 @@ export class User {
   @Column({ type: 'varchar', nullable: true, name: 'avatar_url' })
   avatarUrl!: string | null;
 
+  @Column({ type: 'varchar', nullable: true, name: 'confirmation_token' })
+  confirmationToken!: string | null;
+
   @Column({ type: 'varchar', nullable: true, name: 'reset_token' })
   resetToken!: string | null;
 

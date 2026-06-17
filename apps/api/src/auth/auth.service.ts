@@ -34,16 +34,18 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const rawConfirmationToken = randomBytes(32).toString('hex');
 
     const user = this.usersRepository.create({
       email: dto.email,
       password: hashedPassword,
       role: Role.User,
+      confirmationToken: this.hashToken(rawConfirmationToken),
     });
 
     const saved = await this.usersRepository.save(user);
 
-    await this.mailService.sendConfirmationEmail(saved.email);
+    await this.mailService.sendConfirmationEmail(saved.email, rawConfirmationToken);
 
     return { id: saved.id, email: saved.email };
   }

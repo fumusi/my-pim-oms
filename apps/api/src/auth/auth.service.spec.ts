@@ -102,7 +102,7 @@ describe('AuthService', () => {
 
       await service.register(registerDto);
 
-      expect(mailService.sendConfirmationEmail).toHaveBeenCalledWith(registerDto.email);
+      expect(mailService.sendConfirmationEmail).toHaveBeenCalledWith(registerDto.email, expect.stringMatching(/^[0-9a-f]{64}$/));
     });
   });
 
