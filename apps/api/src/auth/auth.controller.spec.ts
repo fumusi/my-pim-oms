@@ -16,6 +16,8 @@ describe('AuthController', () => {
     refresh: jest.Mock;
     logout: jest.Mock;
     register: jest.Mock;
+    forgotPassword: jest.Mock;
+    resetPassword: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -24,6 +26,8 @@ describe('AuthController', () => {
       login: jest.fn(),
       refresh: jest.fn(),
       logout: jest.fn(),
+      forgotPassword: jest.fn(),
+      resetPassword: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -105,6 +109,19 @@ describe('AuthController', () => {
       };
       const req = { user: jwtPayload } as unknown as Request & { user: typeof jwtPayload };
       expect(controller.me(req)).toEqual({ id: 1, email: 'a@b.com', role: Role.User });
+    });
+  });
+
+  describe('POST /auth/reset-password', () => {
+    it('returns success message on valid token', async () => {
+      authService.resetPassword.mockResolvedValue(undefined);
+      const result = await controller.resetPassword({
+        token: 'valid-token',
+        newPassword: 'NewPass1',
+        confirmPassword: 'NewPass1',
+      });
+      expect(authService.resetPassword).toHaveBeenCalled();
+      expect(result).toEqual({ message: 'Password reset successfully.' });
     });
   });
 

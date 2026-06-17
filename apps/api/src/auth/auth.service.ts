@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
@@ -10,9 +10,12 @@ import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 @Injectable()
 export class AuthService {
@@ -89,6 +92,40 @@ export class AuthService {
       const userId = this.extractUserIdFromRefreshToken(refreshToken);
       await this.redisService.del(`rt:${userId}`);
     }
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const tokenHash = this.hashToken(dto.token);
+    const user = await this.usersRepository.findOneBy({ resetToken: tokenHash });
+
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.usersRepository.update(user.id, {
+      password: passwordHash,
+      resetToken: null,
+      resetTokenExpiresAt: null,
+    });
+
+    await this.redisService.del(`rt:${user.id}`);
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const user = await this.usersRepository.findOneBy({ email: dto.email });
+    if (!user) return;
+
+    const rawToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await this.usersRepository.update(user.id, {
+      resetToken: this.hashToken(rawToken),
+      resetTokenExpiresAt: expiresAt,
+    });
+
+    await this.mailService.sendPasswordResetEmail(user.email, rawToken);
   }
 
   private async issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
