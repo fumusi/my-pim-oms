@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { ExecutionContext } from '@nestjs/common';
@@ -47,8 +47,8 @@ describe('RolesGuard', () => {
     expect(() => guard.canActivate(mockContext(Role.User))).toThrow(ForbiddenException);
   });
 
-  it('throws 403 when request has no authenticated user', () => {
+  it('throws 401 when request has no authenticated user', () => {
     reflector.getAllAndOverride.mockReturnValue([Role.Admin]);
-    expect(() => guard.canActivate(mockContext())).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(mockContext())).toThrow(UnauthorizedException);
   });
 });
