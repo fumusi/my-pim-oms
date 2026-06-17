@@ -26,14 +26,14 @@ const savedUser = { id: 1, email: 'test@example.com', role: Role.User } as User;
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersRepo: { findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock };
-  let mailService: { sendConfirmationEmail: jest.Mock };
+  let usersRepo: { findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock };
+  let mailService: { sendConfirmationEmail: jest.Mock; sendPasswordResetEmail: jest.Mock };
   let jwtService: { signAsync: jest.Mock };
   let redisService: { get: jest.Mock; set: jest.Mock; del: jest.Mock; exists: jest.Mock };
 
   beforeEach(async () => {
-    usersRepo = { findOneBy: jest.fn(), create: jest.fn(), save: jest.fn() };
-    mailService = { sendConfirmationEmail: jest.fn() };
+    usersRepo = { findOneBy: jest.fn(), create: jest.fn(), save: jest.fn(), update: jest.fn() };
+    mailService = { sendConfirmationEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };
     jwtService = { signAsync: jest.fn().mockResolvedValue('signed-token') };
     redisService = {
       get: jest.fn(),
@@ -216,6 +216,50 @@ describe('AuthService', () => {
       await service.logout(user, '1:some-refresh-token');
 
       expect(redisService.del).toHaveBeenCalledWith('rt:1');
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('returns without error when email is not found (no enumeration)', async () => {
+      usersRepo.findOneBy.mockResolvedValue(null);
+      await expect(service.forgotPassword({ email: 'nobody@example.com' })).resolves.toBeUndefined();
+      expect(usersRepo.update).not.toHaveBeenCalled();
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('generates token, stores it with expiry, and sends reset email', async () => {
+      usersRepo.findOneBy.mockResolvedValue(savedUser);
+      usersRepo.update.mockResolvedValue(undefined);
+      mailService.sendPasswordResetEmail.mockResolvedValue(undefined);
+
+      await service.forgotPassword({ email: savedUser.email });
+
+      const [id, patch] = usersRepo.update.mock.calls[0];
+      expect(id).toBe(savedUser.id);
+      expect(typeof patch.resetToken).toBe('string');
+      expect(patch.resetToken).toHaveLength(64); // 32 bytes hex
+      expect(patch.resetTokenExpiresAt).toBeInstanceOf(Date);
+      expect(patch.resetTokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
+
+      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        savedUser.email,
+        patch.resetToken,
+      );
+    });
+
+    it('token expires in ~15 minutes', async () => {
+      usersRepo.findOneBy.mockResolvedValue(savedUser);
+      usersRepo.update.mockResolvedValue(undefined);
+      mailService.sendPasswordResetEmail.mockResolvedValue(undefined);
+
+      const before = Date.now();
+      await service.forgotPassword({ email: savedUser.email });
+      const after = Date.now();
+
+      const [, patch] = usersRepo.update.mock.calls[0];
+      const ttlMs = patch.resetTokenExpiresAt.getTime();
+      expect(ttlMs).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
+      expect(ttlMs).toBeLessThanOrEqual(after + 15 * 60 * 1000);
     });
   });
 });

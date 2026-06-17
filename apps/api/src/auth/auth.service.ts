@@ -10,6 +10,7 @@ import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
@@ -89,6 +90,21 @@ export class AuthService {
       const userId = this.extractUserIdFromRefreshToken(refreshToken);
       await this.redisService.del(`rt:${userId}`);
     }
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const user = await this.usersRepository.findOneBy({ email: dto.email });
+    if (!user) return;
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.usersRepository.update(user.id, {
+      resetToken: token,
+      resetTokenExpiresAt: expiresAt,
+    });
+
+    await this.mailService.sendPasswordResetEmail(user.email, token);
   }
 
   private async issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {

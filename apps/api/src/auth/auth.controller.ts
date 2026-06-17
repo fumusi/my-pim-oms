@@ -7,6 +7,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const REFRESH_COOKIE = 'refreshToken';
@@ -54,6 +55,14 @@ export class AuthController {
     );
     res.cookie(REFRESH_COOKIE, refreshToken, cookieOptions());
     return { accessToken };
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto);
+    return { message: 'If that email is registered, a reset link has been sent.' };
   }
 
   @Post('logout')
