@@ -1,16 +1,41 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { MailerService } from '@nestjs-modules/mailer';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MailService {
-  private readonly logger = new Logger(MailService.name);
+  constructor(
+    private readonly mailerService: MailerService,
+    private readonly config: ConfigService,
+  ) {}
 
-  async sendConfirmationEmail(email: string): Promise<void> {
-    // stub — replace with real MailerService later
-    this.logger.log(`[MAIL STUB] Confirmation email → ${email}`);
+  async sendConfirmationEmail(to: string, token: string): Promise<void> {
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:5173');
+    const url = token ? `${appUrl}/verify-email?token=${token}` : null;
+
+    await this.mailerService.sendMail({
+      to,
+      subject: 'Welcome to PIM OMS – confirm your email',
+      html: `
+        <h2>Welcome to PIM OMS!</h2>
+        ${url ? `<p>Click below to confirm your email address:</p><p><a href="${url}">Confirm email</a></p><p>This link expires in 24 hours.</p>` : '<p>Your account has been created successfully.</p>'}
+      `,
+    });
   }
 
   async sendPasswordResetEmail(to: string, token: string): Promise<void> {
-    // stub — replace with real MailerService later
-    this.logger.log(`[MAIL STUB] Password reset email → ${to} | token: ${token}`);
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:5173');
+    const url = `${appUrl}/reset-password?token=${token}`;
+
+    await this.mailerService.sendMail({
+      to,
+      subject: 'Reset your password – PIM OMS',
+      html: `
+        <h2>Password Reset</h2>
+        <p>Click the link below to reset your password. This link expires in 15 minutes.</p>
+        <p><a href="${url}">Reset password</a></p>
+        <p>If you didn't request this, you can safely ignore this email.</p>
+      `,
+    });
   }
 }
