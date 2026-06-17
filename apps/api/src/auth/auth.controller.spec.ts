@@ -37,6 +37,15 @@ describe('AuthController', () => {
     controller = module.get<AuthController>(AuthController);
   });
 
+  describe('POST /auth/register', () => {
+    it('returns id and email from authService.register', async () => {
+      authService.register.mockResolvedValue({ id: 1, email: 'a@b.com' });
+      await expect(
+        controller.register({ email: 'a@b.com', password: 'Password1', confirmPassword: 'Password1' }),
+      ).resolves.toEqual({ id: 1, email: 'a@b.com' });
+    });
+  });
+
   describe('POST /auth/login', () => {
     it('sets httpOnly refreshToken cookie and returns accessToken', async () => {
       authService.login.mockResolvedValue({
@@ -81,6 +90,21 @@ describe('AuthController', () => {
         '1:new-refresh-opaque',
         expect.objectContaining({ httpOnly: true, path: '/api/auth' }),
       );
+    });
+  });
+
+  describe('GET /auth/me', () => {
+    it('returns id, email and role stripped from JWT payload', () => {
+      const jwtPayload = {
+        sub: 1,
+        email: 'a@b.com',
+        role: Role.User,
+        jti: 'jti-abc',
+        iat: 1000,
+        exp: 2000,
+      };
+      const req = { user: jwtPayload } as unknown as Request & { user: typeof jwtPayload };
+      expect(controller.me(req)).toEqual({ id: 1, email: 'a@b.com', role: Role.User });
     });
   });
 
