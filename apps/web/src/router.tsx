@@ -25,9 +25,11 @@ function getToken() {
 function IndexRedirect() {
   const navigate = useNavigate()
   const token = useSelector((s: RootState) => s.auth.accessToken)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // called.current guard makes this intentionally run once on mount only
   useEffect(() => {
     navigate({ to: selectIsAuthenticated(token) ? '/dashboard' : '/login', replace: true })
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
@@ -105,11 +107,16 @@ const routeTree = rootRoute.addChildren([
 
 export const router = createRouter({
   routeTree,
-  defaultErrorComponent: ({ error }) => (
-    <pre style={{ color: 'red', padding: '2rem', whiteSpace: 'pre-wrap' }}>
-      {error instanceof Error ? error.stack : String(error)}
-    </pre>
-  ),
+  defaultErrorComponent: ({ error }) =>
+    import.meta.env.DEV ? (
+      <pre style={{ color: 'red', padding: '2rem', whiteSpace: 'pre-wrap' }}>
+        {error instanceof Error ? error.stack : String(error)}
+      </pre>
+    ) : (
+      <div style={{ padding: '2rem', color: '#e0e2f0', textAlign: 'center' }}>
+        Something went wrong. Please try again.
+      </div>
+    ),
 })
 
 declare module '@tanstack/react-router' {

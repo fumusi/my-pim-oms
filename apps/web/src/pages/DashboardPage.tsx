@@ -1,14 +1,22 @@
 import { useDispatch } from 'react-redux'
 import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import type { AppDispatch } from '../store'
 import { clearAccessToken } from '../store/authSlice'
+import { logout } from '../api/auth'
 
 export function DashboardPage() {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await logout()
+    } catch {
+      // best-effort — clear local session regardless
+    }
     dispatch(clearAccessToken())
+    toast.success('Signed out')
     navigate({ to: '/login' })
   }
 

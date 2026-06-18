@@ -14,3 +14,5 @@ export const resetPassword = (token: string, newPassword: string, confirmPasswor
 
 export const exchangeOAuthCode = (code: string) =>
   api.get<{ accessToken: string }>(`/auth/exchange?code=${code}`)
+
+export const logout = () => api.post('/auth/logout')
