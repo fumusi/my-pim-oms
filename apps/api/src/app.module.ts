@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { ExactModule } from './exact/exact.module';
+import { ProductsModule } from './products/products.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HealthModule } from './health/health.module';
@@ -25,6 +27,8 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
     AuthModule,
     UsersModule,
+    ExactModule,
+    ProductsModule,
     HealthModule,
   ],
   providers: [
