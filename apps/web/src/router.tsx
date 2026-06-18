@@ -11,11 +11,15 @@ import { useSelector } from 'react-redux'
 import { store } from './store'
 import { selectIsAuthenticated, clearAccessToken } from './store/authSlice'
 import type { RootState } from './store'
+import { AppLayout } from './layouts/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ProductsPage } from './pages/ProductsPage'
+import { OrdersPage } from './pages/OrdersPage'
+import { UsersPage } from './pages/UsersPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 
 function getToken() {
@@ -81,16 +85,45 @@ const oauthCallbackRoute = createRoute({
   component: OAuthCallbackPage,
 })
 
-const dashboardRoute = createRoute({
+// ── Protected layout — wraps all authenticated pages ──────────────────────────
+const appLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/dashboard',
+  id: 'app',
   beforeLoad: () => {
     if (!selectIsAuthenticated(getToken())) {
       store.dispatch(clearAccessToken())
       throw redirect({ to: '/login' })
     }
   },
+  component: AppLayout,
+})
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/dashboard',
+  staticData: { title: 'Dashboard' },
   component: DashboardPage,
+})
+
+const productsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/products',
+  staticData: { title: 'Products' },
+  component: ProductsPage,
+})
+
+const ordersRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders',
+  staticData: { title: 'Orders' },
+  component: OrdersPage,
+})
+
+const usersRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/users',
+  staticData: { title: 'User Management' },
+  component: UsersPage,
 })
 
 const routeTree = rootRoute.addChildren([
@@ -100,7 +133,12 @@ const routeTree = rootRoute.addChildren([
   forgotPasswordRoute,
   resetPasswordRoute,
   oauthCallbackRoute,
-  dashboardRoute,
+  appLayoutRoute.addChildren([
+    dashboardRoute,
+    productsRoute,
+    ordersRoute,
+    usersRoute,
+  ]),
 ])
 
 export const router = createRouter({
@@ -120,5 +158,8 @@ export const router = createRouter({
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router
+  }
+  interface StaticDataRouteOption {
+    title?: string
   }
 }
