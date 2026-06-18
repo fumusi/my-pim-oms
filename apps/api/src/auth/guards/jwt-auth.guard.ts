@@ -39,6 +39,10 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
+    if (await this.redisService.exists(`bl:user:${payload.sub}`)) {
+      throw new UnauthorizedException();
+    }
+
     request.user = payload;
     return true;
   }

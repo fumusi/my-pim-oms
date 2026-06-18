@@ -203,17 +203,36 @@ describe('UsersService', () => {
       expect(result.role).toBe(Role.Admin);
     });
 
-    it('clears refresh token when deactivating', async () => {
+    it('blacklists tokens and clears refresh token when deactivating', async () => {
       const user = makeUser();
       repo.findOneBy
         .mockResolvedValueOnce(user)
         .mockResolvedValueOnce({ ...user, isActive: false });
       repo.update.mockResolvedValue({});
       redis.del.mockResolvedValue(undefined);
+      redis.set.mockResolvedValue(undefined);
 
       await service.adminUpdateUser(2, 1, { isActive: false });
 
       expect(redis.del).toHaveBeenCalledWith('rt:1');
+      expect(redis.set).toHaveBeenCalledWith('bl:user:1', '1', 3600);
+    });
+
+    it('clears user blacklist when reactivating', async () => {
+      const user = makeUser({ isActive: false });
+      repo.findOneBy
+        .mockResolvedValueOnce(user)
+        .mockResolvedValueOnce({ ...user, isActive: true });
+      repo.update.mockResolvedValue({});
+      redis.del.mockResolvedValue(undefined);
+
+      await service.adminUpdateUser(2, 1, { isActive: true });
+
+      expect(redis.del).toHaveBeenCalledWith('bl:user:1');
+    });
+
+    it('throws BadRequestException when admin updates themselves', async () => {
+      await expect(service.adminUpdateUser(1, 1, { role: Role.User })).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when target missing', async () => {
@@ -235,15 +254,17 @@ describe('UsersService', () => {
   // ── adminDeleteUser ──────────────────────────────────────────────────────────
 
   describe('adminDeleteUser', () => {
-    it('soft-deletes target user', async () => {
+    it('soft-deletes target user and blacklists their tokens', async () => {
       repo.findOneBy.mockResolvedValue(makeUser({ id: 5 }));
       repo.update.mockResolvedValue({});
       redis.del.mockResolvedValue(undefined);
+      redis.set.mockResolvedValue(undefined);
 
       await service.adminDeleteUser(2, 5);
 
       expect(repo.update).toHaveBeenCalledWith(5, { isActive: false });
       expect(redis.del).toHaveBeenCalledWith('rt:5');
+      expect(redis.set).toHaveBeenCalledWith('bl:user:5', '1', 3600);
     });
 
     it('throws BadRequestException when admin tries to self-delete', async () => {

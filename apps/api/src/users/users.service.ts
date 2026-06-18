@@ -95,6 +95,10 @@ export class UsersService {
     targetId: number,
     dto: AdminUpdateUserDto,
   ): Promise<UserProfile> {
+    if (adminId === targetId) {
+      throw new BadRequestException('Use /users/me to update your own account');
+    }
+
     const user = await this.repo.findOneBy({ id: targetId });
     if (!user) throw new NotFoundException('User not found');
 
@@ -110,9 +114,11 @@ export class UsersService {
 
     await this.repo.update(targetId, patch);
 
-    // If deactivated, invalidate their refresh token
     if (dto.isActive === false) {
       await this.redis.del(`rt:${targetId}`);
+      await this.redis.set(`bl:user:${targetId}`, '1', 3600);
+    } else if (dto.isActive === true) {
+      await this.redis.del(`bl:user:${targetId}`);
     }
 
     const updated = await this.repo.findOneBy({ id: targetId });
@@ -129,6 +135,7 @@ export class UsersService {
 
     await this.repo.update(targetId, { isActive: false });
     await this.redis.del(`rt:${targetId}`);
+    await this.redis.set(`bl:user:${targetId}`, '1', 3600);
   }
 
   private toProfile(user: User): UserProfile {

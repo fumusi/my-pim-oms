@@ -142,7 +142,7 @@ export function UsersPage() {
                               <path d="M10 11v6M14 11v6" />
                               <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                             </svg>
-                            Delete
+                            Deactivate
                           </button>
                         </div>
                       </td>
