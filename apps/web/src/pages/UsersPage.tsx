@@ -134,7 +134,7 @@ export function UsersPage() {
                           <button
                             className="users-action-btn users-action-btn-danger"
                             onClick={() => setDeleteTarget(u)}
-                            title="Delete user"
+                            title="Deactivate user"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="3 6 5 6 21 6" />

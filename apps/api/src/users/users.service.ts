@@ -129,8 +129,7 @@ export class UsersService {
       await this.redis.del(`bl:user:${targetId}`);
     }
 
-    const updated = await this.repo.findOneBy({ id: targetId });
-    return this.toProfile(updated!);
+    return this.toProfile({ ...user, ...patch } as User);
   }
 
   async adminDeleteUser(adminId: number, targetId: number): Promise<void> {

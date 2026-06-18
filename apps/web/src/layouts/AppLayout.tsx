@@ -97,7 +97,7 @@ export function AppLayout() {
       // best-effort
     }
     dispatch(clearAccessToken())
-    toast.success('Signed out')
+    toast.success('You have been logged out')
     navigate({ to: '/login' })
   }
 

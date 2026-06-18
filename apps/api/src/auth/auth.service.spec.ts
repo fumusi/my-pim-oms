@@ -23,7 +23,7 @@ const loginDto: LoginDto = {
   password: 'Password1',
 };
 
-const savedUser = { id: 1, email: 'test@example.com', role: Role.User } as User;
+const savedUser = { id: 1, email: 'test@example.com', role: Role.User, isActive: true } as User;
 
 describe('AuthService', () => {
   let service: AuthService;

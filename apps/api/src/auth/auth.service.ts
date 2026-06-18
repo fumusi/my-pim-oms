@@ -89,6 +89,8 @@ export class AuthService {
       }
     }
 
+    if (!user.isActive) throw new UnauthorizedException('Account is deactivated');
+
     return this.issueTokens(user);
   }
 

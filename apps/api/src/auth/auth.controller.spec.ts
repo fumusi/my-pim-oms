@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -16,6 +17,7 @@ describe('AuthController', () => {
     refresh: jest.Mock;
     logout: jest.Mock;
     register: jest.Mock;
+    getProfile: jest.Mock;
     forgotPassword: jest.Mock;
     resetPassword: jest.Mock;
   };
@@ -28,11 +30,15 @@ describe('AuthController', () => {
       logout: jest.fn(),
       forgotPassword: jest.fn(),
       resetPassword: jest.fn(),
+      getProfile: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: authService }],
+      providers: [
+        { provide: AuthService, useValue: authService },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('1h') } },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: () => true })
@@ -98,7 +104,7 @@ describe('AuthController', () => {
   });
 
   describe('GET /auth/me', () => {
-    it('returns id, email and role stripped from JWT payload', () => {
+    it('returns user profile from authService.getProfile', async () => {
       const jwtPayload = {
         sub: 1,
         email: 'a@b.com',
@@ -107,8 +113,10 @@ describe('AuthController', () => {
         iat: 1000,
         exp: 2000,
       };
+      const profile = { id: 1, email: 'a@b.com', role: Role.User };
+      authService.getProfile.mockResolvedValue(profile);
       const req = { user: jwtPayload } as unknown as Request & { user: typeof jwtPayload };
-      expect(controller.me(req)).toEqual({ id: 1, email: 'a@b.com', role: Role.User });
+      await expect(controller.me(req)).resolves.toEqual(profile);
     });
   });
 
