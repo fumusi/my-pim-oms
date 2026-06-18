@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
@@ -58,6 +59,7 @@ describe('UsersService', () => {
         UsersService,
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: RedisService, useValue: redis },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('1h') } },
       ],
     }).compile();
 

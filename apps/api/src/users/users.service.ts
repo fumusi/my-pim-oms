@@ -4,8 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import ms from 'ms';
 import { User } from './entities/user.entity';
 import { RedisService } from '../redis/redis.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -30,11 +32,17 @@ export interface PaginatedUsers {
 
 @Injectable()
 export class UsersService {
+  private readonly accessTokenTtl: number;
+
   constructor(
     @InjectRepository(User)
     private readonly repo: Repository<User>,
     private readonly redis: RedisService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    const raw = this.config.get<string>('JWT_EXPIRES_IN', '1h');
+    this.accessTokenTtl = Math.floor(ms(raw as ms.StringValue) / 1000);
+  }
 
   async getMe(userId: number): Promise<UserProfile> {
     const user = await this.repo.findOneBy({ id: userId });
@@ -116,7 +124,7 @@ export class UsersService {
 
     if (dto.isActive === false) {
       await this.redis.del(`rt:${targetId}`);
-      await this.redis.set(`bl:user:${targetId}`, '1', 3600);
+      await this.redis.set(`bl:user:${targetId}`, '1', this.accessTokenTtl);
     } else if (dto.isActive === true) {
       await this.redis.del(`bl:user:${targetId}`);
     }
@@ -135,7 +143,7 @@ export class UsersService {
 
     await this.repo.update(targetId, { isActive: false });
     await this.redis.del(`rt:${targetId}`);
-    await this.redis.set(`bl:user:${targetId}`, '1', 3600);
+    await this.redis.set(`bl:user:${targetId}`, '1', this.accessTokenTtl);
   }
 
   private toProfile(user: User): UserProfile {
