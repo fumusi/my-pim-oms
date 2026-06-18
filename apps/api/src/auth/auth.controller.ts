@@ -122,7 +122,6 @@ export class AuthController {
 
   @Get('me')
   me(@Req() req: Request & { user: JwtPayload }) {
-    const { sub, email, role } = req.user;
-    return { id: sub, email, role };
+    return this.authService.getProfile(req.user.sub);
   }
 }
