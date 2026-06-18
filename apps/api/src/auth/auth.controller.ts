@@ -1,6 +1,6 @@
 import {
   Body, Controller, Get, HttpCode, HttpStatus,
-  Post, Req, Res, UseGuards,
+  Post, Query, Req, Res, UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
@@ -92,9 +92,21 @@ export class AuthController {
     @Req() req: Request & { user: GithubProfile },
     @Res() res: Response,
   ) {
-    const { accessToken, refreshToken } = await this.authService.findOrCreateGithubUser(req.user);
+    const tokens = await this.authService.findOrCreateGithubUser(req.user);
+    const code = await this.authService.createOAuthExchangeCode(tokens);
+    res.redirect(`${this.config.get('APP_URL')}/auth/callback?code=${code}`);
+  }
+
+  @Get('exchange')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async exchange(
+    @Query('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken } = await this.authService.exchangeOAuthCode(code);
     res.cookie(REFRESH_COOKIE, refreshToken, cookieOptions());
-    res.redirect(`${this.config.get('APP_URL')}/auth/callback?token=${accessToken}`);
+    return { accessToken };
   }
 
   @Post('logout')
