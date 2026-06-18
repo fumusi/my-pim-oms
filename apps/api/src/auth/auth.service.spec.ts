@@ -23,7 +23,7 @@ const loginDto: LoginDto = {
   password: 'Password1',
 };
 
-const savedUser = { id: 1, email: 'test@example.com', role: Role.User } as User;
+const savedUser = { id: 1, email: 'test@example.com', role: Role.User, isActive: true } as User;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -159,6 +159,46 @@ describe('AuthService', () => {
       // the stored value must NOT be the plain token
       const storedHash = redisService.set.mock.calls[0][1];
       expect(storedHash).not.toBe(refreshToken);
+    });
+  });
+
+  describe('findOrCreateGithubUser', () => {
+    const githubProfile = {
+      email: 'gh@example.com',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      avatarUrl: null,
+    };
+
+    it('issues tokens for an existing active user', async () => {
+      usersRepo.findOneBy.mockResolvedValue(savedUser);
+      redisService.set.mockResolvedValue(undefined);
+
+      const result = await service.findOrCreateGithubUser({ ...githubProfile, email: savedUser.email });
+
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+    });
+
+    it('throws 401 for a deactivated user', async () => {
+      usersRepo.findOneBy.mockResolvedValue({ ...savedUser, isActive: false });
+
+      await expect(
+        service.findOrCreateGithubUser({ ...githubProfile, email: savedUser.email }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('creates a new user when email is not found and issues tokens', async () => {
+      const newUser = { ...savedUser, id: 99, email: githubProfile.email };
+      usersRepo.findOneBy.mockResolvedValue(null);
+      usersRepo.create.mockReturnValue(newUser);
+      usersRepo.save.mockResolvedValue(newUser);
+      redisService.set.mockResolvedValue(undefined);
+
+      const result = await service.findOrCreateGithubUser(githubProfile);
+
+      expect(usersRepo.save).toHaveBeenCalled();
+      expect(result).toHaveProperty('accessToken');
     });
   });
 
