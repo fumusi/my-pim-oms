@@ -94,7 +94,7 @@ export class AuthController {
   ) {
     const tokens = await this.authService.findOrCreateGithubUser(req.user);
     const code = await this.authService.createOAuthExchangeCode(tokens);
-    res.redirect(`${this.config.get('APP_URL')}/auth/callback?code=${code}`);
+    res.redirect(`${this.config.getOrThrow('APP_URL')}/auth/callback?code=${code}`);
   }
 
   @Get('exchange')
