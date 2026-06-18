@@ -54,7 +54,7 @@ export class AuthService {
   async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersRepository.findOneBy({ email: dto.email });
 
-    if (!user || !user.password || !(await bcrypt.compare(dto.password, user.password))) {
+    if (!user || !user.isActive || !user.password || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -118,7 +118,7 @@ export class AuthService {
     }
 
     const user = await this.usersRepository.findOneBy({ id: userId });
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new UnauthorizedException();
     }
 
@@ -172,6 +172,20 @@ export class AuthService {
     });
 
     await this.mailService.sendPasswordResetEmail(user.email, rawToken);
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) throw new UnauthorizedException();
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+    };
   }
 
   private async issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {

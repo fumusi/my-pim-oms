@@ -1,5 +1,17 @@
 import { api } from './client'
 
+export interface UserProfile {
+  id: number
+  email: string
+  role: string
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  createdAt: string
+}
+
+export const getMe = () => api.get<UserProfile>('/auth/me')
+
 export const register = (email: string, password: string, confirmPassword: string) =>
   api.post('/auth/register', { email, password, confirmPassword })
 

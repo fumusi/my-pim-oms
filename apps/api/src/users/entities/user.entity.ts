@@ -33,6 +33,9 @@ export class User {
   @Column({ type: 'varchar', nullable: true, name: 'avatar_url' })
   avatarUrl!: string | null;
 
+  @Column({ type: 'boolean', default: true, name: 'is_active' })
+  isActive!: boolean;
+
   @Column({ type: 'varchar', nullable: true, name: 'confirmation_token' })
   confirmationToken!: string | null;
 

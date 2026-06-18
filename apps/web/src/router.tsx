@@ -7,6 +7,7 @@ import {
   Outlet,
   useNavigate,
 } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
 import { store } from './store'
 import { selectIsAuthenticated, clearAccessToken } from './store/authSlice'
@@ -19,6 +20,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ProductsPage } from './pages/ProductsPage'
 import { OrdersPage } from './pages/OrdersPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { UsersPage } from './pages/UsersPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 
@@ -119,10 +121,23 @@ const ordersRoute = createRoute({
   component: OrdersPage,
 })
 
+const profileRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/profile',
+  staticData: { title: 'Profile' },
+  component: ProfilePage,
+})
+
 const usersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/users',
   staticData: { title: 'User Management' },
+  beforeLoad: () => {
+    if (store.getState().auth.user?.role !== 'admin') {
+      toast.error('Access denied')
+      throw redirect({ to: '/dashboard' })
+    }
+  },
   component: UsersPage,
 })
 
@@ -137,6 +152,7 @@ const routeTree = rootRoute.addChildren([
     dashboardRoute,
     productsRoute,
     ordersRoute,
+    profileRoute,
     usersRoute,
   ]),
 ])

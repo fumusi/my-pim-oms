@@ -408,6 +408,12 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-decoration: none;
+  transition: color 0.12s;
+}
+
+.header-user-email:hover {
+  color: #c5c7d8;
 }
 
 .header-logout-btn {
@@ -713,6 +719,217 @@ body {
 .dash-order-amount {
   font-size: 0.8rem;
   color: #9396a5;
+}
+
+/* ── Role badge ──────────────────────────── */
+.role-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  line-height: 1.4;
+}
+
+/* ── Profile page ────────────────────────── */
+.profile-wrap {
+  max-width: 520px;
+}
+
+.profile-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+}
+
+.profile-card {
+  background: #151622;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+}
+
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: #a78bfa;
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.profile-display-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #e0e2f0;
+}
+
+.profile-email {
+  font-size: 0.8125rem;
+  color: #6b6e83;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.profile-details {
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 1.5rem;
+  gap: 1rem;
+}
+
+.profile-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.profile-dt {
+  font-size: 0.8125rem;
+  color: #6b6e83;
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.profile-dd {
+  font-size: 0.8125rem;
+  color: #c5c7d8;
+  margin: 0;
+}
+
+.profile-empty {
+  color: #3d3f57;
+}
+
+.profile-actions {
+  padding: 1rem 1.5rem;
+}
+
+.profile-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  color: #a78bfa;
+  text-decoration: none;
+  transition: color 0.12s;
+}
+
+.profile-action-link:hover {
+  color: #c4b5fd;
+}
+
+/* ── Users table ─────────────────────────── */
+.users-table-wrap {
+  overflow-x: auto;
+  margin: 0 -1.25rem;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8375rem;
+}
+
+.users-table th {
+  text-align: left;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #6b6e83;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+}
+
+.users-table td {
+  padding: 0.75rem 1.25rem;
+  color: #c5c7d8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.users-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.users-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.users-td-muted {
+  color: #6b6e83 !important;
+}
+
+.users-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 0 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.users-pagination-info {
+  font-size: 0.775rem;
+  color: #4e5068;
+}
+
+.users-pagination-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.users-pg-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #6b6e83;
+  font-size: 0.775rem;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.users-pg-btn:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #c5c7d8;
+}
+
+.users-pg-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* ── Decorative arch (matches screenshot) ── */

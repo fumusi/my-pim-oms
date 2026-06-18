@@ -6,10 +6,18 @@ import { clearAccessToken } from '../store/authSlice'
 import { logout } from '../api/auth'
 import type { AppDispatch, RootState } from '../store'
 
-const NAV_ITEMS = [
+interface NavItem {
+  to: string
+  label: string
+  adminOnly: boolean
+  icon: React.ReactNode
+}
+
+const NAV_ITEMS: NavItem[] = [
   {
-    to: '/dashboard' as const,
+    to: '/dashboard',
     label: 'Dashboard',
+    adminOnly: false,
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -20,8 +28,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    to: '/products' as const,
+    to: '/products',
     label: 'Products',
+    adminOnly: false,
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -31,8 +40,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    to: '/orders' as const,
+    to: '/orders',
     label: 'Orders',
+    adminOnly: false,
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
@@ -43,8 +53,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    to: '/users' as const,
+    to: '/users',
     label: 'User Management',
+    adminOnly: true,
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -67,6 +78,10 @@ export function AppLayout() {
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/')
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.adminOnly || user?.role === 'admin',
+  )
 
   async function handleLogout() {
     try {
@@ -96,7 +111,7 @@ export function AppLayout() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Main navigation">
-          {NAV_ITEMS.map(({ to, label, icon }) => (
+          {visibleItems.map(({ to, label, icon }) => (
             <Link
               key={to}
               to={to}
@@ -126,7 +141,9 @@ export function AppLayout() {
           <h1 className="app-page-title">{pageTitle}</h1>
 
           <div className="header-user">
-            <span className="header-user-email">{user?.email}</span>
+            <Link to="/profile" className="header-user-email">
+              {user?.email}
+            </Link>
             <button className="header-logout-btn" onClick={handleLogout}>
               Sign out
             </button>
