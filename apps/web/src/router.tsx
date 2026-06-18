@@ -25,11 +25,9 @@ function getToken() {
 function IndexRedirect() {
   const navigate = useNavigate()
   const token = useSelector((s: RootState) => s.auth.accessToken)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // called.current guard makes this intentionally run once on mount only
   useEffect(() => {
     navigate({ to: selectIsAuthenticated(token) ? '/dashboard' : '/login', replace: true })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — intentional one-shot redirect on mount
   return null
 }
 
