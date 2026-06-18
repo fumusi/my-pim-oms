@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, Outlet, useMatches, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
@@ -75,6 +75,13 @@ export function AppLayout() {
   const { location } = useRouterState()
   const matches = useMatches()
   const pageTitle = matches.at(-1)?.staticData?.title ?? ''
+
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSidebarOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [sidebarOpen])
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/')
