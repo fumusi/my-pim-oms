@@ -1,10 +1,13 @@
 import {
   Body, Controller, Get, HttpCode, HttpStatus,
-  Post, Req, Res,
+  Post, Query, Req, Res, UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response, CookieOptions } from 'express';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
+import type { GithubProfile } from './strategies/github.strategy';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -23,7 +26,10 @@ const cookieOptions = (): CookieOptions => ({
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post('register')
   @Public()
@@ -72,6 +78,35 @@ export class AuthController {
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto);
     return { message: 'Password reset successfully.' };
+  }
+
+  @Get('github')
+  @Public()
+  @UseGuards(AuthGuard('github'))
+  github() {}
+
+  @Get('github/callback')
+  @Public()
+  @UseGuards(AuthGuard('github'))
+  async githubCallback(
+    @Req() req: Request & { user: GithubProfile },
+    @Res() res: Response,
+  ) {
+    const tokens = await this.authService.findOrCreateGithubUser(req.user);
+    const code = await this.authService.createOAuthExchangeCode(tokens);
+    res.redirect(`${this.config.getOrThrow('APP_URL')}/auth/callback?code=${code}`);
+  }
+
+  @Get('exchange')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async exchange(
+    @Query('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken } = await this.authService.exchangeOAuthCode(code);
+    res.cookie(REFRESH_COOKIE, refreshToken, cookieOptions());
+    return { accessToken };
   }
 
   @Post('logout')

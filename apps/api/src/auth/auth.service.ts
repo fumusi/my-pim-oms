@@ -13,9 +13,10 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
+import type { GithubProfile } from './strategies/github.strategy';
 
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
-const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -53,11 +54,55 @@ export class AuthService {
   async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersRepository.findOneBy({ email: dto.email });
 
-    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
+    if (!user || !user.password || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     return this.issueTokens(user);
+  }
+
+  async findOrCreateGithubUser(profile: GithubProfile): Promise<{ accessToken: string; refreshToken: string }> {
+    // Trusts GitHub's email verification as proof of ownership. If a user registered
+    // with the same email via password, GitHub login grants access to that account.
+    // Explicit account-linking confirmation is deferred to a future story.
+    let user = await this.usersRepository.findOneBy({ email: profile.email });
+
+    if (!user) {
+      try {
+        user = await this.usersRepository.save(
+          this.usersRepository.create({
+            email: profile.email,
+            password: null,
+            role: Role.User,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            avatarUrl: profile.avatarUrl,
+          }),
+        );
+      } catch (e: any) {
+        if (e.code === '23505') {
+          user = await this.usersRepository.findOneBy({ email: profile.email });
+          if (!user) throw e;
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    return this.issueTokens(user);
+  }
+
+  async createOAuthExchangeCode(tokens: { accessToken: string; refreshToken: string }): Promise<string> {
+    const code = randomBytes(16).toString('hex');
+    await this.redisService.set(`oauth:${code}`, JSON.stringify(tokens), 60);
+    return code;
+  }
+
+  async exchangeOAuthCode(code: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const data = await this.redisService.get(`oauth:${code}`);
+    if (!data) throw new UnauthorizedException('Invalid or expired exchange code');
+    await this.redisService.del(`oauth:${code}`);
+    return JSON.parse(data) as { accessToken: string; refreshToken: string };
   }
 
   async refresh(refreshToken: string | undefined): Promise<{ accessToken: string; refreshToken: string }> {
@@ -89,7 +134,6 @@ export class AuthService {
       }
     }
 
-    // Invalidate the refresh token
     if (refreshToken) {
       const userId = this.extractUserIdFromRefreshToken(refreshToken);
       await this.redisService.del(`rt:${userId}`);
