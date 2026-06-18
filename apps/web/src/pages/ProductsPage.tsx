@@ -1,13 +1,87 @@
+import { useQuery } from '@tanstack/react-query'
+import { getProducts } from '../api/products'
+
+function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
+  if (isSalesItem === null) {
+    return <span className="users-status-pill" style={{ color: '#6b6e83', background: 'rgba(107,110,131,0.12)' }}>—</span>
+  }
+  if (isSalesItem) {
+    return <span className="users-status-pill users-status-active">Active</span>
+  }
+  return <span className="users-status-pill users-status-inactive">Inactive</span>
+}
+
 export function ProductsPage() {
+  const { data: products, isLoading, isError } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => getProducts().then((r) => r.data),
+  })
+
+  if (isLoading) {
+    return (
+      <div className="profile-loading">
+        <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="profile-loading">
+        <p style={{ color: '#f87171' }}>Failed to load products.</p>
+      </div>
+    )
+  }
+
+  if (!products || products.length === 0) {
+    return (
+      <div className="shell-empty-state">
+        <svg className="shell-empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+        <p className="shell-empty-title">No products yet</p>
+        <p className="shell-empty-hint">Sync products from Exact Online to see them here.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="shell-empty-state">
-      <svg className="shell-empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-        <line x1="12" y1="22.08" x2="12" y2="12" />
-      </svg>
-      <p className="shell-empty-title">No products yet</p>
-      <p className="shell-empty-hint">Product catalogue management coming soon.</p>
+    <div className="dash-card">
+      <div className="dash-card-header">
+        <div>
+          <div className="dash-card-title">Product Catalogue</div>
+          <div className="dash-card-sub">{products.length} product{products.length === 1 ? '' : 's'} synced from Exact Online</div>
+        </div>
+      </div>
+
+      <div className="users-table-wrap">
+        <table className="users-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>SKU</th>
+              <th>Category</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id}>
+                <td>{p.description ?? <span className="users-td-muted">—</span>}</td>
+                <td className="users-td-muted">{p.code ?? '—'}</td>
+                <td className="users-td-muted">
+                  {p.itemGroup?.description ?? p.itemGroupDescription ?? '—'}
+                </td>
+                <td>
+                  <StatusBadge isSalesItem={p.isSalesItem} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Redirect, Res } from '@nestjs/common';
+import { Controller, Get, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -20,9 +20,8 @@ export class ExactController {
   }
 
   @Get('authorize')
-  @Roles(Role.Admin)
-  @Redirect()
-  authorize() {
+  @Public()
+  getAuthorizeUrl() {
     return { url: this.authService.getAuthorizationUrl() };
   }
 

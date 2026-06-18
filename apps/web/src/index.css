@@ -1129,6 +1129,69 @@ body {
   color: #ef4444;
 }
 
+/* ── Exact Online section ────────────────── */
+.exact-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.exact-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s, border-color 0.15s;
+  border: none;
+  white-space: nowrap;
+}
+
+.exact-btn-primary {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+}
+
+.exact-btn-primary:hover:not(:disabled) { background: #6d28d9; }
+.exact-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.exact-btn-outline {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #c5c7d8;
+}
+
+.exact-btn-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.exact-btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.exact-status-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.exact-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.exact-status-label {
+  font-size: 0.775rem;
+  font-weight: 500;
+}
+
 /* ── Decorative arch (matches screenshot) ── */
 .auth-arch {
   position: fixed;

@@ -1,4 +1,10 @@
+import { useEffect } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { useSelector } from 'react-redux'
 import type { ReactNode } from 'react'
+import type { RootState } from '../store'
+import { getExactStatus, getExactAuthorizeUrl, syncExactProducts } from '../api/exact'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -156,6 +162,146 @@ function StatCard({ label, value, trend, trendUp, trendNote, accentColor, accent
   )
 }
 
+// ── Exact Online section ───────────────────────────────────────────────────────
+
+function ExactOnlineSection() {
+  const user = useSelector((s: RootState) => s.auth.user)
+  const isAdmin = user?.role === 'admin'
+
+  const { data: statusData, isLoading: statusLoading } = useQuery({
+    queryKey: ['exact-status'],
+    queryFn: () => getExactStatus().then((r) => r.data),
+    enabled: isAdmin,
+    staleTime: 15_000,
+  })
+
+  const syncMutation = useMutation({
+    mutationFn: () => syncExactProducts().then((r) => r.data),
+    onSuccess: (data) => {
+      toast.success(
+        `Synced ${data.synced} products — ${data.created} created, ${data.updated} updated`,
+      )
+    },
+    onError: () => toast.error('Sync failed. Check the connection and try again.'),
+  })
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('exact_connected') === '1') {
+      toast.success('Exact Online connected successfully')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  async function handleConnect() {
+    try {
+      const { data } = await getExactAuthorizeUrl()
+      window.location.href = data.url
+    } catch {
+      toast.error('Could not get authorization URL')
+    }
+  }
+
+  if (!isAdmin) return null
+
+  const connected = statusData?.status === 'connected'
+  const broken = statusData?.status === 'unauthorized'
+
+  return (
+    <div className="row g-3 mt-0 mb-0">
+      <div className="col-12">
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <div>
+              <div className="dash-card-title">Exact Online Integration</div>
+              <div className="dash-card-sub">
+                {statusLoading
+                  ? 'Checking connection…'
+                  : connected
+                  ? 'Connected and ready to sync'
+                  : broken
+                  ? 'Token expired — reconnect to restore access'
+                  : 'Not connected'}
+              </div>
+            </div>
+
+            {!statusLoading && (
+              <div className="exact-status-badge-wrap">
+                <span
+                  className="exact-status-dot"
+                  style={{
+                    background: connected ? '#34d399' : broken ? '#f59e0b' : '#4e5068',
+                  }}
+                />
+                <span
+                  className="exact-status-label"
+                  style={{
+                    color: connected ? '#34d399' : broken ? '#f59e0b' : '#6b6e83',
+                  }}
+                >
+                  {connected ? 'Connected' : broken ? 'Token expired' : 'Disconnected'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="exact-actions">
+            <button
+              className="exact-btn exact-btn-outline"
+              disabled={connected && !broken}
+              onClick={handleConnect}
+            >
+              {connected ? (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Connected
+                </>
+              ) : (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  {broken ? 'Reconnect to Exact' : 'Connect to Exact'}
+                </>
+              )}
+            </button>
+
+            <button
+              className="exact-btn exact-btn-primary"
+              disabled={!connected || syncMutation.isPending}
+              onClick={() => syncMutation.mutate()}
+            >
+              {syncMutation.isPending ? (
+                <>
+                  <span
+                    className="spinner-border spinner-border-sm"
+                    role="status"
+                    aria-hidden="true"
+                    style={{ width: '12px', height: '12px', borderWidth: '2px' }}
+                  />
+                  Syncing…
+                </>
+              ) : (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                  Sync Products
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
@@ -171,7 +317,7 @@ export function DashboardPage() {
       </div>
 
       {/* Content row */}
-      <div className="row g-3">
+      <div className="row g-3 mb-4">
         {/* Revenue chart */}
         <div className="col-12 col-xl-8">
           <div className="dash-card">
@@ -256,6 +402,9 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Exact Online */}
+      <ExactOnlineSection />
     </div>
   )
 }
