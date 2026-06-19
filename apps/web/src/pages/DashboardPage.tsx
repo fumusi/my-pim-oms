@@ -297,18 +297,20 @@ export function DashboardPage() {
             icon={<ClipboardIcon />}
           />
         </div>
-        <div className="col-6 col-xl-3">
-          <StatCard
-            label="Registered Users"
-            value={isAdmin ? userCount : null}
-            note={isAdmin ? 'total accounts' : 'admin only'}
-            accentColor="#10b981"
-            accentBg="rgba(16, 185, 129, 0.14)"
-            icon={<UsersIcon />}
-            loading={isAdmin && usersLoading}
-            href={isAdmin ? '/users' : undefined}
-          />
-        </div>
+        {isAdmin && (
+          <div className="col-6 col-xl-3">
+            <StatCard
+              label="Registered Users"
+              value={userCount}
+              note="total accounts"
+              accentColor="#10b981"
+              accentBg="rgba(16, 185, 129, 0.14)"
+              icon={<UsersIcon />}
+              loading={usersLoading}
+              href="/users"
+            />
+          </div>
+        )}
         <div className="col-6 col-xl-3">
           <StatCard
             label="Low Stock Items"
