@@ -1,4 +1,12 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { useSelector } from 'react-redux'
+import { Link } from '@tanstack/react-router'
+import type { RootState } from '../store'
+import { getExactStatus, getExactAuthorizeUrl, startExactSync, getExactSyncStatus } from '../api/exact'
+import { getProducts } from '../api/products'
+import { getUsers } from '../api/admin'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -44,114 +52,232 @@ function AlertIcon() {
   )
 }
 
-function ArrowUp() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="12" y1="19" x2="12" y2="5" />
-      <polyline points="5 12 12 5 19 12" />
-    </svg>
-  )
-}
+// ── Stat card ─────────────────────────────────────────────────────────────────
 
-function ArrowDown() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <polyline points="19 12 12 19 5 12" />
-    </svg>
-  )
-}
-
-// ── Data ──────────────────────────────────────────────────────────────────────
-
-interface StatCardData {
+interface StatCardProps {
   label: string
-  value: string
-  trend: string
-  trendUp: boolean
-  trendNote: string
+  value: string | null
+  note: string
   accentColor: string
   accentBg: string
-  icon: ReactNode
+  icon: React.ReactNode
+  loading?: boolean
+  href?: string
 }
 
-const STATS: StatCardData[] = [
-  {
-    label: 'Total Products',
-    value: '1,284',
-    trend: '+8.2%',
-    trendUp: true,
-    trendNote: 'vs last month',
-    accentColor: '#7c3aed',
-    accentBg: 'rgba(124, 58, 237, 0.14)',
-    icon: <BoxIcon />,
-  },
-  {
-    label: 'Total Orders',
-    value: '348',
-    trend: '+14.5%',
-    trendUp: true,
-    trendNote: 'vs last month',
-    accentColor: '#3b82f6',
-    accentBg: 'rgba(59, 130, 246, 0.14)',
-    icon: <ClipboardIcon />,
-  },
-  {
-    label: 'Active Users',
-    value: '92',
-    trend: '+3.1%',
-    trendUp: true,
-    trendNote: 'vs last month',
-    accentColor: '#10b981',
-    accentBg: 'rgba(16, 185, 129, 0.14)',
-    icon: <UsersIcon />,
-  },
-  {
-    label: 'Low Stock Items',
-    value: '17',
-    trend: '+5',
-    trendUp: false,
-    trendNote: 'since yesterday',
-    accentColor: '#f59e0b',
-    accentBg: 'rgba(245, 158, 11, 0.14)',
-    icon: <AlertIcon />,
-  },
-]
-
-const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
-  Delivered:  { color: '#34d399', bg: 'rgba(52, 211, 153, 0.12)' },
-  Shipped:    { color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
-  Processing: { color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.12)' },
-  Pending:    { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.12)' },
-}
-
-const RECENT_ORDERS = [
-  { id: '#ORD-0348', customer: 'Alice Johnson', status: 'Shipped',    amount: '$142.00', date: 'Jun 17' },
-  { id: '#ORD-0347', customer: 'Bob Smith',     status: 'Processing', amount: '$89.99',  date: 'Jun 17' },
-  { id: '#ORD-0346', customer: 'Carol White',   status: 'Delivered',  amount: '$264.50', date: 'Jun 16' },
-  { id: '#ORD-0345', customer: 'David Brown',   status: 'Pending',    amount: '$38.00',  date: 'Jun 16' },
-  { id: '#ORD-0344', customer: 'Eva Green',     status: 'Shipped',    amount: '$195.00', date: 'Jun 15' },
-]
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-// ── Components ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, trend, trendUp, trendNote, accentColor, accentBg, icon }: StatCardData) {
-  return (
-    <div className="dash-stat-card">
+function StatCard({ label, value, note, accentColor, accentBg, icon, loading, href }: StatCardProps) {
+  const inner = (
+    <>
       <div className="dash-stat-top">
         <div className="dash-stat-icon" style={{ color: accentColor, background: accentBg }}>
           {icon}
         </div>
-        <div className={`dash-stat-trend${trendUp ? '' : ' dash-stat-trend--down'}`}>
-          {trendUp ? <ArrowUp /> : <ArrowDown />}
-          {trend}
+      </div>
+      <div className="dash-stat-value">
+        {loading ? (
+          <span className="spinner-border spinner-border-sm" style={{ width: '16px', height: '16px', borderWidth: '2px', color: accentColor }} role="status" />
+        ) : (
+          value ?? <span style={{ color: '#4e5068', fontSize: '1.1rem' }}>No data</span>
+        )}
+      </div>
+      <div className="dash-stat-label">{label}</div>
+      <div className="dash-stat-note">{note}</div>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link to={href} style={{ textDecoration: 'none' }}>
+        <div className="dash-stat-card dash-stat-card--link">{inner}</div>
+      </Link>
+    )
+  }
+
+  return <div className="dash-stat-card">{inner}</div>
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+function NoData({ message = 'No data available yet' }: { message?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '2.5rem 1rem', color: '#4e5068' }}>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span style={{ fontSize: '0.825rem' }}>{message}</span>
+    </div>
+  )
+}
+
+// ── Exact Online section ───────────────────────────────────────────────────────
+
+function ExactOnlineSection() {
+  const user = useSelector((s: RootState) => s.auth.user)
+  const isAdmin = user?.role === 'admin'
+  const queryClient = useQueryClient()
+  const prevSyncStatus = useRef<string | undefined>(undefined)
+
+  const { data: statusData, isLoading: statusLoading } = useQuery({
+    queryKey: ['exact-status'],
+    queryFn: () => getExactStatus().then((r) => r.data),
+    enabled: isAdmin,
+    staleTime: 15_000,
+  })
+
+  const { data: jobStatus } = useQuery({
+    queryKey: ['sync-job-status'],
+    queryFn: () => getExactSyncStatus().then((r) => r.data),
+    enabled: isAdmin,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' ? 1500 : false,
+  })
+
+  useEffect(() => {
+    const prev = prevSyncStatus.current
+    prevSyncStatus.current = jobStatus?.status
+    if (prev !== 'running') return
+
+    if (jobStatus?.status === 'done') {
+      toast.success(
+        `Synced ${jobStatus.result.synced} products — ${jobStatus.result.created} created, ${jobStatus.result.updated} updated`,
+      )
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
+      void queryClient.invalidateQueries({ queryKey: ['product-count'] })
+    } else if (jobStatus?.status === 'error') {
+      toast.error(`Sync failed: ${jobStatus.error}`)
+    }
+  }, [jobStatus?.status, queryClient])
+
+  const syncMutation = useMutation({
+    mutationFn: () => startExactSync().then((r) => r.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['sync-job-status'] })
+    },
+    onError: () => toast.error('Could not start sync. Check the connection and try again.'),
+  })
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('exact_connected') === '1') {
+      toast.success('Exact Online connected successfully')
+    } else if (params.get('exact_error') === 'missing_code') {
+      toast.error('Exact Online authorization failed: no code received')
+    } else if (params.get('exact_error') === 'invalid_state') {
+      toast.error('Exact Online authorization failed: invalid or expired state — please try again')
+    }
+    if (params.has('exact_connected') || params.has('exact_error')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  async function handleConnect() {
+    try {
+      const { data } = await getExactAuthorizeUrl()
+      window.location.href = data.url
+    } catch {
+      toast.error('Could not get authorization URL')
+    }
+  }
+
+  if (!isAdmin) return null
+
+  const connected = statusData?.status === 'connected'
+  const broken = statusData?.status === 'unauthorized'
+  const canConnect = !connected || broken
+
+  return (
+    <div className="row g-3 mt-0 mb-0">
+      <div className="col-12">
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <div>
+              <div className="dash-card-title">Exact Online Integration</div>
+              <div className="dash-card-sub">
+                {statusLoading
+                  ? 'Checking connection…'
+                  : connected
+                  ? 'Connected and ready to sync'
+                  : broken
+                  ? 'Token expired — reconnect to restore access'
+                  : 'Not connected'}
+              </div>
+            </div>
+
+            {!statusLoading && (
+              <div className="exact-status-badge-wrap">
+                <span
+                  className="exact-status-dot"
+                  style={{
+                    background: connected ? '#34d399' : broken ? '#f59e0b' : '#4e5068',
+                  }}
+                />
+                <span
+                  className="exact-status-label"
+                  style={{
+                    color: connected ? '#34d399' : broken ? '#f59e0b' : '#6b6e83',
+                  }}
+                >
+                  {connected ? 'Connected' : broken ? 'Token expired' : 'Disconnected'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="exact-actions">
+            <button
+              className="exact-btn exact-btn-outline"
+              disabled={!canConnect}
+              onClick={handleConnect}
+            >
+              {connected ? (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Connected
+                </>
+              ) : (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  {broken ? 'Reconnect to Exact' : 'Connect to Exact'}
+                </>
+              )}
+            </button>
+
+            <button
+              className="exact-btn exact-btn-primary"
+              disabled={!connected || syncMutation.isPending || jobStatus?.status === 'running'}
+              onClick={() => syncMutation.mutate()}
+            >
+              {syncMutation.isPending || jobStatus?.status === 'running' ? (
+                <>
+                  <span
+                    className="spinner-border spinner-border-sm"
+                    role="status"
+                    aria-hidden="true"
+                    style={{ width: '12px', height: '12px', borderWidth: '2px' }}
+                  />
+                  Syncing…
+                </>
+              ) : (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                  Sync Products
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
-      <div className="dash-stat-value">{value}</div>
-      <div className="dash-stat-label">{label}</div>
-      <div className="dash-stat-note">{trendNote}</div>
     </div>
   )
 }
@@ -159,19 +285,77 @@ function StatCard({ label, value, trend, trendUp, trendNote, accentColor, accent
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
+  const user = useSelector((s: RootState) => s.auth.user)
+  const isAdmin = user?.role === 'admin'
+
+  const { data: productsPage, isLoading: productsLoading } = useQuery({
+    queryKey: ['product-count'],
+    queryFn: () => getProducts(1, 1).then((r) => r.data),
+  })
+
+  const { data: usersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['admin-users-count'],
+    queryFn: () => getUsers(1, 1).then((r) => r.data),
+    enabled: isAdmin,
+  })
+
+  const productCount = productsPage != null ? String(productsPage.meta.total) : null
+  const userCount = usersData != null ? String(usersData.meta.total) : null
+
   return (
     <div>
       {/* Stat cards */}
       <div className="row g-3 mb-4">
-        {STATS.map((s) => (
-          <div key={s.label} className="col-6 col-xl-3">
-            <StatCard {...s} />
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Total Products"
+            value={productCount}
+            note="synced from Exact Online"
+            accentColor="#7c3aed"
+            accentBg="rgba(124, 58, 237, 0.14)"
+            icon={<BoxIcon />}
+            loading={productsLoading}
+            href="/products"
+          />
+        </div>
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Total Orders"
+            value={null}
+            note="coming soon"
+            accentColor="#3b82f6"
+            accentBg="rgba(59, 130, 246, 0.14)"
+            icon={<ClipboardIcon />}
+          />
+        </div>
+        {isAdmin && (
+          <div className="col-6 col-xl-3">
+            <StatCard
+              label="Registered Users"
+              value={userCount}
+              note="total accounts"
+              accentColor="#10b981"
+              accentBg="rgba(16, 185, 129, 0.14)"
+              icon={<UsersIcon />}
+              loading={usersLoading}
+              href="/users"
+            />
           </div>
-        ))}
+        )}
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Low Stock Items"
+            value={null}
+            note="coming soon"
+            accentColor="#f59e0b"
+            accentBg="rgba(245, 158, 11, 0.14)"
+            icon={<AlertIcon />}
+          />
+        </div>
       </div>
 
       {/* Content row */}
-      <div className="row g-3">
+      <div className="row g-3 mb-4">
         {/* Revenue chart */}
         <div className="col-12 col-xl-8">
           <div className="dash-card">
@@ -180,47 +364,8 @@ export function DashboardPage() {
                 <div className="dash-card-title">Revenue Overview</div>
                 <div className="dash-card-sub">Monthly revenue — last 12 months</div>
               </div>
-              <span className="dash-badge-pill">Placeholder</span>
             </div>
-
-            <div className="dash-chart-area">
-              <svg
-                viewBox="0 0 600 160"
-                preserveAspectRatio="none"
-                className="dash-chart-svg"
-                aria-label="Revenue overview chart placeholder"
-              >
-                <defs>
-                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {[40, 80, 120].map((y) => (
-                  <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                ))}
-                <path
-                  d="M0,135 C50,125 80,75 120,62 S195,92 240,78 S315,32 360,42 S435,82 480,67 S555,47 600,28 L600,160 L0,160 Z"
-                  fill="url(#chartGrad)"
-                />
-                <path
-                  d="M0,135 C50,125 80,75 120,62 S195,92 240,78 S315,32 360,42 S435,82 480,67 S555,47 600,28"
-                  fill="none"
-                  stroke="#7c3aed"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                {([[120,62],[240,78],[360,42],[480,67],[600,28]] as [number,number][]).map(([cx, cy]) => (
-                  <circle key={cx} cx={cx} cy={cy} r="3.5" fill="#7c3aed" />
-                ))}
-              </svg>
-
-              <div className="dash-chart-labels">
-                {MONTHS.map((m) => (
-                  <span key={m}>{m}</span>
-                ))}
-              </div>
-            </div>
+            <NoData message="Revenue data not available yet" />
           </div>
         </div>
 
@@ -230,32 +375,16 @@ export function DashboardPage() {
             <div className="dash-card-header">
               <div>
                 <div className="dash-card-title">Recent Orders</div>
-                <div className="dash-card-sub">Last 5 orders</div>
+                <div className="dash-card-sub">Latest activity</div>
               </div>
             </div>
-
-            <div className="dash-order-list">
-              {RECENT_ORDERS.map((o) => {
-                const s = STATUS_STYLE[o.status] ?? STATUS_STYLE.Pending
-                return (
-                  <div key={o.id} className="dash-order-row">
-                    <div className="dash-order-info">
-                      <span className="dash-order-id">{o.id}</span>
-                      <span className="dash-order-customer">{o.customer}</span>
-                    </div>
-                    <div className="dash-order-right">
-                      <span className="dash-order-badge" style={{ color: s.color, background: s.bg }}>
-                        {o.status}
-                      </span>
-                      <span className="dash-order-amount">{o.amount}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <NoData message="No orders yet" />
           </div>
         </div>
       </div>
+
+      {/* Exact Online */}
+      <ExactOnlineSection />
     </div>
   )
 }
