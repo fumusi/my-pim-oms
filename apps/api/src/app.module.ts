@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { RedisModule } from './redis/redis.module';
     UsersModule,
     ExactModule,
     ProductsModule,
+    CategoriesModule,
     HealthModule,
   ],
   providers: [

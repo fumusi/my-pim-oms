@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { ExactItemGroup } from './exact-item-group.entity';
+import { Category } from '../../categories/entities/category.entity';
 import { decimalTransformer } from '../../database/transformers/transformers';
 
 @Entity('exact_items')
@@ -85,6 +86,10 @@ export class ExactItem {
   @ManyToOne(() => ExactItemGroup, (group) => group.items, { nullable: true })
   @JoinColumn({ name: 'item_group_id' })
   itemGroup!: ExactItemGroup | null;
+
+  @ManyToOne(() => Category, (cat) => cat.products, { nullable: true })
+  @JoinColumn({ name: 'category_id' })
+  category!: Category | null;
 
   @Column({ nullable: true, type: 'varchar', name: 'item_group_code' })
   itemGroupCode!: string | null;
