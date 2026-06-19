@@ -144,6 +144,7 @@ function ExactOnlineSection() {
         `Synced ${jobStatus.result.synced} products — ${jobStatus.result.created} created, ${jobStatus.result.updated} updated`,
       )
       void queryClient.invalidateQueries({ queryKey: ['products'] })
+      void queryClient.invalidateQueries({ queryKey: ['product-count'] })
     } else if (jobStatus?.status === 'error') {
       toast.error(`Sync failed: ${jobStatus.error}`)
     }
@@ -161,6 +162,12 @@ function ExactOnlineSection() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('exact_connected') === '1') {
       toast.success('Exact Online connected successfully')
+    } else if (params.get('exact_error') === 'missing_code') {
+      toast.error('Exact Online authorization failed: no code received')
+    } else if (params.get('exact_error') === 'invalid_state') {
+      toast.error('Exact Online authorization failed: invalid or expired state — please try again')
+    }
+    if (params.has('exact_connected') || params.has('exact_error')) {
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
