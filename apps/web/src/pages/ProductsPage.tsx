@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getProducts } from '../api/products'
+
+const PAGE_SIZE = 20
 
 function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
   if (isSalesItem === null) {
@@ -12,6 +15,8 @@ function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
 }
 
 export function ProductsPage() {
+  const [page, setPage] = useState(1)
+
   const { data: products, isLoading, isError } = useQuery({
     queryKey: ['products'],
     queryFn: () => getProducts().then((r) => r.data),
@@ -47,6 +52,9 @@ export function ProductsPage() {
     )
   }
 
+  const totalPages = Math.ceil(products.length / PAGE_SIZE)
+  const paginated = products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <div className="dash-card">
       <div className="dash-card-header">
@@ -60,6 +68,7 @@ export function ProductsPage() {
         <table className="users-table">
           <thead>
             <tr>
+              <th>#</th>
               <th>Name</th>
               <th>SKU</th>
               <th>Category</th>
@@ -67,8 +76,9 @@ export function ProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {products.map((p) => (
+            {paginated.map((p, i) => (
               <tr key={p.id}>
+                <td className="users-td-muted">{(page - 1) * PAGE_SIZE + i + 1}</td>
                 <td>{p.description ?? <span className="users-td-muted">—</span>}</td>
                 <td className="users-td-muted">{p.code ?? '—'}</td>
                 <td className="users-td-muted">
@@ -82,6 +92,30 @@ export function ProductsPage() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="users-pagination">
+          <span className="users-pagination-info">
+            Page {page} of {totalPages}
+          </span>
+          <div className="users-pagination-btns">
+            <button
+              className="users-pg-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              ‹ Prev
+            </button>
+            <button
+              className="users-pg-btn"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

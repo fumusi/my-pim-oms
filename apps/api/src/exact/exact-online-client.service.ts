@@ -24,10 +24,14 @@ export class ExactOnlineClientService {
     initialPath: string,
     onPage: (items: T[]) => Promise<void> | void,
     delayMs = 150,
+    maxPages?: number,
   ): Promise<void> {
     let nextUrl: string | undefined = initialPath;
+    let page = 0;
 
     while (nextUrl) {
+      if (maxPages !== undefined && page >= maxPages) break;
+      page++;
       const currentUrl = nextUrl;
       const resolvedUrl = this.resolveUrl(currentUrl);
 
@@ -51,6 +55,7 @@ export class ExactOnlineClientService {
           const remaining = parseInt(String(headers['x-ratelimit-remaining'] ?? '60'));
 
           nextUrl = response.data.d?.__next;
+          this.logger.debug(`forEachPage page ${page}: got ${response.data.d?.results?.length ?? 0} items, __next = ${nextUrl ?? 'none'}`);
 
           if (nextUrl) {
             if (remaining <= 2) {

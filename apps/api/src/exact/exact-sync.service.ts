@@ -5,10 +5,10 @@ import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
 import { mapItem, mapItemGroup } from './mappers/item.mapper';
-import { ODataResponse, ExactItemResponse, ExactItemGroupResponse, SyncSummary } from './types';
+import { ExactItemResponse, ExactItemGroupResponse, SyncSummary } from './types';
 
-const MAX_ITEM_PAGES = 3;
 const PAGE_SIZE = 100;
+const MAX_ITEM_PAGES = 3;
 
 @Injectable()
 export class ExactSyncService {
@@ -26,19 +26,14 @@ export class ExactSyncService {
   }
 
   private async syncItemGroups(): Promise<void> {
-    for (let page = 0; ; page++) {
-      const skip = page * PAGE_SIZE;
-      const data = await this.client.get<ODataResponse<ExactItemGroupResponse>>(
-        `logistics/ItemGroups?$top=${PAGE_SIZE}&$skip=${skip}`,
-      );
-      const groups = data.d?.results ?? [];
-      if (groups.length === 0) break;
-
-      const entities = groups.map((g) => this.itemGroupRepo.create(mapItemGroup(g) as ExactItemGroup));
-      await this.itemGroupRepo.save(entities, { chunk: 50 });
-
-      if (groups.length < PAGE_SIZE) break;
-    }
+    await this.client.forEachPage<ExactItemGroupResponse>(
+      `logistics/ItemGroups?$top=${PAGE_SIZE}`,
+      async (groups) => {
+        if (groups.length === 0) return;
+        const entities = groups.map((g) => this.itemGroupRepo.create(mapItemGroup(g) as ExactItemGroup));
+        await this.itemGroupRepo.save(entities, { chunk: 50 });
+      },
+    );
   }
 
   private async syncItems(): Promise<SyncSummary> {
@@ -50,25 +45,23 @@ export class ExactSyncService {
     let created = 0;
     let updated = 0;
 
-    for (let page = 0; page < MAX_ITEM_PAGES; page++) {
-      const skip = page * PAGE_SIZE;
-      const data = await this.client.get<ODataResponse<ExactItemResponse>>(
-        `logistics/Items?$top=${PAGE_SIZE}&$skip=${skip}`,
-      );
-      const items = data.d?.results ?? [];
-      if (items.length === 0) break;
+    await this.client.forEachPage<ExactItemResponse>(
+      `logistics/Items?$top=${PAGE_SIZE}`,
+      async (items) => {
+        if (items.length === 0) return;
 
-      for (const item of items) {
-        synced++;
-        if (existingIds.has(item.ID)) updated++;
-        else created++;
-      }
+        for (const item of items) {
+          synced++;
+          if (existingIds.has(item.ID)) updated++;
+          else created++;
+        }
 
-      const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
-      await this.itemRepo.save(entities, { chunk: 50 });
-
-      if (items.length < PAGE_SIZE) break;
-    }
+        const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
+        await this.itemRepo.save(entities, { chunk: 50 });
+      },
+      150,
+      MAX_ITEM_PAGES,
+    );
 
     return { synced, created, updated };
   }

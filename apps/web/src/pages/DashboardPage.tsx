@@ -2,9 +2,11 @@ import { useEffect } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
-import type { ReactNode } from 'react'
+import { Link } from '@tanstack/react-router'
 import type { RootState } from '../store'
 import { getExactStatus, getExactAuthorizeUrl, syncExactProducts } from '../api/exact'
+import { getProducts } from '../api/products'
+import { getUsers } from '../api/admin'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -50,114 +52,61 @@ function AlertIcon() {
   )
 }
 
-function ArrowUp() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="12" y1="19" x2="12" y2="5" />
-      <polyline points="5 12 12 5 19 12" />
-    </svg>
-  )
-}
+// ── Stat card ─────────────────────────────────────────────────────────────────
 
-function ArrowDown() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <polyline points="19 12 12 19 5 12" />
-    </svg>
-  )
-}
-
-// ── Data ──────────────────────────────────────────────────────────────────────
-
-interface StatCardData {
+interface StatCardProps {
   label: string
-  value: string
-  trend: string
-  trendUp: boolean
-  trendNote: string
+  value: string | null
+  note: string
   accentColor: string
   accentBg: string
-  icon: ReactNode
+  icon: React.ReactNode
+  loading?: boolean
+  href?: string
 }
 
-const STATS: StatCardData[] = [
-  {
-    label: 'Total Products',
-    value: '1,284',
-    trend: '+8.2%',
-    trendUp: true,
-    trendNote: 'vs last month',
-    accentColor: '#7c3aed',
-    accentBg: 'rgba(124, 58, 237, 0.14)',
-    icon: <BoxIcon />,
-  },
-  {
-    label: 'Total Orders',
-    value: '348',
-    trend: '+14.5%',
-    trendUp: true,
-    trendNote: 'vs last month',
-    accentColor: '#3b82f6',
-    accentBg: 'rgba(59, 130, 246, 0.14)',
-    icon: <ClipboardIcon />,
-  },
-  {
-    label: 'Active Users',
-    value: '92',
-    trend: '+3.1%',
-    trendUp: true,
-    trendNote: 'vs last month',
-    accentColor: '#10b981',
-    accentBg: 'rgba(16, 185, 129, 0.14)',
-    icon: <UsersIcon />,
-  },
-  {
-    label: 'Low Stock Items',
-    value: '17',
-    trend: '+5',
-    trendUp: false,
-    trendNote: 'since yesterday',
-    accentColor: '#f59e0b',
-    accentBg: 'rgba(245, 158, 11, 0.14)',
-    icon: <AlertIcon />,
-  },
-]
-
-const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
-  Delivered:  { color: '#34d399', bg: 'rgba(52, 211, 153, 0.12)' },
-  Shipped:    { color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.12)' },
-  Processing: { color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.12)' },
-  Pending:    { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.12)' },
-}
-
-const RECENT_ORDERS = [
-  { id: '#ORD-0348', customer: 'Alice Johnson', status: 'Shipped',    amount: '$142.00', date: 'Jun 17' },
-  { id: '#ORD-0347', customer: 'Bob Smith',     status: 'Processing', amount: '$89.99',  date: 'Jun 17' },
-  { id: '#ORD-0346', customer: 'Carol White',   status: 'Delivered',  amount: '$264.50', date: 'Jun 16' },
-  { id: '#ORD-0345', customer: 'David Brown',   status: 'Pending',    amount: '$38.00',  date: 'Jun 16' },
-  { id: '#ORD-0344', customer: 'Eva Green',     status: 'Shipped',    amount: '$195.00', date: 'Jun 15' },
-]
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-// ── Components ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, trend, trendUp, trendNote, accentColor, accentBg, icon }: StatCardData) {
-  return (
-    <div className="dash-stat-card">
+function StatCard({ label, value, note, accentColor, accentBg, icon, loading, href }: StatCardProps) {
+  const inner = (
+    <>
       <div className="dash-stat-top">
         <div className="dash-stat-icon" style={{ color: accentColor, background: accentBg }}>
           {icon}
         </div>
-        <div className={`dash-stat-trend${trendUp ? '' : ' dash-stat-trend--down'}`}>
-          {trendUp ? <ArrowUp /> : <ArrowDown />}
-          {trend}
-        </div>
       </div>
-      <div className="dash-stat-value">{value}</div>
+      <div className="dash-stat-value">
+        {loading ? (
+          <span className="spinner-border spinner-border-sm" style={{ width: '16px', height: '16px', borderWidth: '2px', color: accentColor }} role="status" />
+        ) : (
+          value ?? <span style={{ color: '#4e5068', fontSize: '1.1rem' }}>No data</span>
+        )}
+      </div>
       <div className="dash-stat-label">{label}</div>
-      <div className="dash-stat-note">{trendNote}</div>
+      <div className="dash-stat-note">{note}</div>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link to={href} style={{ textDecoration: 'none' }}>
+        <div className="dash-stat-card dash-stat-card--link">{inner}</div>
+      </Link>
+    )
+  }
+
+  return <div className="dash-stat-card">{inner}</div>
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+function NoData({ message = 'No data available yet' }: { message?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '2.5rem 1rem', color: '#4e5068' }}>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span style={{ fontSize: '0.825rem' }}>{message}</span>
     </div>
   )
 }
@@ -305,15 +254,71 @@ function ExactOnlineSection() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
+  const user = useSelector((s: RootState) => s.auth.user)
+  const isAdmin = user?.role === 'admin'
+
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => getProducts().then((r) => r.data),
+  })
+
+  const { data: usersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['admin-users-count'],
+    queryFn: () => getUsers(1, 1).then((r) => r.data),
+    enabled: isAdmin,
+  })
+
+  const productCount = products != null ? String(products.length) : null
+  const userCount = usersData != null ? String(usersData.meta.total) : null
+
   return (
     <div>
       {/* Stat cards */}
       <div className="row g-3 mb-4">
-        {STATS.map((s) => (
-          <div key={s.label} className="col-6 col-xl-3">
-            <StatCard {...s} />
-          </div>
-        ))}
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Total Products"
+            value={productCount}
+            note="synced from Exact Online"
+            accentColor="#7c3aed"
+            accentBg="rgba(124, 58, 237, 0.14)"
+            icon={<BoxIcon />}
+            loading={productsLoading}
+            href="/products"
+          />
+        </div>
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Total Orders"
+            value={null}
+            note="coming soon"
+            accentColor="#3b82f6"
+            accentBg="rgba(59, 130, 246, 0.14)"
+            icon={<ClipboardIcon />}
+          />
+        </div>
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Registered Users"
+            value={isAdmin ? userCount : null}
+            note={isAdmin ? 'total accounts' : 'admin only'}
+            accentColor="#10b981"
+            accentBg="rgba(16, 185, 129, 0.14)"
+            icon={<UsersIcon />}
+            loading={isAdmin && usersLoading}
+            href={isAdmin ? '/users' : undefined}
+          />
+        </div>
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Low Stock Items"
+            value={null}
+            note="coming soon"
+            accentColor="#f59e0b"
+            accentBg="rgba(245, 158, 11, 0.14)"
+            icon={<AlertIcon />}
+          />
+        </div>
       </div>
 
       {/* Content row */}
@@ -326,47 +331,8 @@ export function DashboardPage() {
                 <div className="dash-card-title">Revenue Overview</div>
                 <div className="dash-card-sub">Monthly revenue — last 12 months</div>
               </div>
-              <span className="dash-badge-pill">Placeholder</span>
             </div>
-
-            <div className="dash-chart-area">
-              <svg
-                viewBox="0 0 600 160"
-                preserveAspectRatio="none"
-                className="dash-chart-svg"
-                aria-label="Revenue overview chart placeholder"
-              >
-                <defs>
-                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {[40, 80, 120].map((y) => (
-                  <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-                ))}
-                <path
-                  d="M0,135 C50,125 80,75 120,62 S195,92 240,78 S315,32 360,42 S435,82 480,67 S555,47 600,28 L600,160 L0,160 Z"
-                  fill="url(#chartGrad)"
-                />
-                <path
-                  d="M0,135 C50,125 80,75 120,62 S195,92 240,78 S315,32 360,42 S435,82 480,67 S555,47 600,28"
-                  fill="none"
-                  stroke="#7c3aed"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                {([[120,62],[240,78],[360,42],[480,67],[600,28]] as [number,number][]).map(([cx, cy]) => (
-                  <circle key={cx} cx={cx} cy={cy} r="3.5" fill="#7c3aed" />
-                ))}
-              </svg>
-
-              <div className="dash-chart-labels">
-                {MONTHS.map((m) => (
-                  <span key={m}>{m}</span>
-                ))}
-              </div>
-            </div>
+            <NoData message="Revenue data not available yet" />
           </div>
         </div>
 
@@ -376,29 +342,10 @@ export function DashboardPage() {
             <div className="dash-card-header">
               <div>
                 <div className="dash-card-title">Recent Orders</div>
-                <div className="dash-card-sub">Last 5 orders</div>
+                <div className="dash-card-sub">Latest activity</div>
               </div>
             </div>
-
-            <div className="dash-order-list">
-              {RECENT_ORDERS.map((o) => {
-                const s = STATUS_STYLE[o.status] ?? STATUS_STYLE.Pending
-                return (
-                  <div key={o.id} className="dash-order-row">
-                    <div className="dash-order-info">
-                      <span className="dash-order-id">{o.id}</span>
-                      <span className="dash-order-customer">{o.customer}</span>
-                    </div>
-                    <div className="dash-order-right">
-                      <span className="dash-order-badge" style={{ color: s.color, background: s.bg }}>
-                        {o.status}
-                      </span>
-                      <span className="dash-order-amount">{o.amount}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <NoData message="No orders yet" />
           </div>
         </div>
       </div>

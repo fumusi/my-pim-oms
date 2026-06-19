@@ -543,6 +543,16 @@ body {
   padding: 1.125rem 1.25rem;
 }
 
+.dash-stat-card--link {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dash-stat-card--link:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  background: #1a1b2e;
+}
+
 .dash-stat-top {
   display: flex;
   align-items: flex-start;
