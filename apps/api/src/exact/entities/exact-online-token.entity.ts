@@ -12,10 +12,10 @@ export class ExactOnlineToken {
   id!: number;
 
   @Column({ name: 'access_token', type: 'text' })
-  access_token!: string;
+  accessToken!: string;
 
   @Column({ name: 'refresh_token', type: 'text' })
-  refresh_token!: string;
+  refreshToken!: string;
 
   @Column({
     name: 'expires_at',
@@ -25,11 +25,11 @@ export class ExactOnlineToken {
       from: (value: string) => Number(value),
     },
   })
-  expires_at!: number;
+  expiresAt!: number;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
-  created_at!: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
-  updated_at!: Date;
+  updatedAt!: Date;
 }

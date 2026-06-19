@@ -7,6 +7,7 @@ import { ExactItemGroup } from './entities/exact-item-group.entity';
 import { ExactOnlineAuthService } from './exact-online-auth.service';
 import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactSyncService } from './exact-sync.service';
+import { ItemsService } from './items.service';
 import { ExactController } from './exact.controller';
 
 @Module({
@@ -15,7 +16,7 @@ import { ExactController } from './exact.controller';
     TypeOrmModule.forFeature([ExactOnlineToken, ExactItem, ExactItemGroup]),
   ],
   controllers: [ExactController],
-  providers: [ExactOnlineAuthService, ExactOnlineClientService, ExactSyncService],
-  exports: [ExactOnlineAuthService, ExactSyncService],
+  providers: [ExactOnlineAuthService, ExactOnlineClientService, ExactSyncService, ItemsService],
+  exports: [ExactOnlineAuthService, ExactSyncService, ItemsService],
 })
 export class ExactModule {}

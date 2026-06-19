@@ -25,11 +25,11 @@ export class ExactItem {
   @Column({ nullable: true, type: 'varchar', name: 'cost_price_currency' })
   costPriceCurrency!: string | null;
 
-  @Column({ type: 'smallint', nullable: true, name: 'is_batch_number_item' })
-  isBatchNumberItem!: number | null;
+  @Column({ type: 'boolean', nullable: true, name: 'is_batch_number_item' })
+  isBatchNumberItem!: boolean | null;
 
-  @Column({ type: 'smallint', nullable: true, name: 'is_batch_item' })
-  isBatchItem!: number | null;
+  @Column({ type: 'boolean', nullable: true, name: 'is_batch_item' })
+  isBatchItem!: boolean | null;
 
   @Column({ nullable: true, type: 'boolean', name: 'is_fraction_allowed_item' })
   isFractionAllowedItem!: boolean | null;
@@ -49,11 +49,11 @@ export class ExactItem {
   @Column({ nullable: true, type: 'boolean', name: 'is_stock_item' })
   isStockItem!: boolean | null;
 
-  @Column({ type: 'smallint', nullable: true, name: 'is_webshop_item' })
-  isWebshopItem!: number | null;
+  @Column({ type: 'boolean', nullable: true, name: 'is_webshop_item' })
+  isWebshopItem!: boolean | null;
 
-  @Column({ type: 'smallint', nullable: true, name: 'is_serial_number_item' })
-  isSerialNumberItem!: number | null;
+  @Column({ type: 'boolean', nullable: true, name: 'is_serial_number_item' })
+  isSerialNumberItem!: boolean | null;
 
   @Column({ nullable: true, type: 'boolean', name: 'is_taxable_item' })
   isTaxableItem!: boolean | null;

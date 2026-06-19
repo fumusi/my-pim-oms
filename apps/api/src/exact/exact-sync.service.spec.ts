@@ -4,7 +4,7 @@ import { ExactSyncService } from './exact-sync.service';
 import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
-import type { ExactItemResponse, ExactItemGroupResponse, ODataResponse } from './types';
+import type { ExactItemResponse, ExactItemGroupResponse } from './types';
 
 const makeItemResponse = (id: string, overrides: Partial<ExactItemResponse> = {}): ExactItemResponse => ({
   ID: id,
@@ -77,23 +77,30 @@ const makeGroupResponse = (id: string): ExactItemGroupResponse => ({
   Modified: null,
 });
 
-const odataPage = <T>(results: T[]): ODataResponse<T> => ({
-  d: { results, __next: undefined },
-});
-
 type ForEachPageCallback<T> = (items: T[]) => Promise<void> | void;
+
+// Dispatches forEachPage calls to the right fixture based on the URL path.
+function makeForEachPageMock(
+  groupItems: ExactItemGroupResponse[],
+  productItems: ExactItemResponse[],
+) {
+  return async (path: string, onPage: ForEachPageCallback<unknown>) => {
+    if (path.includes('ItemGroups')) {
+      await onPage(groupItems);
+    } else {
+      await onPage(productItems);
+    }
+  };
+}
 
 describe('ExactSyncService', () => {
   let service: ExactSyncService;
-  let client: { get: jest.Mock; forEachPage: jest.Mock };
+  let client: { forEachPage: jest.Mock };
   let itemRepo: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
   let itemGroupRepo: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
-    client = {
-      get: jest.fn(),
-      forEachPage: jest.fn(),
-    };
+    client = { forEachPage: jest.fn() };
     itemRepo = {
       find: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockImplementation((data) => data),
@@ -120,14 +127,12 @@ describe('ExactSyncService', () => {
   describe('syncProducts', () => {
     it('returns summary with correct created/updated counts', async () => {
       itemRepo.find.mockResolvedValue([{ id: 'item-1' }]);
-
-      // groups sync via forEachPage
-      client.forEachPage.mockImplementation(async (_path: string, onPage: ForEachPageCallback<unknown>) => {
-        await onPage([makeGroupResponse('grp-1')]);
-      });
-      // items sync via get ($skip pages)
-      client.get
-        .mockResolvedValueOnce(odataPage([makeItemResponse('item-1'), makeItemResponse('item-2')]));
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock(
+          [makeGroupResponse('grp-1')],
+          [makeItemResponse('item-1'), makeItemResponse('item-2')],
+        ),
+      );
 
       const result = await service.syncProducts();
 
@@ -138,47 +143,41 @@ describe('ExactSyncService', () => {
 
     it('syncs item groups before items (FK dependency)', async () => {
       const callOrder: string[] = [];
-
-      client.forEachPage.mockImplementation(async (path: string, onPage: ForEachPageCallback<unknown>) => {
+      client.forEachPage.mockImplementation(async (path: string) => {
         callOrder.push(path.includes('ItemGroups') ? 'groups' : 'items');
-        await onPage([]);
       });
-      client.get.mockResolvedValue(odataPage([]));
 
       await service.syncProducts();
 
       expect(callOrder[0]).toBe('groups');
+      expect(callOrder[1]).toBe('items');
     });
 
-    it('stops item sync after MAX_ITEM_PAGES (3) even if more pages exist', async () => {
-      const fullPage = Array.from({ length: 100 }, (_, i) => makeItemResponse(`item-${i}`));
-
+    it('passes MAX_ITEM_PAGES cap (3) to forEachPage for items', async () => {
       client.forEachPage.mockResolvedValue(undefined);
-      client.get.mockResolvedValue(odataPage(fullPage));
 
       await service.syncProducts();
 
-      const itemCalls = client.get.mock.calls.filter((args: string[]) =>
-        args[0].includes('Items?'),
+      const itemCall = client.forEachPage.mock.calls.find(([path]: [string]) =>
+        path.includes('Items?'),
       );
-      expect(itemCalls.length).toBe(3);
+      expect(itemCall?.[3]).toBe(3);
     });
 
-    it('stops early when a partial page is returned', async () => {
-      const partialPage = [makeItemResponse('item-a'), makeItemResponse('item-b')];
-
-      client.forEachPage.mockResolvedValue(undefined);
-      client.get.mockResolvedValueOnce(odataPage(partialPage));
+    it('handles empty page responses gracefully', async () => {
+      client.forEachPage.mockImplementation(makeForEachPageMock([], []));
 
       const result = await service.syncProducts();
 
-      expect(result.synced).toBe(2);
-      expect(client.get).toHaveBeenCalledTimes(1);
+      expect(result.synced).toBe(0);
+      expect(result.created).toBe(0);
+      expect(result.updated).toBe(0);
     });
 
     it('upserts items via itemRepo.save', async () => {
-      client.forEachPage.mockResolvedValue(undefined);
-      client.get.mockResolvedValueOnce(odataPage([makeItemResponse('item-x')]));
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [makeItemResponse('item-x')]),
+      );
 
       await service.syncProducts();
 
@@ -187,9 +186,8 @@ describe('ExactSyncService', () => {
 
     it('returns all-created summary when no prior items exist', async () => {
       itemRepo.find.mockResolvedValue([]);
-      client.forEachPage.mockResolvedValue(undefined);
-      client.get.mockResolvedValueOnce(
-        odataPage([makeItemResponse('a'), makeItemResponse('b'), makeItemResponse('c')]),
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [makeItemResponse('a'), makeItemResponse('b'), makeItemResponse('c')]),
       );
 
       const result = await service.syncProducts();

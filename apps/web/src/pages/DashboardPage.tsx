@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
 import { Link } from '@tanstack/react-router'
 import type { RootState } from '../store'
-import { getExactStatus, getExactAuthorizeUrl, syncExactProducts } from '../api/exact'
+import { getExactStatus, getExactAuthorizeUrl, startExactSync, getExactSyncStatus } from '../api/exact'
 import { getProducts } from '../api/products'
 import { getUsers } from '../api/admin'
 
@@ -116,6 +116,8 @@ function NoData({ message = 'No data available yet' }: { message?: string }) {
 function ExactOnlineSection() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
+  const queryClient = useQueryClient()
+  const prevSyncStatus = useRef<string | undefined>(undefined)
 
   const { data: statusData, isLoading: statusLoading } = useQuery({
     queryKey: ['exact-status'],
@@ -124,14 +126,35 @@ function ExactOnlineSection() {
     staleTime: 15_000,
   })
 
-  const syncMutation = useMutation({
-    mutationFn: () => syncExactProducts().then((r) => r.data),
-    onSuccess: (data) => {
+  const { data: jobStatus } = useQuery({
+    queryKey: ['sync-job-status'],
+    queryFn: () => getExactSyncStatus().then((r) => r.data),
+    enabled: isAdmin,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' ? 1500 : false,
+  })
+
+  useEffect(() => {
+    const prev = prevSyncStatus.current
+    prevSyncStatus.current = jobStatus?.status
+    if (prev !== 'running') return
+
+    if (jobStatus?.status === 'done') {
       toast.success(
-        `Synced ${data.synced} products — ${data.created} created, ${data.updated} updated`,
+        `Synced ${jobStatus.result.synced} products — ${jobStatus.result.created} created, ${jobStatus.result.updated} updated`,
       )
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
+    } else if (jobStatus?.status === 'error') {
+      toast.error(`Sync failed: ${jobStatus.error}`)
+    }
+  }, [jobStatus?.status, queryClient])
+
+  const syncMutation = useMutation({
+    mutationFn: () => startExactSync().then((r) => r.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['sync-job-status'] })
     },
-    onError: () => toast.error('Sync failed. Check the connection and try again.'),
+    onError: () => toast.error('Could not start sync. Check the connection and try again.'),
   })
 
   useEffect(() => {
@@ -155,6 +178,7 @@ function ExactOnlineSection() {
 
   const connected = statusData?.status === 'connected'
   const broken = statusData?.status === 'unauthorized'
+  const canConnect = !connected || broken
 
   return (
     <div className="row g-3 mt-0 mb-0">
@@ -197,7 +221,7 @@ function ExactOnlineSection() {
           <div className="exact-actions">
             <button
               className="exact-btn exact-btn-outline"
-              disabled={connected && !broken}
+              disabled={!canConnect}
               onClick={handleConnect}
             >
               {connected ? (
@@ -220,10 +244,10 @@ function ExactOnlineSection() {
 
             <button
               className="exact-btn exact-btn-primary"
-              disabled={!connected || syncMutation.isPending}
+              disabled={!connected || syncMutation.isPending || jobStatus?.status === 'running'}
               onClick={() => syncMutation.mutate()}
             >
-              {syncMutation.isPending ? (
+              {syncMutation.isPending || jobStatus?.status === 'running' ? (
                 <>
                   <span
                     className="spinner-border spinner-border-sm"
@@ -257,9 +281,9 @@ export function DashboardPage() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
 
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => getProducts().then((r) => r.data),
+  const { data: productsPage, isLoading: productsLoading } = useQuery({
+    queryKey: ['product-count'],
+    queryFn: () => getProducts(1, 1).then((r) => r.data),
   })
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
@@ -268,7 +292,7 @@ export function DashboardPage() {
     enabled: isAdmin,
   })
 
-  const productCount = products != null ? String(products.length) : null
+  const productCount = productsPage != null ? String(productsPage.meta.total) : null
   const userCount = usersData != null ? String(usersData.meta.total) : null
 
   return (

@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ExactItem } from '../exact/entities/exact-item.entity';
+import { ExactModule } from '../exact/exact.module';
 import { ProductsController } from './products.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ExactItem])],
+  imports: [ExactModule],
   controllers: [ProductsController],
 })
 export class ProductsModule {}

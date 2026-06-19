@@ -30,7 +30,12 @@ export class ExactOnlineClientService {
     let page = 0;
 
     while (nextUrl) {
-      if (maxPages !== undefined && page >= maxPages) break;
+      if (maxPages !== undefined && page >= maxPages) {
+        this.logger.warn(
+          `forEachPage: reached maxPages cap (${maxPages}) on "${initialPath}" — some records were not fetched`,
+        );
+        break;
+      }
       page++;
       const currentUrl = nextUrl;
       const resolvedUrl = this.resolveUrl(currentUrl);

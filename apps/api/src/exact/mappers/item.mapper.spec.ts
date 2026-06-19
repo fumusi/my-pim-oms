@@ -140,6 +140,26 @@ describe('mapItem', () => {
     expect(result.barcode).toBeNull();
     expect(result.pictureUrl).toBeNull();
   });
+
+  it('normalises smallint flags: 0 → false, 1 → true, null → null', () => {
+    const falsy = mapItem(makeItemResponse({ IsBatchItem: 0, IsBatchNumberItem: 0, IsWebshopItem: 0, IsSerialNumberItem: 0 }));
+    expect(falsy.isBatchItem).toBe(false);
+    expect(falsy.isBatchNumberItem).toBe(false);
+    expect(falsy.isWebshopItem).toBe(false);
+    expect(falsy.isSerialNumberItem).toBe(false);
+
+    const truthy = mapItem(makeItemResponse({ IsBatchItem: 1, IsBatchNumberItem: 1, IsWebshopItem: 1, IsSerialNumberItem: 1 }));
+    expect(truthy.isBatchItem).toBe(true);
+    expect(truthy.isBatchNumberItem).toBe(true);
+    expect(truthy.isWebshopItem).toBe(true);
+    expect(truthy.isSerialNumberItem).toBe(true);
+
+    const nullish = mapItem(makeItemResponse({ IsBatchItem: null, IsBatchNumberItem: null, IsWebshopItem: null, IsSerialNumberItem: null }));
+    expect(nullish.isBatchItem).toBeNull();
+    expect(nullish.isBatchNumberItem).toBeNull();
+    expect(nullish.isWebshopItem).toBeNull();
+    expect(nullish.isSerialNumberItem).toBeNull();
+  });
 });
 
 describe('mapItemGroup', () => {
@@ -150,7 +170,7 @@ describe('mapItemGroup', () => {
     expect(result.code).toBe('GRP');
     expect(result.description).toBe('Group A');
     expect(result.division).toBe(123);
-    expect(result.isDefault).toBe(1);
+    expect(result.isDefault).toBe(true);
     expect(result.glCosts).toBe('gl-costs-uuid');
     expect(result.glCostsCode).toBe('C1');
     expect(result.glRevenue).toBe('gl-revenue-uuid');

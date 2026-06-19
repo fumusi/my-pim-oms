@@ -3,6 +3,8 @@ import { ExactItemGroup } from '../entities/exact-item-group.entity';
 import { ExactItemResponse, ExactItemGroupResponse } from '../types';
 import { parseDate } from '../utils/parse-date';
 
+const numToBool = (n: number | null): boolean | null => (n == null ? null : n !== 0);
+
 export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
   return {
     id: i.ID,
@@ -12,16 +14,16 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
     standardSalesPrice: i.StandardSalesPrice,
     costPriceStandard: i.CostPriceStandard,
     costPriceCurrency: i.CostPriceCurrency,
-    isBatchNumberItem: i.IsBatchNumberItem,
-    isBatchItem: i.IsBatchItem,
+    isBatchNumberItem: numToBool(i.IsBatchNumberItem),
+    isBatchItem: numToBool(i.IsBatchItem),
     isFractionAllowedItem: i.IsFractionAllowedItem,
     isPackageItem: i.IsPackageItem,
     isPurchaseItem: i.IsPurchaseItem,
     isSalesItem: i.IsSalesItem,
     isSerialItem: i.IsSerialItem,
     isStockItem: i.IsStockItem,
-    isWebshopItem: i.IsWebshopItem,
-    isSerialNumberItem: i.IsSerialNumberItem,
+    isWebshopItem: numToBool(i.IsWebshopItem),
+    isSerialNumberItem: numToBool(i.IsSerialNumberItem),
     isTaxableItem: i.IsTaxableItem,
     barcode: i.Barcode,
     extraDescription: i.ExtraDescription,
@@ -71,7 +73,7 @@ export function mapItemGroup(g: ExactItemGroupResponse): Partial<ExactItemGroup>
     creator: g.Creator,
     creatorFullName: g.CreatorFullName,
     modifier: g.Modifier,
-    isDefault: g.IsDefault,
+    isDefault: numToBool(g.IsDefault),
     created: parseDate(g.Created),
     modified: parseDate(g.Modified),
   };

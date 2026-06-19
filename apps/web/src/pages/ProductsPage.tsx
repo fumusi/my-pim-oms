@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { getProducts } from '../api/products'
 
-const PAGE_SIZE = 20
+const PAGE_LIMIT = 20
 
 function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
   if (isSalesItem === null) {
@@ -17,12 +17,13 @@ function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
 export function ProductsPage() {
   const [page, setPage] = useState(1)
 
-  const { data: products, isLoading, isError } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => getProducts().then((r) => r.data),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['products', page],
+    queryFn: () => getProducts(page, PAGE_LIMIT).then((r) => r.data),
+    placeholderData: keepPreviousData,
   })
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="profile-loading">
         <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
@@ -38,7 +39,7 @@ export function ProductsPage() {
     )
   }
 
-  if (!products || products.length === 0) {
+  if (!data || data.meta.total === 0) {
     return (
       <div className="shell-empty-state">
         <svg className="shell-empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -52,15 +53,15 @@ export function ProductsPage() {
     )
   }
 
-  const totalPages = Math.ceil(products.length / PAGE_SIZE)
-  const paginated = products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const { data: products, meta } = data
+  const rowOffset = (meta.page - 1) * meta.limit
 
   return (
     <div className="dash-card">
       <div className="dash-card-header">
         <div>
           <div className="dash-card-title">Product Catalogue</div>
-          <div className="dash-card-sub">{products.length} product{products.length === 1 ? '' : 's'} synced from Exact Online</div>
+          <div className="dash-card-sub">{meta.total} product{meta.total === 1 ? '' : 's'} synced from Exact Online</div>
         </div>
       </div>
 
@@ -76,9 +77,9 @@ export function ProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {paginated.map((p, i) => (
+            {products.map((p, i) => (
               <tr key={p.id}>
-                <td className="users-td-muted">{(page - 1) * PAGE_SIZE + i + 1}</td>
+                <td className="users-td-muted">{rowOffset + i + 1}</td>
                 <td>{p.description ?? <span className="users-td-muted">—</span>}</td>
                 <td className="users-td-muted">{p.code ?? '—'}</td>
                 <td className="users-td-muted">
@@ -93,22 +94,22 @@ export function ProductsPage() {
         </table>
       </div>
 
-      {totalPages > 1 && (
+      {meta.totalPages > 1 && (
         <div className="users-pagination">
           <span className="users-pagination-info">
-            Page {page} of {totalPages}
+            Page {meta.page} of {meta.totalPages}
           </span>
           <div className="users-pagination-btns">
             <button
               className="users-pg-btn"
-              disabled={page <= 1}
+              disabled={meta.page <= 1}
               onClick={() => setPage((p) => p - 1)}
             >
               ‹ Prev
             </button>
             <button
               className="users-pg-btn"
-              disabled={page >= totalPages}
+              disabled={meta.page >= meta.totalPages}
               onClick={() => setPage((p) => p + 1)}
             >
               Next ›

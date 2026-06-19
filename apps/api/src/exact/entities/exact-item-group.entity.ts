@@ -15,8 +15,8 @@ export class ExactItemGroup {
   @Column({ nullable: true, type: 'int' })
   division!: number | null;
 
-  @Column({ type: 'smallint', nullable: true, name: 'is_default' })
-  isDefault!: number | null;
+  @Column({ type: 'boolean', nullable: true, name: 'is_default' })
+  isDefault!: boolean | null;
 
   @Column({ type: 'uuid', nullable: true, name: 'gl_costs' })
   glCosts!: string | null;

@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { HttpService } from '@nestjs/axios';
 import {
   Injectable,
@@ -12,6 +13,7 @@ import { firstValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 import { TokenSet, TokenResponse, ConnectionStatus } from './types';
 import { ExactOnlineToken } from './entities/exact-online-token.entity';
+import { encrypt, decrypt } from './utils/token-crypto';
 
 @Injectable()
 export class ExactOnlineAuthService implements OnApplicationBootstrap {
@@ -20,9 +22,11 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly redirectUri: string;
+  private readonly encryptionKey: string;
   private tokenSet: TokenSet | null = null;
   private refreshInFlight: Promise<void> | null = null;
   private connectionBroken = false;
+  private readonly pendingStates = new Set<string>();
   private readonly logger = new Logger(ExactOnlineAuthService.name);
 
   constructor(
@@ -34,16 +38,29 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
     this.clientId = this.configService.getOrThrow<string>('EXACT_CLIENT_ID');
     this.clientSecret = this.configService.getOrThrow<string>('EXACT_CLIENT_SECRET');
     this.redirectUri = this.configService.getOrThrow<string>('EXACT_REDIRECT_URI');
+    this.encryptionKey = this.configService.getOrThrow<string>('EXACT_TOKEN_SECRET');
+
+    if (!/^[0-9a-f]{64}$/i.test(this.encryptionKey)) {
+      throw new Error('EXACT_TOKEN_SECRET must be a 64-character hex string (32 bytes). Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    }
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    const stored = await this.tokenRepository.findOne({ where: {} });
+    const stored = await this.tokenRepository.findOne({ where: {}, order: { id: 'ASC' } });
     if (!stored) return;
-    this.tokenSet = {
-      access_token: stored.access_token,
-      refresh_token: stored.refresh_token,
-      expires_at: stored.expires_at,
-    };
+    try {
+      this.tokenSet = {
+        access_token: decrypt(stored.accessToken, this.encryptionKey),
+        refresh_token: decrypt(stored.refreshToken, this.encryptionKey),
+        expires_at: stored.expiresAt,
+      };
+    } catch {
+      this.logger.warn(
+        'Stored Exact Online token could not be decrypted (possibly pre-encryption plaintext). ' +
+        'Clearing stored token — re-authorize via the dashboard.',
+      );
+      await this.tokenRepository.delete({ id: stored.id });
+    }
   }
 
   markDisconnected(): void {
@@ -59,13 +76,24 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
   }
 
   getAuthorizationUrl(): string {
+    const state = randomBytes(16).toString('hex');
+    this.pendingStates.add(state);
+    setTimeout(() => this.pendingStates.delete(state), 10 * 60 * 1000);
+
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
       force_login: '0',
+      state,
     });
     return `${this.authUrl}?${params.toString()}`;
+  }
+
+  validateAndConsumeState(state: string): boolean {
+    if (!this.pendingStates.has(state)) return false;
+    this.pendingStates.delete(state);
+    return true;
   }
 
   async authCallback(code: string): Promise<void> {
@@ -146,12 +174,24 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
     const expires_at = Date.now() + (Number(expires_in) || 600) * 1000;
     this.tokenSet = { access_token, refresh_token, expires_at };
 
-    const existing = await this.tokenRepository.findOne({ where: {} });
+    const encAccessToken = encrypt(access_token, this.encryptionKey);
+    const encRefreshToken = encrypt(refresh_token, this.encryptionKey);
+
+    const existing = await this.tokenRepository.findOne({ where: {}, order: { id: 'ASC' } });
     if (existing) {
-      await this.tokenRepository.save({ ...existing, access_token, refresh_token, expires_at });
+      await this.tokenRepository.save({
+        ...existing,
+        accessToken: encAccessToken,
+        refreshToken: encRefreshToken,
+        expiresAt: expires_at,
+      });
     } else {
       await this.tokenRepository.save(
-        this.tokenRepository.create({ access_token, refresh_token, expires_at }),
+        this.tokenRepository.create({
+          accessToken: encAccessToken,
+          refreshToken: encRefreshToken,
+          expiresAt: expires_at,
+        }),
       );
     }
   }
