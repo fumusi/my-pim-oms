@@ -120,26 +120,30 @@ export class ItemsService {
   async unassignFromCategory(productIds: string[], categoryId: number): Promise<number> {
     if (productIds.length === 0) return 0;
 
-    // Only unassign items actually in this category — ignore others silently.
-    const rows = await this.repo
-      .createQueryBuilder('i')
-      .select('i.id')
-      .where('i.id IN (:...ids)', { ids: productIds })
-      .andWhere('"category_id" = :cid', { cid: categoryId })
-      .getMany();
+    return this.repo.manager.transaction(async (em) => {
+      // Lock rows so a concurrent assignToCategory can't move a product between our SELECT and UPDATE.
+      const rows = await em
+        .createQueryBuilder()
+        .select('id')
+        .from('exact_items', 'i')
+        .where('id IN (:...ids)', { ids: productIds })
+        .andWhere('"category_id" = :cid', { cid: categoryId })
+        .setLock('pessimistic_write')
+        .getRawMany<{ id: string }>();
 
-    const toUnassign = rows.map((r) => r.id);
-    if (toUnassign.length === 0) return 0;
+      const toUnassign = rows.map((r) => r.id);
+      if (toUnassign.length === 0) return 0;
 
-    // Clear pim_template alongside category_id — template was stamped on assign, must be cleared on unassign.
-    await this.repo.manager
-      .createQueryBuilder()
-      .update('exact_items')
-      .set({ category_id: null, pim_template: null })
-      .where('id IN (:...ids)', { ids: toUnassign })
-      .execute();
+      // Clear pim_template alongside category_id — template was stamped on assign, must be cleared on unassign.
+      await em
+        .createQueryBuilder()
+        .update('exact_items')
+        .set({ category_id: null, pim_template: null })
+        .where('id IN (:...ids)', { ids: toUnassign })
+        .execute();
 
-    return toUnassign.length;
+      return toUnassign.length;
+    });
   }
 
   async findAll(page = 1, limit = 20): Promise<PaginatedItems> {

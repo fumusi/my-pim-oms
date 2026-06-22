@@ -49,10 +49,12 @@ function flattenLang(
   lang: 'nl' | 'en' | 'de',
 ) {
   const { name, description, ...rest } = item;
+  const n = name as LocalizedText;
+  const d = description as LocalizedText | null;
   return {
     ...rest,
-    name: (name as LocalizedText)[lang] ?? (name as LocalizedText).nl,
-    description: description ? ((description as LocalizedText)[lang] ?? (description as LocalizedText).nl) : null,
+    name: n[lang] ?? n.nl ?? n.en ?? n.de ?? '',
+    description: d ? (d[lang] ?? d.nl ?? d.en ?? d.de ?? null) : null,
   };
 }
 
