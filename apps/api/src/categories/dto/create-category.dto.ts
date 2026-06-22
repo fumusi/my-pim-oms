@@ -1,11 +1,16 @@
-import type { LocalizedText } from '../../common/types/localized-text.interface';
+import { z } from 'zod';
+import { createZodDto } from 'nestjs-zod';
 import { CategoryStatus } from '../../common/enums/category-status.enum';
 
-export class CreateCategoryDto {
-  name!: LocalizedText;
-  description?: LocalizedText | null;
-  image?: string | null;
-  icon?: string | null;
-  status?: CategoryStatus;
-  template?: Record<string, unknown> | null;
-}
+const localizedTextSchema = z.object({ nl: z.string(), en: z.string(), de: z.string() });
+
+export const CreateCategorySchema = z.object({
+  name: localizedTextSchema,
+  description: localizedTextSchema.nullable().optional(),
+  image: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  status: z.enum(CategoryStatus).optional(),
+  template: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+
+export class CreateCategoryDto extends createZodDto(CreateCategorySchema) {}

@@ -1,9 +1,6 @@
-import type { LocalizedText } from '../../common/types/localized-text.interface';
+import { createZodDto } from 'nestjs-zod';
+import { CreateCategorySchema } from './create-category.dto';
 
-export class UpdateCategoryDto {
-  name?: LocalizedText;
-  description?: LocalizedText | null;
-  image?: string | null;
-  icon?: string | null;
-  template?: Record<string, unknown> | null;
-}
+export const UpdateCategorySchema = CreateCategorySchema.omit({ status: true }).partial();
+
+export class UpdateCategoryDto extends createZodDto(UpdateCategorySchema) {}
