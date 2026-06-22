@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
+import { EntityNotFoundError } from 'typeorm';
 import { CategoriesService } from './categories.service';
 import { Category } from './entities/category.entity';
 import { ItemsService } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 const makeCategory = (overrides: Partial<Category> = {}): Category =>
   ({
@@ -25,6 +28,12 @@ const makeCategory = (overrides: Partial<Category> = {}): Category =>
 describe('CategoriesService', () => {
   let service: CategoriesService;
 
+  // EntityManager used inside transactions
+  const em = {
+    findOneOrFail: jest.fn(),
+    save: jest.fn(),
+  };
+
   const categoryRepo = {
     find: jest.fn(),
     findOne: jest.fn(),
@@ -32,6 +41,9 @@ describe('CategoriesService', () => {
     create: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
+    manager: {
+      transaction: jest.fn().mockImplementation((cb) => cb(em)),
+    },
   };
 
   const itemsService = {
@@ -50,20 +62,22 @@ describe('CategoriesService', () => {
 
     service = module.get(CategoriesService);
     jest.clearAllMocks();
+    // Re-wire transaction mock after clearAllMocks resets it
+    categoryRepo.manager.transaction.mockImplementation((cb) => cb(em));
   });
 
   // ── create ─────────────────────────────────────────────────────────────────
 
   describe('create', () => {
     it('creates a category and wires updatedBy', async () => {
-      const data = { name: { nl: 'Test', en: 'Test', de: 'Test' } };
-      const built = makeCategory(data);
+      const dto: CreateCategoryDto = { name: { nl: 'Test', en: 'Test', de: 'Test' } };
+      const built = makeCategory(dto);
       categoryRepo.create.mockReturnValue(built);
       categoryRepo.save.mockResolvedValue(built);
 
-      const result = await service.create(data, 'admin@test.com');
+      const result = await service.create(dto, 'admin@test.com');
 
-      expect(categoryRepo.create).toHaveBeenCalledWith({ ...data, updatedBy: 'admin@test.com' });
+      expect(categoryRepo.create).toHaveBeenCalledWith({ ...dto, updatedBy: 'admin@test.com' });
       expect(result).toBe(built);
     });
   });
@@ -73,10 +87,11 @@ describe('CategoriesService', () => {
   describe('update', () => {
     it('merges data, sets updatedBy, and saves', async () => {
       const cat = makeCategory();
+      const dto: UpdateCategoryDto = { image: 'https://example.com/img.png' };
       categoryRepo.findOneOrFail.mockResolvedValue(cat);
       categoryRepo.save.mockImplementation((c: Category) => Promise.resolve(c));
 
-      await service.update(1, { image: 'https://example.com/img.png' }, 'admin@test.com');
+      await service.update(1, dto, 'admin@test.com');
 
       expect(cat.image).toBe('https://example.com/img.png');
       expect(cat.updatedBy).toBe('admin@test.com');
@@ -97,34 +112,35 @@ describe('CategoriesService', () => {
   // ── setStatus ──────────────────────────────────────────────────────────────
 
   describe('setStatus → inactive', () => {
-    it('saves the category with new status and updatedBy', async () => {
+    it('saves the category with new status and updatedBy inside a transaction', async () => {
       const cat = makeCategory();
-      categoryRepo.findOneOrFail.mockResolvedValue(cat);
-      categoryRepo.save.mockImplementation((c: Category) => Promise.resolve(c));
+      em.findOneOrFail.mockResolvedValue(cat);
+      em.save.mockImplementation((c: Category) => Promise.resolve(c));
       itemsService.deactivateByCategoryId.mockResolvedValue(undefined);
 
       await service.setStatus(1, CategoryStatus.Inactive, 'admin@test.com');
 
+      expect(categoryRepo.manager.transaction).toHaveBeenCalled();
       expect(cat.status).toBe(CategoryStatus.Inactive);
       expect(cat.updatedBy).toBe('admin@test.com');
-      expect(categoryRepo.save).toHaveBeenCalledWith(cat);
+      expect(em.save).toHaveBeenCalledWith(cat);
     });
 
-    it('calls deactivateByCategoryId when setting to inactive', async () => {
+    it('calls deactivateByCategoryId with the transaction em when setting to inactive', async () => {
       const cat = makeCategory();
-      categoryRepo.findOneOrFail.mockResolvedValue(cat);
-      categoryRepo.save.mockImplementation((c: Category) => Promise.resolve(c));
+      em.findOneOrFail.mockResolvedValue(cat);
+      em.save.mockImplementation((c: Category) => Promise.resolve(c));
       itemsService.deactivateByCategoryId.mockResolvedValue(undefined);
 
       await service.setStatus(1, CategoryStatus.Inactive);
 
-      expect(itemsService.deactivateByCategoryId).toHaveBeenCalledWith(1);
+      expect(itemsService.deactivateByCategoryId).toHaveBeenCalledWith(1, em);
     });
 
     it('does NOT call deactivateByCategoryId when setting to active', async () => {
       const cat = makeCategory({ status: CategoryStatus.Inactive });
-      categoryRepo.findOneOrFail.mockResolvedValue(cat);
-      categoryRepo.save.mockImplementation((c: Category) => Promise.resolve(c));
+      em.findOneOrFail.mockResolvedValue(cat);
+      em.save.mockImplementation((c: Category) => Promise.resolve(c));
 
       await service.setStatus(1, CategoryStatus.Active);
 
@@ -135,7 +151,15 @@ describe('CategoriesService', () => {
   // ── delete ─────────────────────────────────────────────────────────────────
 
   describe('delete', () => {
+    it('throws EntityNotFoundError for a non-existent category', async () => {
+      categoryRepo.findOneOrFail.mockRejectedValue(new EntityNotFoundError(Category, { id: 999 }));
+
+      await expect(service.delete(999)).rejects.toBeInstanceOf(EntityNotFoundError);
+      expect(itemsService.countByCategory).not.toHaveBeenCalled();
+    });
+
     it('throws 400 with assigned product count when products exist', async () => {
+      categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
       itemsService.countByCategory.mockResolvedValue(3);
 
       await expect(service.delete(1)).rejects.toBeInstanceOf(BadRequestException);
@@ -146,6 +170,7 @@ describe('CategoriesService', () => {
     });
 
     it('uses singular form when exactly 1 product assigned', async () => {
+      categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
       itemsService.countByCategory.mockResolvedValue(1);
 
       await expect(service.delete(1)).rejects.toMatchObject({
@@ -154,6 +179,7 @@ describe('CategoriesService', () => {
     });
 
     it('deletes category when no products are assigned', async () => {
+      categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
       itemsService.countByCategory.mockResolvedValue(0);
       categoryRepo.delete.mockResolvedValue({ affected: 1 });
 

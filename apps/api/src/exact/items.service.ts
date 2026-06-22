@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { ExactItem } from './entities/exact-item.entity';
 
 const MAX_LIMIT = 100;
@@ -17,16 +17,22 @@ export class ItemsService {
     private readonly repo: Repository<ExactItem>,
   ) {}
 
+  // Count without JOIN — category_id lives on exact_items, no need to join categories.
   countByCategory(categoryId: number): Promise<number> {
-    return this.repo.count({ where: { category: { id: categoryId } } });
+    return this.repo
+      .createQueryBuilder('item')
+      .where('"category_id" = :id', { id: categoryId })
+      .getCount();
   }
 
-  async deactivateByCategoryId(categoryId: number): Promise<void> {
-    await this.repo
-      .createQueryBuilder('item')
-      .update()
+  // Accepts an optional EntityManager so callers can include this in a transaction.
+  async deactivateByCategoryId(categoryId: number, em?: EntityManager): Promise<void> {
+    const manager = em ?? this.repo.manager;
+    await manager
+      .createQueryBuilder()
+      .update(ExactItem)
       .set({ isSalesItem: false })
-      .where('item.category = :id', { id: categoryId })
+      .where('"category_id" = :id', { id: categoryId })
       .execute();
   }
 

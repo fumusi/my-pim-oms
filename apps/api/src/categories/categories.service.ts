@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ItemsService } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
 
@@ -21,32 +23,33 @@ export class CategoriesService {
     return this.categoryRepo.findOne({ where: { id } });
   }
 
-  async create(data: Partial<Category>, updatedBy?: string): Promise<Category> {
+  async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {
     const category = this.categoryRepo.create({ ...data, updatedBy: updatedBy ?? null });
     return this.categoryRepo.save(category);
   }
 
-  async update(id: number, data: Partial<Category>, updatedBy?: string): Promise<Category> {
+  async update(id: number, data: UpdateCategoryDto, updatedBy?: string): Promise<Category> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
     Object.assign(category, data, { updatedBy: updatedBy ?? null });
     return this.categoryRepo.save(category);
   }
 
   async setStatus(id: number, status: CategoryStatus, updatedBy?: string): Promise<Category> {
-    const category = await this.categoryRepo.findOneOrFail({ where: { id } });
-    category.status = status;
-    category.updatedBy = updatedBy ?? null;
-    const saved = await this.categoryRepo.save(category);
-
-    // When a category is deactivated, all its products are set to isSalesItem=false.
-    // isSalesItem is the current PIM proxy for "active" (replace with pim_status column later).
+    // Category save and item deactivation run in one transaction so they can't diverge.
     // NOTE: re-activation does NOT restore products — any product deactivated here stays
-    // inactive until manually re-enabled. This is intentional until pim_status lands.
-    if (status === CategoryStatus.Inactive) {
-      await this.itemsService.deactivateByCategoryId(id);
-    }
+    // inactive until manually re-enabled. This is intentional until a pim_status column lands.
+    return this.categoryRepo.manager.transaction(async (em) => {
+      const category = await em.findOneOrFail(Category, { where: { id } });
+      category.status = status;
+      category.updatedBy = updatedBy ?? null;
+      const saved = await em.save(category);
 
-    return saved;
+      if (status === CategoryStatus.Inactive) {
+        await this.itemsService.deactivateByCategoryId(id, em);
+      }
+
+      return saved;
+    });
   }
 
   async archive(id: number, updatedBy?: string): Promise<Category> {
@@ -58,6 +61,7 @@ export class CategoriesService {
   }
 
   async delete(id: number): Promise<void> {
+    await this.categoryRepo.findOneOrFail({ where: { id } });
     const count = await this.itemsService.countByCategory(id);
     if (count > 0) {
       throw new BadRequestException(
