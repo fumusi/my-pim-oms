@@ -15,11 +15,10 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { createZodDto } from 'nestjs-zod';
-import type { Request } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { CategoryStatus } from '../common/enums/category-status.enum';
-import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { AuthRequest } from '../common/types/auth-request.type';
 import type { LocalizedText } from '../common/types/localized-text.interface';
 import { CategoriesService, CategoryWithCount, CategoryDetail } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -42,7 +41,6 @@ const DetailQuerySchema = z.object({
 });
 class DetailQueryDto extends createZodDto(DetailQuerySchema) {}
 
-type AuthRequest = Request & { user: JwtPayload };
 
 function flattenLang(
   item: CategoryWithCount | CategoryDetail,

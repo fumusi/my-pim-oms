@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { ExactItem } from './entities/exact-item.entity';
+import { Category } from '../categories/entities/category.entity';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdatePimTemplateDto } from './dto/update-pim-template.dto';
 
@@ -23,6 +24,8 @@ export class ItemsService {
   constructor(
     @InjectRepository(ExactItem)
     private readonly repo: Repository<ExactItem>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
   ) {}
 
   // Count without JOIN — category_id lives on exact_items, no need to join categories.
@@ -155,20 +158,12 @@ export class ItemsService {
     return this.repo.save(item);
   }
 
-  async create(dto: CreateItemDto, createdBy?: string): Promise<ExactItem> {
-    void createdBy;
-    let pimTemplate: Record<string, unknown> | null = null;
+  async create(dto: CreateItemDto): Promise<ExactItem> {
+    let category: Category | null = null;
 
     if (dto.categoryId !== undefined) {
-      const row = await this.repo.manager
-        .createQueryBuilder()
-        .select('template')
-        .from('categories', 'c')
-        .where('id = :id', { id: dto.categoryId })
-        .getRawOne<{ template: Record<string, unknown> | null }>();
-
-      if (!row) throw new NotFoundException(`Category ${dto.categoryId} not found`);
-      pimTemplate = row.template;
+      category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+      if (!category) throw new NotFoundException(`Category ${dto.categoryId} not found`);
     }
 
     const item = this.repo.create({
@@ -176,8 +171,8 @@ export class ItemsService {
       description: dto.description,
       code: dto.code ?? null,
       standardSalesPrice: dto.standardSalesPrice ?? null,
-      category: dto.categoryId !== undefined ? ({ id: dto.categoryId } as never) : null,
-      pimTemplate,
+      category,
+      pimTemplate: category?.template ?? null,
     });
 
     return this.repo.save(item);
