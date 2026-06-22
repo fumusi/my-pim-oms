@@ -12,10 +12,11 @@ export class ProductsController {
     @Query('excludeCategoryId') excludeCategoryId?: string,
     @Query('search') search?: string,
   ) {
+    const parsedCategoryId = excludeCategoryId ? parseInt(excludeCategoryId, 10) : undefined;
     return this.itemsService.findAll(
       page,
       limit,
-      excludeCategoryId ? parseInt(excludeCategoryId, 10) : undefined,
+      parsedCategoryId !== undefined && !Number.isNaN(parsedCategoryId) ? parsedCategoryId : undefined,
       search,
     );
   }

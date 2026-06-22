@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useDebounce } from 'use-debounce'
 import { getProducts, type Product } from '../api/products'
 
 interface Props {
@@ -11,15 +12,17 @@ interface Props {
 
 export function AssignProductsModal({ categoryId, loading, onConfirm, onCancel }: Props) {
   const [search, setSearch] = useState('')
+  const [debouncedSearch] = useDebounce(search, 300)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const { data, isLoading } = useQuery({
-    queryKey: ['products-available', categoryId, search, page],
+    queryKey: ['products-available', categoryId, debouncedSearch, page],
     queryFn: () =>
-      getProducts({ page, limit: 20, excludeCategoryId: categoryId, search: search || undefined }).then(
+      getProducts({ page, limit: 20, excludeCategoryId: categoryId, search: debouncedSearch || undefined }).then(
         (r) => r.data,
       ),
+    placeholderData: keepPreviousData,
   })
 
   const products = data?.data ?? []

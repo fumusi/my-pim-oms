@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { getProducts } from '../api/products'
+import { resolveName, type Lang } from '../utils/format'
 
 const PAGE_LIMIT = 20
 
@@ -16,6 +17,7 @@ function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
 
 export function ProductsPage() {
   const [page, setPage] = useState(1)
+  const [lang, setLang] = useState<Lang>('nl')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', page],
@@ -63,6 +65,17 @@ export function ProductsPage() {
           <div className="dash-card-title">Product Catalogue</div>
           <div className="dash-card-sub">{meta.total} product{meta.total === 1 ? '' : 's'} synced from Exact Online</div>
         </div>
+        <div className="lang-switcher">
+          {(['nl', 'en', 'de'] as Lang[]).map((l) => (
+            <button
+              key={l}
+              className={`lang-switcher-btn${lang === l ? ' lang-switcher-btn--active' : ''}`}
+              onClick={() => setLang(l)}
+            >
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="users-table-wrap">
@@ -87,9 +100,7 @@ export function ProductsPage() {
                   {p.itemGroup?.description ?? p.itemGroupDescription ?? '—'}
                 </td>
                 <td className="users-td-muted">
-                  {p.category
-                    ? (p.category.name.nl ?? p.category.name.en ?? p.category.name.de ?? '—')
-                    : '—'}
+                  {p.category ? resolveName(p.category.name, lang) : '—'}
                 </td>
                 <td>
                   <StatusBadge isSalesItem={p.isSalesItem} />

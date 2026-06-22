@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useDebounce } from 'use-debounce'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../store'
@@ -10,28 +11,13 @@ import {
   archiveCategory,
   assignProducts,
   unassignProducts,
-  type LocalizedText,
   type UpdateCategoryBody,
   type AssignResult,
 } from '../api/categories'
+import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CategoryDrawer } from '../components/CategoryDrawer'
 import { AssignProductsModal } from '../components/AssignProductsModal'
-
-type Lang = 'nl' | 'en' | 'de'
-
-function resolveLang(text: LocalizedText, lang: Lang): string {
-  return text[lang] ?? text.nl ?? text.en ?? text.de ?? '—'
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function getApiError(err: unknown): string {
-  const e = err as { response?: { data?: { message?: string } } }
-  return e?.response?.data?.message ?? 'Something went wrong'
-}
 
 export function CategoryDetailPage() {
   const { id } = useParams({ from: '/app/categories/$id' })
@@ -44,18 +30,21 @@ export function CategoryDetailPage() {
   const [lang, setLang] = useState<Lang>('nl')
   const [productPage, setProductPage] = useState(1)
   const [productSearch, setProductSearch] = useState('')
+  const [debouncedSearch] = useDebounce(productSearch, 300)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<string | null>(null)
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
 
   const { data: category, isLoading, isError } = useQuery({
-    queryKey: ['category', categoryId, productPage, productSearch],
+    queryKey: ['category', categoryId, productPage, debouncedSearch],
     queryFn: () =>
       getCategoryDetail(categoryId, {
         page: productPage,
         limit: 20,
-        search: productSearch || undefined,
+        search: debouncedSearch || undefined,
       }).then((r) => r.data),
+    placeholderData: keepPreviousData,
   })
 
   const updateMutation = useMutation({
@@ -74,6 +63,7 @@ export function CategoryDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['category', categoryId] })
       queryClient.invalidateQueries({ queryKey: ['categories'] })
+      setArchiveConfirmOpen(false)
       toast.success('Category archived')
     },
     onError: (err) => toast.error(getApiError(err)),
@@ -140,7 +130,7 @@ export function CategoryDetailPage() {
               <span className="cat-detail-icon">{category.icon}</span>
             ) : null}
             <div>
-              <div className="cat-detail-name">{resolveLang(category.name, lang)}</div>
+              <div className="cat-detail-name">{resolveName(category.name, lang)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
                 <span className={`cat-status-pill ${category.archivedAt ? 'cat-status-archived' : category.status === 'active' ? 'cat-status-active' : 'cat-status-inactive'}`}>
                   {category.archivedAt ? 'Archived' : category.status === 'active' ? 'Active' : 'Inactive'}
@@ -172,8 +162,7 @@ export function CategoryDetailPage() {
                 </button>
                 <button
                   className="exact-btn exact-btn-outline"
-                  onClick={() => archiveMutation.mutate()}
-                  disabled={archiveMutation.isPending}
+                  onClick={() => setArchiveConfirmOpen(true)}
                 >
                   Archive
                 </button>
@@ -197,7 +186,7 @@ export function CategoryDetailPage() {
           {category.description && (
             <div className="cat-detail-info-field">
               <span className="modal-label">Description</span>
-              <span className="cat-detail-info-value">{resolveLang(category.description, lang)}</span>
+              <span className="cat-detail-info-value">{resolveName(category.description, lang)}</span>
             </div>
           )}
           <div className="cat-detail-info-field">
@@ -335,6 +324,18 @@ export function CategoryDetailPage() {
           loading={assignMutation.isPending}
           onConfirm={(ids) => assignMutation.mutate(ids)}
           onCancel={() => setAssignModalOpen(false)}
+        />
+      )}
+
+      {/* Archive confirm */}
+      {archiveConfirmOpen && (
+        <ConfirmModal
+          title="Archive category"
+          message={`Archive "${resolveName(category.name, lang)}"? This cannot be undone.`}
+          confirmLabel="Archive"
+          loading={archiveMutation.isPending}
+          onConfirm={() => archiveMutation.mutate()}
+          onCancel={() => setArchiveConfirmOpen(false)}
         />
       )}
 

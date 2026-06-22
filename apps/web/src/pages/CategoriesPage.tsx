@@ -13,27 +13,12 @@ import {
   deleteCategory,
   type Category,
   type CategoryStatus,
-  type LocalizedText,
   type CreateCategoryBody,
   type UpdateCategoryBody,
 } from '../api/categories'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CategoryDrawer } from '../components/CategoryDrawer'
-
-type Lang = 'nl' | 'en' | 'de'
-
-function resolveName(text: LocalizedText, lang: Lang): string {
-  return text[lang] ?? text.nl ?? text.en ?? text.de ?? '—'
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function getApiError(err: unknown): string {
-  const e = err as { response?: { data?: { message?: string } } }
-  return e?.response?.data?.message ?? 'Something went wrong'
-}
+import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 
 interface StatusBadgeProps { category: Category }
 function StatusBadge({ category }: StatusBadgeProps) {
