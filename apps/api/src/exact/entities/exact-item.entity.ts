@@ -142,6 +142,9 @@ export class ExactItem {
   @Column({ nullable: true, type: 'varchar', name: 'modifier_full_name' })
   modifierFullName!: string | null;
 
+  @Column({ nullable: true, type: 'varchar', name: 'updated_by' })
+  updatedBy!: string | null;
+
   @Column({ nullable: true, type: 'timestamptz' })
   created!: Date | null;
 

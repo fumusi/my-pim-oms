@@ -1,7 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { ExactItem } from './entities/exact-item.entity';
+import { Category } from '../categories/entities/category.entity';
+import { CreateItemDto } from './dto/create-item.dto';
+import { UpdatePimTemplateDto } from './dto/update-pim-template.dto';
 
 const MAX_LIMIT = 100;
 
@@ -20,6 +24,8 @@ export class ItemsService {
   constructor(
     @InjectRepository(ExactItem)
     private readonly repo: Repository<ExactItem>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
   ) {}
 
   // Count without JOIN — category_id lives on exact_items, no need to join categories.
@@ -144,6 +150,35 @@ export class ItemsService {
 
       return toUnassign.length;
     });
+  }
+
+  async updatePimTemplate(id: string, dto: UpdatePimTemplateDto, updatedBy?: string): Promise<ExactItem> {
+    const item = await this.repo.findOneOrFail({ where: { id } });
+    item.pimTemplate = dto.pimTemplate;
+    item.updatedBy = updatedBy ?? null;
+    return this.repo.save(item);
+  }
+
+  async create(dto: CreateItemDto, updatedBy?: string): Promise<ExactItem> {
+    let category: Category | null = null;
+
+    if (dto.categoryId !== undefined) {
+      category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+      if (!category) throw new NotFoundException(`Category ${dto.categoryId} not found`);
+    }
+
+    const item = this.repo.create({
+      id: randomUUID(),
+      description: dto.description,
+      code: dto.code ?? null,
+      standardSalesPrice: dto.standardSalesPrice ?? null,
+      isSalesItem: true,
+      category,
+      pimTemplate: category?.template ?? null,
+      updatedBy: updatedBy ?? null,
+    });
+
+    return this.repo.save(item);
   }
 
   async findAll(page = 1, limit = 20): Promise<PaginatedItems> {
