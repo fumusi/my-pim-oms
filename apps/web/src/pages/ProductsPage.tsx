@@ -19,7 +19,7 @@ export function ProductsPage() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', page],
-    queryFn: () => getProducts(page, PAGE_LIMIT).then((r) => r.data),
+    queryFn: () => getProducts({ page, limit: PAGE_LIMIT }).then((r) => r.data),
     placeholderData: keepPreviousData,
   })
 
@@ -72,6 +72,7 @@ export function ProductsPage() {
               <th>#</th>
               <th>Name</th>
               <th>SKU</th>
+              <th>Group</th>
               <th>Category</th>
               <th>Status</th>
             </tr>
@@ -84,6 +85,11 @@ export function ProductsPage() {
                 <td className="users-td-muted">{p.code ?? '—'}</td>
                 <td className="users-td-muted">
                   {p.itemGroup?.description ?? p.itemGroupDescription ?? '—'}
+                </td>
+                <td className="users-td-muted">
+                  {p.category
+                    ? (p.category.name.nl ?? p.category.name.en ?? p.category.name.de ?? '—')
+                    : '—'}
                 </td>
                 <td>
                   <StatusBadge isSalesItem={p.isSalesItem} />

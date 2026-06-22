@@ -9,7 +9,14 @@ export class ProductsController {
   findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('excludeCategoryId') excludeCategoryId?: string,
+    @Query('search') search?: string,
   ) {
-    return this.itemsService.findAll(page, limit);
+    return this.itemsService.findAll(
+      page,
+      limit,
+      excludeCategoryId ? parseInt(excludeCategoryId, 10) : undefined,
+      search,
+    );
   }
 }

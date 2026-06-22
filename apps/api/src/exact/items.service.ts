@@ -60,16 +60,19 @@ export class ItemsService {
       .execute();
   }
 
-  async findByCategoryId(categoryId: number, page = 1, limit = 20): Promise<PaginatedItems> {
+  async findByCategoryId(categoryId: number, page = 1, limit = 20, search?: string): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
-    const [data, total] = await this.repo
+    const qb = this.repo
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.itemGroup', 'itemGroup')
       .where('"category_id" = :id', { id: categoryId })
       .orderBy('item.description', 'ASC')
       .skip((page - 1) * safeLimit)
-      .take(safeLimit)
-      .getManyAndCount();
+      .take(safeLimit);
+    if (search) {
+      qb.andWhere('(LOWER(item.description) LIKE :s OR LOWER(item.code) LIKE :s)', { s: `%${search.toLowerCase()}%` });
+    }
+    const [data, total] = await qb.getManyAndCount();
     return { data, meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } };
   }
 
@@ -110,13 +113,10 @@ export class ItemsService {
       }
 
       if (toAssign.length > 0) {
-        // Raw table name required in QB so FK columns (category_id, pim_template) can be set directly.
-        await em
-          .createQueryBuilder()
-          .update('exact_items')
-          .set({ category_id: categoryId, pim_template: categoryTemplate })
-          .where('id IN (:...ids)', { ids: toAssign })
-          .execute();
+        await em.query(
+          `UPDATE exact_items SET category_id = $1, pim_template = $2 WHERE id = ANY($3::uuid[])`,
+          [categoryId, categoryTemplate ? JSON.stringify(categoryTemplate) : null, toAssign],
+        );
       }
 
       return { assigned: toAssign.length, skipped };
@@ -141,12 +141,10 @@ export class ItemsService {
       if (toUnassign.length === 0) return 0;
 
       // Clear pim_template alongside category_id — template was stamped on assign, must be cleared on unassign.
-      await em
-        .createQueryBuilder()
-        .update('exact_items')
-        .set({ category_id: null, pim_template: null })
-        .where('id IN (:...ids)', { ids: toUnassign })
-        .execute();
+      await em.query(
+        `UPDATE exact_items SET category_id = NULL, pim_template = NULL WHERE id = ANY($1::uuid[])`,
+        [toUnassign],
+      );
 
       return toUnassign.length;
     });
@@ -181,17 +179,22 @@ export class ItemsService {
     return this.repo.save(item);
   }
 
-  async findAll(page = 1, limit = 20): Promise<PaginatedItems> {
+  async findAll(page = 1, limit = 20, excludeCategoryId?: number, search?: string): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
-    const skip = (page - 1) * safeLimit;
-
-    const [data, total] = await this.repo.findAndCount({
-      relations: { itemGroup: true },
-      order: { description: 'ASC' },
-      skip,
-      take: safeLimit,
-    });
-
+    const qb = this.repo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.itemGroup', 'itemGroup')
+      .leftJoinAndSelect('item.category', 'category')
+      .orderBy('item.description', 'ASC')
+      .skip((page - 1) * safeLimit)
+      .take(safeLimit);
+    if (excludeCategoryId !== undefined) {
+      qb.andWhere('("category_id" IS NULL OR "category_id" != :cid)', { cid: excludeCategoryId });
+    }
+    if (search) {
+      qb.andWhere('(LOWER(item.description) LIKE :s OR LOWER(item.code) LIKE :s)', { s: `%${search.toLowerCase()}%` });
+    }
+    const [data, total] = await qb.getManyAndCount();
     return {
       data,
       meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) },
