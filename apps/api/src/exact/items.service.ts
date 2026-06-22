@@ -152,13 +152,14 @@ export class ItemsService {
     });
   }
 
-  async updatePimTemplate(id: string, dto: UpdatePimTemplateDto): Promise<ExactItem> {
+  async updatePimTemplate(id: string, dto: UpdatePimTemplateDto, updatedBy?: string): Promise<ExactItem> {
     const item = await this.repo.findOneOrFail({ where: { id } });
     item.pimTemplate = dto.pimTemplate;
+    item.updatedBy = updatedBy ?? null;
     return this.repo.save(item);
   }
 
-  async create(dto: CreateItemDto): Promise<ExactItem> {
+  async create(dto: CreateItemDto, updatedBy?: string): Promise<ExactItem> {
     let category: Category | null = null;
 
     if (dto.categoryId !== undefined) {
@@ -171,8 +172,10 @@ export class ItemsService {
       description: dto.description,
       code: dto.code ?? null,
       standardSalesPrice: dto.standardSalesPrice ?? null,
+      isSalesItem: true,
       category,
       pimTemplate: category?.template ?? null,
+      updatedBy: updatedBy ?? null,
     });
 
     return this.repo.save(item);
