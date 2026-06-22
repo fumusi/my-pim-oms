@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { CategoryStatus } from '../../common/enums/category-status.enum';
-import type { LocalizedText } from '../../common/types/localized-text.interface';
+import { LocalizedText } from '../../common/types/localized-text.interface';
 
 @Entity('categories')
 export class Category {
