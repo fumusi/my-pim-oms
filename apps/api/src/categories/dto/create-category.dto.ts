@@ -2,7 +2,11 @@ import { z } from 'zod';
 import { createZodDto } from 'nestjs-zod';
 import { CategoryStatus } from '../../common/enums/category-status.enum';
 
-const localizedTextSchema = z.object({ nl: z.string(), en: z.string(), de: z.string() });
+const localizedTextSchema = z
+  .object({ nl: z.string().optional(), en: z.string().optional(), de: z.string().optional() })
+  .refine((val) => val.nl || val.en || val.de, {
+    message: 'At least one language (nl, en, de) is required',
+  });
 
 export const CreateCategorySchema = z.object({
   name: localizedTextSchema,

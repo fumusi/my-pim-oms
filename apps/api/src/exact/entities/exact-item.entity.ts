@@ -91,6 +91,9 @@ export class ExactItem {
   @JoinColumn({ name: 'category_id' })
   category!: Category | null;
 
+  @Column({ type: 'jsonb', nullable: true, name: 'pim_template' })
+  pimTemplate!: Record<string, unknown> | null;
+
   @Column({ nullable: true, type: 'varchar', name: 'item_group_code' })
   itemGroupCode!: string | null;
 

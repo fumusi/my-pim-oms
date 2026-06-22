@@ -1,11 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { ItemsService } from '../exact/items.service';
+import { ItemsService, AssignResult, PaginatedItems } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
+
+export interface CategoryWithCount extends Category {
+  productCount: number;
+}
+
+export interface CategoryDetail extends CategoryWithCount {
+  products: PaginatedItems;
+}
 
 @Injectable()
 export class CategoriesService {
@@ -15,12 +23,31 @@ export class CategoriesService {
     private readonly itemsService: ItemsService,
   ) {}
 
-  findAll(): Promise<Category[]> {
-    return this.categoryRepo.find({ order: { id: 'ASC' } });
+  async findAll(statusFilter?: CategoryStatus): Promise<CategoryWithCount[]> {
+    const where: FindOptionsWhere<Category> = { archivedAt: IsNull() };
+    if (statusFilter) where.status = statusFilter;
+
+    const categories = await this.categoryRepo.find({ where, order: { id: 'ASC' } });
+    if (categories.length === 0) return [];
+
+    const counts = await this.itemsService.countsByCategoryIds(categories.map((c) => c.id));
+    return categories.map((c) => ({ ...c, productCount: counts.get(c.id) ?? 0 }));
   }
 
   findOne(id: number): Promise<Category | null> {
     return this.categoryRepo.findOne({ where: { id } });
+  }
+
+  async findOneDetail(id: number, page = 1, limit = 20): Promise<CategoryDetail | null> {
+    const category = await this.categoryRepo.findOne({ where: { id } });
+    if (!category) return null;
+
+    const [productCount, products] = await Promise.all([
+      this.itemsService.countByCategory(id),
+      this.itemsService.findByCategoryId(id, page, limit),
+    ]);
+
+    return { ...category, productCount, products };
   }
 
   async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {
@@ -55,6 +82,12 @@ export class CategoriesService {
   async archive(id: number, updatedBy?: string): Promise<Category> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
     if (category.archivedAt) return category;
+    const count = await this.itemsService.countByCategory(id);
+    if (count > 0) {
+      throw new BadRequestException(
+        `Cannot archive category: ${count} product${count === 1 ? '' : 's'} still assigned`,
+      );
+    }
     category.archivedAt = new Date();
     category.updatedBy = updatedBy ?? null;
     return this.categoryRepo.save(category);
@@ -69,6 +102,17 @@ export class CategoriesService {
       );
     }
     await this.categoryRepo.delete(id);
+  }
+
+  async assignProducts(id: number, productIds: string[], updatedBy?: string): Promise<AssignResult> {
+    void updatedBy;
+    const category = await this.categoryRepo.findOneOrFail({ where: { id } });
+    return this.itemsService.assignToCategory(productIds, id, category.template);
+  }
+
+  async unassignProducts(id: number, productIds: string[]): Promise<void> {
+    await this.categoryRepo.findOneOrFail({ where: { id } });
+    await this.itemsService.unassignFromCategory(productIds, id);
   }
 
   // applyTemplate: will be implemented once ExactItem gains a pim_template column.
