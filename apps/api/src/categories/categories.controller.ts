@@ -95,7 +95,11 @@ export class CategoriesController {
     const detail = await this.categoriesService.findOneDetail(id, query.page, query.limit);
     if (!detail) throw new NotFoundException(`Category ${id} not found`);
 
-    if (req.user.role !== Role.Admin) {
+    const isAdmin = req.user.role === Role.Admin;
+    if (!isAdmin) {
+      if (detail.status !== CategoryStatus.Active || detail.archivedAt) {
+        throw new NotFoundException(`Category ${id} not found`);
+      }
       return stripTemplate(detail);
     }
     return detail;
@@ -154,23 +158,15 @@ export class CategoriesController {
 
   @Post(':id/assign')
   @Roles(Role.Admin)
-  assignProducts(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: AssignProductsDto,
-    @Req() req: AuthRequest,
-  ) {
-    return this.categoriesService.assignProducts(id, dto.productIds, req.user.email);
+  assignProducts(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignProductsDto) {
+    return this.categoriesService.assignProducts(id, dto.productIds);
   }
 
-  // ── DELETE /categories/:id/assign ──────────────────────────────────────────────
+  // ── POST /categories/:id/unassign ─────────────────────────────────────────────
 
-  @Delete(':id/assign')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post(':id/unassign')
   @Roles(Role.Admin)
-  async unassignProducts(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: AssignProductsDto,
-  ) {
-    await this.categoriesService.unassignProducts(id, dto.productIds);
+  unassignProducts(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignProductsDto) {
+    return this.categoriesService.unassignProducts(id, dto.productIds);
   }
 }

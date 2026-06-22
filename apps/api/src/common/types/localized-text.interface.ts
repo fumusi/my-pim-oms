@@ -1,5 +1,5 @@
 export interface LocalizedText {
-  nl: string;
-  en: string;
-  de: string;
+  nl?: string;
+  en?: string;
+  de?: string;
 }

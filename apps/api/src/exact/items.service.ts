@@ -69,52 +69,56 @@ export class ItemsService {
 
   // Override strategy: category template fully replaces the product's existing pim_template.
   // If the category has no template (null), pim_template is cleared on the assigned products.
+  // Wrapped in a transaction with SELECT FOR UPDATE to prevent double-assignment race conditions.
   async assignToCategory(
     productIds: string[],
     categoryId: number,
     categoryTemplate: Record<string, unknown> | null = null,
   ): Promise<AssignResult> {
-    const skipped: { id: string; reason: string }[] = [];
+    return this.repo.manager.transaction(async (em) => {
+      const skipped: { id: string; reason: string }[] = [];
 
-    // Single query: fetch id + current category_id for all requested items.
-    const rows = await this.repo.manager
-      .createQueryBuilder()
-      .select('id, category_id')
-      .from('exact_items', 'i')
-      .where('id IN (:...ids)', { ids: productIds })
-      .getRawMany<{ id: string; category_id: string | null }>();
-
-    const found = new Map(rows.map((r) => [r.id, r.category_id]));
-    const toAssign: string[] = [];
-
-    for (const pid of productIds) {
-      if (!found.has(pid)) {
-        skipped.push({ id: pid, reason: 'product not found' });
-        continue;
-      }
-      const currentCategoryId = found.get(pid);
-      if (currentCategoryId !== null && Number(currentCategoryId) === categoryId) {
-        skipped.push({ id: pid, reason: 'already assigned to this category' });
-        continue;
-      }
-      toAssign.push(pid);
-    }
-
-    if (toAssign.length > 0) {
-      // Use raw table name in QB so FK columns can be set directly.
-      await this.repo.manager
+      // Lock rows for the duration of the transaction to prevent concurrent assignment races.
+      const rows = await em
         .createQueryBuilder()
-        .update('exact_items')
-        .set({ category_id: categoryId, pim_template: categoryTemplate })
-        .where('id IN (:...ids)', { ids: toAssign })
-        .execute();
-    }
+        .select('id, category_id')
+        .from('exact_items', 'i')
+        .where('id IN (:...ids)', { ids: productIds })
+        .setLock('pessimistic_write')
+        .getRawMany<{ id: string; category_id: string | null }>();
 
-    return { assigned: toAssign.length, skipped };
+      const found = new Map(rows.map((r) => [r.id, r.category_id]));
+      const toAssign: string[] = [];
+
+      for (const pid of productIds) {
+        if (!found.has(pid)) {
+          skipped.push({ id: pid, reason: 'product not found' });
+          continue;
+        }
+        const currentCategoryId = found.get(pid);
+        if (currentCategoryId !== null && Number(currentCategoryId) === categoryId) {
+          skipped.push({ id: pid, reason: 'already assigned to this category' });
+          continue;
+        }
+        toAssign.push(pid);
+      }
+
+      if (toAssign.length > 0) {
+        // Raw table name required in QB so FK columns (category_id, pim_template) can be set directly.
+        await em
+          .createQueryBuilder()
+          .update('exact_items')
+          .set({ category_id: categoryId, pim_template: categoryTemplate })
+          .where('id IN (:...ids)', { ids: toAssign })
+          .execute();
+      }
+
+      return { assigned: toAssign.length, skipped };
+    });
   }
 
-  async unassignFromCategory(productIds: string[], categoryId: number): Promise<void> {
-    if (productIds.length === 0) return;
+  async unassignFromCategory(productIds: string[], categoryId: number): Promise<number> {
+    if (productIds.length === 0) return 0;
 
     // Only unassign items actually in this category — ignore others silently.
     const rows = await this.repo
@@ -125,14 +129,17 @@ export class ItemsService {
       .getMany();
 
     const toUnassign = rows.map((r) => r.id);
-    if (toUnassign.length === 0) return;
+    if (toUnassign.length === 0) return 0;
 
+    // Clear pim_template alongside category_id — template was stamped on assign, must be cleared on unassign.
     await this.repo.manager
       .createQueryBuilder()
       .update('exact_items')
-      .set({ category_id: null })
+      .set({ category_id: null, pim_template: null })
       .where('id IN (:...ids)', { ids: toUnassign })
       .execute();
+
+    return toUnassign.length;
   }
 
   async findAll(page = 1, limit = 20): Promise<PaginatedItems> {

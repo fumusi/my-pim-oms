@@ -104,15 +104,15 @@ export class CategoriesService {
     await this.categoryRepo.delete(id);
   }
 
-  async assignProducts(id: number, productIds: string[], updatedBy?: string): Promise<AssignResult> {
-    void updatedBy;
+  async assignProducts(id: number, productIds: string[]): Promise<AssignResult> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
     return this.itemsService.assignToCategory(productIds, id, category.template);
   }
 
-  async unassignProducts(id: number, productIds: string[]): Promise<void> {
+  async unassignProducts(id: number, productIds: string[]): Promise<{ unassigned: number }> {
     await this.categoryRepo.findOneOrFail({ where: { id } });
-    await this.itemsService.unassignFromCategory(productIds, id);
+    const unassigned = await this.itemsService.unassignFromCategory(productIds, id);
+    return { unassigned };
   }
 
   // applyTemplate: will be implemented once ExactItem gains a pim_template column.

@@ -336,13 +336,14 @@ describe('CategoriesService', () => {
       expect(itemsService.unassignFromCategory).not.toHaveBeenCalled();
     });
 
-    it('delegates to itemsService.unassignFromCategory', async () => {
+    it('delegates to itemsService.unassignFromCategory and returns count', async () => {
       categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
-      itemsService.unassignFromCategory.mockResolvedValue(undefined);
+      itemsService.unassignFromCategory.mockResolvedValue(1);
 
-      await service.unassignProducts(1, ['uuid-1']);
+      const result = await service.unassignProducts(1, ['uuid-1']);
 
       expect(itemsService.unassignFromCategory).toHaveBeenCalledWith(['uuid-1'], 1);
+      expect(result).toEqual({ unassigned: 1 });
     });
   });
 });
