@@ -1,7 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { ExactItem } from './entities/exact-item.entity';
+import { CreateItemDto } from './dto/create-item.dto';
+import { UpdatePimTemplateDto } from './dto/update-pim-template.dto';
 
 const MAX_LIMIT = 100;
 
@@ -144,6 +147,40 @@ export class ItemsService {
 
       return toUnassign.length;
     });
+  }
+
+  async updatePimTemplate(id: string, dto: UpdatePimTemplateDto): Promise<ExactItem> {
+    const item = await this.repo.findOneOrFail({ where: { id } });
+    item.pimTemplate = dto.pimTemplate;
+    return this.repo.save(item);
+  }
+
+  async create(dto: CreateItemDto, createdBy?: string): Promise<ExactItem> {
+    void createdBy;
+    let pimTemplate: Record<string, unknown> | null = null;
+
+    if (dto.categoryId !== undefined) {
+      const row = await this.repo.manager
+        .createQueryBuilder()
+        .select('template')
+        .from('categories', 'c')
+        .where('id = :id', { id: dto.categoryId })
+        .getRawOne<{ template: Record<string, unknown> | null }>();
+
+      if (!row) throw new NotFoundException(`Category ${dto.categoryId} not found`);
+      pimTemplate = row.template;
+    }
+
+    const item = this.repo.create({
+      id: randomUUID(),
+      description: dto.description,
+      code: dto.code ?? null,
+      standardSalesPrice: dto.standardSalesPrice ?? null,
+      category: dto.categoryId !== undefined ? ({ id: dto.categoryId } as never) : null,
+      pimTemplate,
+    });
+
+    return this.repo.save(item);
   }
 
   async findAll(page = 1, limit = 20): Promise<PaginatedItems> {
