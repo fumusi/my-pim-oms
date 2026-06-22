@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
-import { ExactItem } from '../exact/entities/exact-item.entity';
+import { ItemsService } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
 
 @Injectable()
@@ -10,8 +10,7 @@ export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
-    @InjectRepository(ExactItem)
-    private readonly itemRepo: Repository<ExactItem>,
+    private readonly itemsService: ItemsService,
   ) {}
 
   findAll(): Promise<Category[]> {
@@ -39,16 +38,12 @@ export class CategoriesService {
     category.updatedBy = updatedBy ?? null;
     const saved = await this.categoryRepo.save(category);
 
-    // When a category is deactivated, mark all its products as non-sales items.
-    // isSalesItem is the current PIM proxy for "active" — replace with a dedicated
-    // pim_status column once that field is added to exact_items.
+    // When a category is deactivated, all its products are set to isSalesItem=false.
+    // isSalesItem is the current PIM proxy for "active" (replace with pim_status column later).
+    // NOTE: re-activation does NOT restore products — any product deactivated here stays
+    // inactive until manually re-enabled. This is intentional until pim_status lands.
     if (status === CategoryStatus.Inactive) {
-      await this.itemRepo
-        .createQueryBuilder()
-        .update()
-        .set({ isSalesItem: false })
-        .where('"category_id" = :id', { id })
-        .execute();
+      await this.itemsService.deactivateByCategoryId(id);
     }
 
     return saved;
@@ -56,13 +51,14 @@ export class CategoriesService {
 
   async archive(id: number, updatedBy?: string): Promise<Category> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
+    if (category.archivedAt) return category;
     category.archivedAt = new Date();
     category.updatedBy = updatedBy ?? null;
     return this.categoryRepo.save(category);
   }
 
   async delete(id: number): Promise<void> {
-    const count = await this.itemRepo.count({ where: { category: { id } } });
+    const count = await this.itemsService.countByCategory(id);
     if (count > 0) {
       throw new BadRequestException(
         `Cannot delete category: ${count} product${count === 1 ? '' : 's'} still assigned`,

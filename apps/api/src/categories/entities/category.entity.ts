@@ -2,18 +2,11 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { CategoryStatus } from '../../common/enums/category-status.enum';
-import { ExactItem } from '../../exact/entities/exact-item.entity';
-
-export interface LocalizedText {
-  nl: string;
-  en: string;
-  de: string;
-}
+import type { LocalizedText } from '../../common/types/localized-text.interface';
 
 @Entity('categories')
 export class Category {
@@ -49,7 +42,4 @@ export class Category {
 
   @Column({ type: 'timestamptz', nullable: true, name: 'archived_at' })
   archivedAt!: Date | null;
-
-  @OneToMany(() => ExactItem, (item) => item.category)
-  products!: ExactItem[];
 }

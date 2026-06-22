@@ -17,6 +17,19 @@ export class ItemsService {
     private readonly repo: Repository<ExactItem>,
   ) {}
 
+  countByCategory(categoryId: number): Promise<number> {
+    return this.repo.count({ where: { category: { id: categoryId } } });
+  }
+
+  async deactivateByCategoryId(categoryId: number): Promise<void> {
+    await this.repo
+      .createQueryBuilder('item')
+      .update()
+      .set({ isSalesItem: false })
+      .where('item.category = :id', { id: categoryId })
+      .execute();
+  }
+
   async findAll(page = 1, limit = 20): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
     const skip = (page - 1) * safeLimit;
