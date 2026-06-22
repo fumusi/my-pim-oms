@@ -290,7 +290,7 @@ export function DashboardPage() {
 
   const { data: productsPage, isLoading: productsLoading } = useQuery({
     queryKey: ['product-count'],
-    queryFn: () => getProducts(1, 1).then((r) => r.data),
+    queryFn: () => getProducts({ page: 1, limit: 1 }).then((r) => r.data),
   })
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
