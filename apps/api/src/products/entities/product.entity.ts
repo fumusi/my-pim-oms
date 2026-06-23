@@ -2,6 +2,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -9,6 +11,7 @@ import { decimalTransformer } from '../../database/transformers/transformers';
 import { ProductStatus } from '../../common/enums/product-status.enum';
 import { SuitableFor } from '../../common/enums/suitable-for.enum';
 import { Finishing } from '../../common/enums/finishing.enum';
+import { Category } from '../../categories/entities/category.entity';
 import type { LocalizedText } from '../../common/types/localized-text.interface';
 
 @Entity('products')
@@ -16,8 +19,8 @@ export class Product {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'uuid', unique: true, name: 'exact_id' })
-  exactId!: string;
+  @Column({ type: 'uuid', unique: true, name: 'exact_id', nullable: true })
+  exactId!: string | null;
 
   // ── Multi-language ──────────────────────────────────────────────────────────
 
@@ -46,6 +49,12 @@ export class Product {
 
   @Column({ type: 'varchar', nullable: true, name: 'purchase_vat_code' })
   purchaseVatCode!: string | null;
+
+  // ── Category ────────────────────────────────────────────────────────────────
+
+  @ManyToOne(() => Category, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'category_id' })
+  category!: Category | null;
 
   // ── Internal ────────────────────────────────────────────────────────────────
 
