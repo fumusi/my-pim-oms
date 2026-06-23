@@ -38,6 +38,7 @@ class ListQueryDto extends createZodDto(ListQuerySchema) {}
 const DetailQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
 });
 class DetailQueryDto extends createZodDto(DetailQuerySchema) {}
 
@@ -92,7 +93,7 @@ export class CategoriesController {
     @Query() query: DetailQueryDto,
     @Req() req: AuthRequest,
   ) {
-    const detail = await this.categoriesService.findOneDetail(id, query.page, query.limit);
+    const detail = await this.categoriesService.findOneDetail(id, query.page, query.limit, query.search);
     if (!detail) throw new NotFoundException(`Category ${id} not found`);
 
     const isAdmin = req.user.role === Role.Admin;

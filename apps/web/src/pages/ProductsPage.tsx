@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { getProducts } from '../api/products'
+import { resolveName, type Lang } from '../utils/format'
 
 const PAGE_LIMIT = 20
 
@@ -16,10 +17,11 @@ function StatusBadge({ isSalesItem }: { isSalesItem: boolean | null }) {
 
 export function ProductsPage() {
   const [page, setPage] = useState(1)
+  const [lang, setLang] = useState<Lang>('nl')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', page],
-    queryFn: () => getProducts(page, PAGE_LIMIT).then((r) => r.data),
+    queryFn: () => getProducts({ page, limit: PAGE_LIMIT, withCategory: true }).then((r) => r.data),
     placeholderData: keepPreviousData,
   })
 
@@ -63,6 +65,17 @@ export function ProductsPage() {
           <div className="dash-card-title">Product Catalogue</div>
           <div className="dash-card-sub">{meta.total} product{meta.total === 1 ? '' : 's'} synced from Exact Online</div>
         </div>
+        <div className="lang-switcher">
+          {(['nl', 'en', 'de'] as Lang[]).map((l) => (
+            <button
+              key={l}
+              className={`lang-switcher-btn${lang === l ? ' lang-switcher-btn--active' : ''}`}
+              onClick={() => setLang(l)}
+            >
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="users-table-wrap">
@@ -72,6 +85,7 @@ export function ProductsPage() {
               <th>#</th>
               <th>Name</th>
               <th>SKU</th>
+              <th>Group</th>
               <th>Category</th>
               <th>Status</th>
             </tr>
@@ -84,6 +98,9 @@ export function ProductsPage() {
                 <td className="users-td-muted">{p.code ?? '—'}</td>
                 <td className="users-td-muted">
                   {p.itemGroup?.description ?? p.itemGroupDescription ?? '—'}
+                </td>
+                <td className="users-td-muted">
+                  {p.category ? resolveName(p.category.name, lang) : '—'}
                 </td>
                 <td>
                   <StatusBadge isSalesItem={p.isSalesItem} />

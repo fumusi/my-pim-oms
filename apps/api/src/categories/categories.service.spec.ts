@@ -126,7 +126,7 @@ describe('CategoriesService', () => {
 
       expect(result?.productCount).toBe(5);
       expect(result?.products).toBe(paginatedProducts);
-      expect(itemsService.findByCategoryId).toHaveBeenCalledWith(1, 1, 20);
+      expect(itemsService.findByCategoryId).toHaveBeenCalledWith(1, 1, 20, undefined);
     });
   });
 

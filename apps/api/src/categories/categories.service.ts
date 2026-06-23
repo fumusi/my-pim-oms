@@ -38,13 +38,13 @@ export class CategoriesService {
     return this.categoryRepo.findOne({ where: { id } });
   }
 
-  async findOneDetail(id: number, page = 1, limit = 20): Promise<CategoryDetail | null> {
+  async findOneDetail(id: number, page = 1, limit = 20, search?: string): Promise<CategoryDetail | null> {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) return null;
 
     const [productCount, products] = await Promise.all([
       this.itemsService.countByCategory(id),
-      this.itemsService.findByCategoryId(id, page, limit),
+      this.itemsService.findByCategoryId(id, page, limit, search),
     ]);
 
     return { ...category, productCount, products };
