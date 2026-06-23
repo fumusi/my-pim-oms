@@ -69,7 +69,7 @@ export function CategoryDrawer({ category, loading, onSave, onClose }: Props) {
         descDe: category.description?.de ?? '',
         image: category.image ?? '',
         icon: category.icon ?? '',
-        status: 'active',
+        status: category.status,
       })
       setTemplate(category.template)
     } else {

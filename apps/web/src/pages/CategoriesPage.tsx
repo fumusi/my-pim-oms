@@ -47,7 +47,7 @@ export function CategoriesPage() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
 
   const { data: categories = [], isLoading, isError } = useQuery({
-    queryKey: ['categories', isAdmin ? statusFilter : 'active'],
+    queryKey: ['categories', isAdmin ? statusFilter : null],
     queryFn: () =>
       getCategories(isAdmin && statusFilter ? { status: statusFilter } : undefined).then((r) => r.data),
   })

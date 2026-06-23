@@ -16,5 +16,5 @@ export interface PaginatedProducts {
   meta: { page: number; limit: number; total: number; totalPages: number }
 }
 
-export const getProducts = (params?: { page?: number; limit?: number; excludeCategoryId?: number; search?: string }) =>
+export const getProducts = (params?: { page?: number; limit?: number; excludeCategoryId?: number; search?: string; withCategory?: boolean }) =>
   api.get<PaginatedProducts>('/products', { params })

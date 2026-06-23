@@ -70,7 +70,7 @@ export class ItemsService {
       .skip((page - 1) * safeLimit)
       .take(safeLimit);
     if (search) {
-      qb.andWhere('(LOWER(item.description) LIKE :s OR LOWER(item.code) LIKE :s)', { s: `%${search.toLowerCase()}%` });
+      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s)', { s: `%${search}%` });
     }
     const [data, total] = await qb.getManyAndCount();
     return { data, meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } };
@@ -179,20 +179,28 @@ export class ItemsService {
     return this.repo.save(item);
   }
 
-  async findAll(page = 1, limit = 20, excludeCategoryId?: number, search?: string): Promise<PaginatedItems> {
+  async findAll(
+    page = 1,
+    limit = 20,
+    excludeCategoryId?: number,
+    search?: string,
+    withCategory = false,
+  ): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
     const qb = this.repo
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.itemGroup', 'itemGroup')
-      .leftJoinAndSelect('item.category', 'category')
       .orderBy('item.description', 'ASC')
       .skip((page - 1) * safeLimit)
       .take(safeLimit);
+    if (withCategory) {
+      qb.leftJoinAndSelect('item.category', 'category');
+    }
     if (excludeCategoryId !== undefined) {
       qb.andWhere('("category_id" IS NULL OR "category_id" != :cid)', { cid: excludeCategoryId });
     }
     if (search) {
-      qb.andWhere('(LOWER(item.description) LIKE :s OR LOWER(item.code) LIKE :s)', { s: `%${search.toLowerCase()}%` });
+      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s)', { s: `%${search}%` });
     }
     const [data, total] = await qb.getManyAndCount();
     return {

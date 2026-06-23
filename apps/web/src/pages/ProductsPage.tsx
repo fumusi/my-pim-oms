@@ -21,7 +21,7 @@ export function ProductsPage() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', page],
-    queryFn: () => getProducts({ page, limit: PAGE_LIMIT }).then((r) => r.data),
+    queryFn: () => getProducts({ page, limit: PAGE_LIMIT, withCategory: true }).then((r) => r.data),
     placeholderData: keepPreviousData,
   })
 
