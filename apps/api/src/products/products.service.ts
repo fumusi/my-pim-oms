@@ -6,6 +6,16 @@ import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
+import type { FindProductsQueryDto } from './dto/find-products-query.dto';
+
+const MAX_LIMIT = 100;
+
+export interface PaginatedProducts {
+  data: Product[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 @Injectable()
 export class ProductsService {
@@ -15,6 +25,63 @@ export class ProductsService {
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
   ) {}
+
+  async findAll(query: FindProductsQueryDto): Promise<PaginatedProducts> {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, MAX_LIMIT);
+
+    const qb = this.repo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.category', 'c')
+      .orderBy('p.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    // Archived products excluded by default; opt-in via status=archived
+    if (!query.status) {
+      qb.andWhere('p.archivedAt IS NULL');
+    } else if (query.status === 'archived') {
+      qb.andWhere('p.archivedAt IS NOT NULL');
+    } else {
+      qb.andWhere('p.archivedAt IS NULL');
+      qb.andWhere('p.status = :status', { status: query.status });
+    }
+
+    if (query.categoryId) {
+      qb.andWhere('c.id = :categoryId', { categoryId: query.categoryId });
+    }
+
+    if (query.search) {
+      const s = `%${query.search}%`;
+      qb.andWhere(
+        `(
+          p.name->>'en' ILIKE :s
+          OR p.name->>'nl' ILIKE :s
+          OR p.name->>'de' ILIKE :s
+          OR p.barcode ILIKE :s
+          OR EXISTS (
+            SELECT 1 FROM exact_items ei
+            WHERE ei.id = p.exact_id
+              AND ei.code ILIKE :s
+          )
+        )`,
+        { s },
+      );
+    }
+
+    if (query.inStock === 'in_stock') {
+      qb.andWhere('p.stock > 0');
+    } else if (query.inStock === 'out_of_stock') {
+      qb.andWhere('(p.stock IS NULL OR p.stock = 0)');
+    } else if (query.inStock === 'low_stock') {
+      qb.andWhere(
+        '(p.lowStockThreshold IS NOT NULL AND p.stock IS NOT NULL AND p.stock >= 0 AND p.stock < p.lowStockThreshold)',
+      );
+    }
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, page, limit };
+  }
 
   async findById(id: number): Promise<Product> {
     const product = await this.repo.findOne({ where: { id }, relations: { category: true } });

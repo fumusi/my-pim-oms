@@ -17,10 +17,11 @@ export const localizedTextSchema = z
 export const CreateProductSchema = z.object({
   name: localizedTextSchema,
   description: localizedTextSchema.nullable().optional(),
-  status: z.nativeEnum(ProductStatus).optional(),
+  status: z.enum(ProductStatus).optional(),
   categoryId: z.number().int().min(1).optional(),
 
-  // internal
+  // internal / stock
+  stock: z.number().nullable().optional(),
   backorder: z.boolean().optional(),
   countryRestriction: z.array(z.string()).nullable().optional(),
   endDate: z.string().nullable().optional(),
@@ -39,12 +40,12 @@ export const CreateProductSchema = z.object({
   // extended attributes
   co2EmissionProduction: z.string().nullable().optional(),
   co2EmissionTransport: z.string().nullable().optional(),
-  suitableFor: z.nativeEnum(SuitableFor).nullable().optional(),
+  suitableFor: z.enum(SuitableFor).nullable().optional(),
   color: z.string().nullable().optional(),
   material: z.string().nullable().optional(),
   application: z.string().nullable().optional(),
   countryOfOrigin: z.string().nullable().optional(),
-  finishing: z.nativeEnum(Finishing).nullable().optional(),
+  finishing: z.enum(Finishing).nullable().optional(),
   douProduct: z.boolean().nullable().optional(),
   biodegradable: z.boolean().nullable().optional(),
   handmade: z.boolean().nullable().optional(),

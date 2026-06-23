@@ -58,7 +58,7 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
 
 export function mapProduct(
   i: ExactItemResponse,
-): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight'> {
+): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight' | 'stock'> {
   return {
     exactId: i.ID,
     barcode: i.Barcode,
@@ -68,6 +68,7 @@ export function mapProduct(
     salesVatCode: i.SalesVatCode,
     name: i.Description ? { en: i.Description } : null,
     weight: i.NetWeight,
+    stock: i.Stock,
   };
 }
 

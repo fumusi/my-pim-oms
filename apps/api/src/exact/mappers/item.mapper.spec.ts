@@ -194,6 +194,12 @@ describe('mapProduct', () => {
     expect(result.weight).toBeNull();
   });
 
+  it('syncs stock from Stock on every upsert', () => {
+    expect(mapProduct(makeItemResponse({ Stock: 42 })).stock).toBe(42);
+    expect(mapProduct(makeItemResponse({ Stock: 0 })).stock).toBe(0);
+    expect(mapProduct(makeItemResponse({ Stock: null })).stock).toBeNull();
+  });
+
   it('maps null Exact fields to null', () => {
     const result = mapProduct(makeItemResponse({
       Barcode: null,

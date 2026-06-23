@@ -6,6 +6,18 @@ import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
 
+function makeQbMock(result: [Product[], number] = [[], 0]) {
+  const qb = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getManyAndCount: jest.fn().mockResolvedValue(result),
+  };
+  return qb;
+}
+
 const makeProduct = (overrides: Partial<Product> = {}): Product =>
   ({
     id: 1,
@@ -28,6 +40,7 @@ const makeCategory = (overrides: Partial<Category> = {}): Category =>
 describe('ProductsService', () => {
   let service: ProductsService;
   let productRepo: {
+    createQueryBuilder: jest.Mock;
     findOne: jest.Mock;
     findOneBy: jest.Mock;
     create: jest.Mock;
@@ -35,9 +48,12 @@ describe('ProductsService', () => {
     remove: jest.Mock;
   };
   let categoryRepo: { findOneBy: jest.Mock };
+  let qb: ReturnType<typeof makeQbMock>;
 
   beforeEach(async () => {
+    qb = makeQbMock();
     productRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
       findOne: jest.fn(),
       findOneBy: jest.fn(),
       create: jest.fn().mockImplementation((data) => ({ ...data })),
@@ -239,6 +255,106 @@ describe('ProductsService', () => {
     it('throws NotFoundException when product does not exist', async () => {
       productRepo.findOneBy.mockResolvedValue(null);
       await expect(service.updateStatus(99, ProductStatus.Inactive)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findAll', () => {
+    it('returns paginated structure with data, total, page, limit', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      qb.getManyAndCount.mockResolvedValue([products, 2]);
+
+      const result = await service.findAll({ page: 1, limit: 10 } as any);
+
+      expect(result.data).toBe(products);
+      expect(result.total).toBe(2);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(10);
+    });
+
+    it('joins category and orders by createdAt DESC', async () => {
+      await service.findAll({ page: 1, limit: 20 } as any);
+
+      expect(productRepo.createQueryBuilder).toHaveBeenCalledWith('p');
+      expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('p.category', 'c');
+      expect(qb.orderBy).toHaveBeenCalledWith('p.createdAt', 'DESC');
+    });
+
+    it('excludes archived products by default (no status param)', async () => {
+      await service.findAll({ page: 1, limit: 20 } as any);
+
+      const calls = qb.andWhere.mock.calls.map(([expr]: [string]) => expr);
+      expect(calls.some((c) => c.includes('archivedAt IS NULL'))).toBe(true);
+      expect(calls.some((c) => c.includes('archivedAt IS NOT NULL'))).toBe(false);
+    });
+
+    it('includes only archived when status=archived', async () => {
+      await service.findAll({ page: 1, limit: 20, status: 'archived' } as any);
+
+      const calls = qb.andWhere.mock.calls.map(([expr]: [string]) => expr);
+      expect(calls.some((c) => c.includes('archivedAt IS NOT NULL'))).toBe(true);
+    });
+
+    it('filters by status and excludes archived when status=active', async () => {
+      await service.findAll({ page: 1, limit: 20, status: 'active' } as any);
+
+      const calls = qb.andWhere.mock.calls.map(([expr]: [string]) => expr);
+      expect(calls.some((c) => c.includes('archivedAt IS NULL'))).toBe(true);
+      expect(qb.andWhere).toHaveBeenCalledWith('p.status = :status', { status: 'active' });
+    });
+
+    it('filters by categoryId via joined alias', async () => {
+      await service.findAll({ page: 1, limit: 20, categoryId: 3 } as any);
+
+      expect(qb.andWhere).toHaveBeenCalledWith('c.id = :categoryId', { categoryId: 3 });
+    });
+
+    it('adds JSONB + barcode + code EXISTS search when search provided', async () => {
+      await service.findAll({ page: 1, limit: 20, search: 'vase' } as any);
+
+      const [expr, params] = qb.andWhere.mock.calls.find(([e]: [string]) =>
+        e.includes('ILIKE'),
+      );
+      expect(expr).toContain("p.name->>'en' ILIKE :s");
+      expect(expr).toContain("p.name->>'nl' ILIKE :s");
+      expect(expr).toContain("p.name->>'de' ILIKE :s");
+      expect(expr).toContain('p.barcode ILIKE :s');
+      expect(expr).toContain('exact_items');
+      expect(params.s).toBe('%vase%');
+    });
+
+    it('adds direct p.stock > 0 filter for inStock=in_stock (no JOIN)', async () => {
+      await service.findAll({ page: 1, limit: 20, inStock: 'in_stock' } as any);
+
+      expect(qb.andWhere).toHaveBeenCalledWith('p.stock > 0');
+    });
+
+    it('adds p.stock IS NULL OR = 0 filter for inStock=out_of_stock', async () => {
+      await service.findAll({ page: 1, limit: 20, inStock: 'out_of_stock' } as any);
+
+      expect(qb.andWhere).toHaveBeenCalledWith('(p.stock IS NULL OR p.stock = 0)');
+    });
+
+    it('adds low_stock_threshold comparison for inStock=low_stock', async () => {
+      await service.findAll({ page: 1, limit: 20, inStock: 'low_stock' } as any);
+
+      const [expr] = qb.andWhere.mock.calls.find(([e]: [string]) =>
+        e.includes('lowStockThreshold'),
+      );
+      expect(expr).toContain('p.stock');
+      expect(expr).toContain('p.lowStockThreshold');
+    });
+
+    it('applies skip/take for pagination', async () => {
+      await service.findAll({ page: 3, limit: 10 } as any);
+
+      expect(qb.skip).toHaveBeenCalledWith(20); // (3-1)*10
+      expect(qb.take).toHaveBeenCalledWith(10);
+    });
+
+    it('caps limit at MAX_LIMIT (100)', async () => {
+      await service.findAll({ page: 1, limit: 9999 } as any);
+
+      expect(qb.take).toHaveBeenCalledWith(100);
     });
   });
 });

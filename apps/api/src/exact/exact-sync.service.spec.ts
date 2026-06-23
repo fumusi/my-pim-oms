@@ -210,7 +210,7 @@ describe('ExactSyncService', () => {
       await service.syncProducts();
 
       expect(qb.orUpdate).toHaveBeenCalledWith(
-        expect.arrayContaining(['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code']),
+        expect.arrayContaining(['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock']),
         ['exact_id'],
       );
       const [updatedCols] = qb.orUpdate.mock.calls[0];
@@ -245,6 +245,7 @@ describe('ExactSyncService', () => {
       expect(product.salesVatCode).toBe('V21');
       expect(product.name).toEqual({ en: 'Ceramic Vase' });
       expect(product.weight).toBe(0.5);
+      expect(product.stock).toBeNull();
       expect(product.status).toBeUndefined();
     });
 

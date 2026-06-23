@@ -15,7 +15,6 @@ import {
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
-import { ItemsService } from '../exact/items.service';
 import { ProductsService } from './products.service';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -27,20 +26,15 @@ import type { LocalizedText } from '../common/types/localized-text.interface';
 
 @Controller('products')
 export class ProductsController {
-  constructor(
-    private readonly itemsService: ItemsService,
-    private readonly productsService: ProductsService,
-  ) {}
+  constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findAll(@Query() query: FindProductsQueryDto) {
-    return this.itemsService.findAll(
-      query.page,
-      query.limit,
-      query.excludeCategoryId,
-      query.search,
-      query.withCategory,
-    );
+  async findAll(@Query() query: FindProductsQueryDto) {
+    const result = await this.productsService.findAll(query);
+    if (query.lang) {
+      return { ...result, data: result.data.map((p) => this.flattenLang(p, query.lang!)) };
+    }
+    return result;
   }
 
   @Post()

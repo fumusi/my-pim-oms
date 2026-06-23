@@ -11,8 +11,8 @@ import { ExactItemResponse, ExactItemGroupResponse, SyncError, SyncSummary } fro
 const PAGE_SIZE = 100;
 const MAX_ITEM_PAGES = 3;
 
-// DB column names updated on conflict — name/weight are seeded on INSERT only
-const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code'];
+// DB column names updated on conflict — name/weight are seeded on INSERT only; stock is live data from Exact
+const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock'];
 
 @Injectable()
 export class ExactSyncService {

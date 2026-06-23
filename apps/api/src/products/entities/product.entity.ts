@@ -88,6 +88,11 @@ export class Product {
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt!: Date;
 
+  // ── Stock ───────────────────────────────────────────────────────────────────
+
+  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  stock!: number | null;
+
   // ── Measurements ────────────────────────────────────────────────────────────
 
   @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
