@@ -4,6 +4,15 @@ import { ConfigService } from '@nestjs/config';
 import type { Product } from '../products/entities/product.entity';
 import type { LocalizedText } from '../common/types/localized-text.interface';
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 @Injectable()
 export class MailService {
   constructor(
@@ -30,8 +39,9 @@ export class MailService {
   async sendLowStockAlert(to: string[], products: Product[]): Promise<void> {
     const rows = products
       .map((p) => {
-        const name = this.pickName(p.name);
-        return `<tr><td>${name}</td><td>${p.barcode ?? '—'}</td><td>${p.stock ?? 0}</td><td>${p.lowStockThreshold ?? '—'}</td></tr>`;
+        const name = escapeHtml(this.pickName(p.name));
+        const barcode = escapeHtml(p.barcode ?? '—');
+        return `<tr><td>${name}</td><td>${barcode}</td><td>${p.stock ?? 0}</td><td>${p.lowStockThreshold ?? '—'}</td></tr>`;
       })
       .join('');
 
@@ -52,8 +62,9 @@ export class MailService {
   async sendOutOfStockAlert(to: string[], products: Product[]): Promise<void> {
     const rows = products
       .map((p) => {
-        const name = this.pickName(p.name);
-        return `<tr><td>${name}</td><td>${p.barcode ?? '—'}</td><td>${p.stock ?? 0}</td></tr>`;
+        const name = escapeHtml(this.pickName(p.name));
+        const barcode = escapeHtml(p.barcode ?? '—');
+        return `<tr><td>${name}</td><td>${barcode}</td><td>${p.stock ?? 0}</td></tr>`;
       })
       .join('');
 

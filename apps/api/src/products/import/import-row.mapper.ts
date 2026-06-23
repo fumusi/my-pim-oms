@@ -185,7 +185,7 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
     if (v !== null && v !== undefined && v !== '') {
       const b = parseBool(v);
       if (b === undefined) {
-        errors.push(`${f} "${v}" must be true or false`);
+        errors.push(`${f} "${v}" must be one of: true, false, 1, 0, yes, no`);
       } else {
         (data as Record<string, unknown>)[f] = b;
       }

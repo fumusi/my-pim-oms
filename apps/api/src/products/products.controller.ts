@@ -76,7 +76,7 @@ export class ProductsController {
 
   @Post('import')
   @Roles(Role.Admin)
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
   importProducts(@UploadedFile() file: Express.Multer.File, @Req() req: AuthRequest) {
     if (!file) throw new BadRequestException('File is required');
     return this.productsService.importProducts(file.buffer, file.mimetype, req.user.email);

@@ -67,19 +67,21 @@ export class ExactSyncService {
         const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
         await this.itemRepo.save(entities, { chunk: 50 });
 
-        for (const item of items) {
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+          const chunk = items.slice(i, i + CHUNK_SIZE);
           try {
             await this.dataSource
               .createQueryBuilder()
               .insert()
               .into(Product)
-              .values([mapProduct(item)])
+              .values(chunk.map(mapProduct))
               .orUpdate(EXACT_UPDATE_COLUMNS, ['exact_id'])
               .execute();
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
-            this.logger.error(`Product upsert failed for ${item.ID}: ${message}`);
-            errors.push({ exactId: item.ID, message });
+            this.logger.error(`Product upsert chunk [${i}..${i + chunk.length - 1}] failed: ${message}`);
+            for (const item of chunk) errors.push({ exactId: item.ID, message });
           }
         }
       },

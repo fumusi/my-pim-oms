@@ -20,7 +20,8 @@ export class StockNotificationService {
   ) {}
 
   async checkAndNotify(): Promise<void> {
-    const adminEmails = await this.getAdminEmails();
+    const admins = await this.userRepo.findBy({ role: Role.Admin, isActive: true });
+    const adminEmails = admins.map((u) => u.email);
     if (adminEmails.length === 0) {
       this.logger.warn('No active admins found — skipping stock notifications');
       return;
@@ -69,7 +70,7 @@ export class StockNotificationService {
       .createQueryBuilder('p')
       .where('p.archivedAt IS NULL')
       .andWhere('p.status = :status', { status: ProductStatus.Active })
-      .andWhere('(p.stock IS NULL OR p.stock = 0)')
+      .andWhere('p.stock = 0')
       .andWhere(
         '(p.lastOutOfStockNotifiedAt IS NULL OR p.lastOutOfStockNotifiedAt < :cutoff)',
         { cutoff: cooldownCutoff },
@@ -77,8 +78,4 @@ export class StockNotificationService {
       .getMany();
   }
 
-  private async getAdminEmails(): Promise<string[]> {
-    const admins = await this.userRepo.findBy({ role: Role.Admin, isActive: true });
-    return admins.map((u) => u.email);
-  }
 }
