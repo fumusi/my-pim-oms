@@ -10,6 +10,7 @@ import { ExactItemResponse, ExactItemGroupResponse, SyncError, SyncSummary } fro
 
 const PAGE_SIZE = 100;
 const MAX_ITEM_PAGES = 3;
+const CHUNK_SIZE = 50;
 
 // DB column names updated on conflict — name/weight are seeded on INSERT only; stock is live data from Exact
 const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock'];
@@ -67,7 +68,6 @@ export class ExactSyncService {
         const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
         await this.itemRepo.save(entities, { chunk: 50 });
 
-        const CHUNK_SIZE = 50;
         for (let i = 0; i < items.length; i += CHUNK_SIZE) {
           const chunk = items.slice(i, i + CHUNK_SIZE);
           try {
