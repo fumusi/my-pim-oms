@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
@@ -9,6 +9,23 @@ import { UpdatePimTemplateDto } from './dto/update-pim-template.dto';
 @Controller('items')
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
+
+  @Get()
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('excludeCategoryId') excludeCategoryId?: string,
+    @Query('search') search?: string,
+    @Query('withCategory') withCategory?: string,
+  ) {
+    return this.itemsService.findAll(
+      page ? parseInt(page, 10) : undefined,
+      limit ? parseInt(limit, 10) : undefined,
+      excludeCategoryId ? parseInt(excludeCategoryId, 10) : undefined,
+      search || undefined,
+      withCategory === 'true',
+    );
+  }
 
   @Post()
   @Roles(Role.Admin)
