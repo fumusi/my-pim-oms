@@ -56,7 +56,9 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
   };
 }
 
-export function mapProduct(i: ExactItemResponse): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode'> {
+export function mapProduct(
+  i: ExactItemResponse,
+): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight'> {
   return {
     exactId: i.ID,
     barcode: i.Barcode,
@@ -64,6 +66,8 @@ export function mapProduct(i: ExactItemResponse): Pick<Product, 'exactId' | 'bar
     basePrice: i.StandardSalesPrice,
     purchasePrice: i.CostPriceStandard,
     salesVatCode: i.SalesVatCode,
+    name: i.Description ? { en: i.Description } : null,
+    weight: i.NetWeight,
   };
 }
 

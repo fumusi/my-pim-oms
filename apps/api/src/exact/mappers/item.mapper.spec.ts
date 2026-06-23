@@ -174,6 +174,26 @@ describe('mapProduct', () => {
     expect(result.salesVatCode).toBe('V1');
   });
 
+  it('seeds name.en from Description for initial insert', () => {
+    const result = mapProduct(makeItemResponse({ Description: 'Ceramic Vase' }));
+    expect(result.name).toEqual({ en: 'Ceramic Vase' });
+  });
+
+  it('sets name to null when Description is null', () => {
+    const result = mapProduct(makeItemResponse({ Description: null }));
+    expect(result.name).toBeNull();
+  });
+
+  it('seeds weight from NetWeight', () => {
+    const result = mapProduct(makeItemResponse({ NetWeight: 1.0 }));
+    expect(result.weight).toBe(1.0);
+  });
+
+  it('sets weight to null when NetWeight is null', () => {
+    const result = mapProduct(makeItemResponse({ NetWeight: null }));
+    expect(result.weight).toBeNull();
+  });
+
   it('maps null Exact fields to null', () => {
     const result = mapProduct(makeItemResponse({
       Barcode: null,
@@ -190,13 +210,13 @@ describe('mapProduct', () => {
     expect(result.salesVatCode).toBeNull();
   });
 
-  it('does not include internal or PIM fields', () => {
+  it('does not include pure internal/PIM-only fields', () => {
     const result = mapProduct(makeItemResponse());
 
     expect(result).not.toHaveProperty('status');
     expect(result).not.toHaveProperty('backorder');
-    expect(result).not.toHaveProperty('name');
     expect(result).not.toHaveProperty('description');
+    expect(result).not.toHaveProperty('endDate');
   });
 });
 
