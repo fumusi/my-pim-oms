@@ -1,4 +1,4 @@
-import { mapItem, mapItemGroup } from './item.mapper';
+import { mapItem, mapItemGroup, mapProduct } from './item.mapper';
 import { parseDate } from '../utils/parse-date';
 import type { ExactItemResponse, ExactItemGroupResponse } from '../types';
 
@@ -159,6 +159,70 @@ describe('mapItem', () => {
     expect(nullish.isBatchNumberItem).toBeNull();
     expect(nullish.isWebshopItem).toBeNull();
     expect(nullish.isSerialNumberItem).toBeNull();
+  });
+});
+
+describe('mapProduct', () => {
+  it('maps exactId, barcode, currency, basePrice, purchasePrice, salesVatCode from Exact response', () => {
+    const result = mapProduct(makeItemResponse());
+
+    expect(result.exactId).toBe('item-uuid-1');
+    expect(result.barcode).toBe('1234567890123');
+    expect(result.currency).toBe('EUR');
+    expect(result.basePrice).toBe(19.99);
+    expect(result.purchasePrice).toBe(10.0);
+    expect(result.salesVatCode).toBe('V1');
+  });
+
+  it('seeds name.en from Description for initial insert', () => {
+    const result = mapProduct(makeItemResponse({ Description: 'Ceramic Vase' }));
+    expect(result.name).toEqual({ en: 'Ceramic Vase' });
+  });
+
+  it('sets name to null when Description is null', () => {
+    const result = mapProduct(makeItemResponse({ Description: null }));
+    expect(result.name).toBeNull();
+  });
+
+  it('seeds weight from NetWeight', () => {
+    const result = mapProduct(makeItemResponse({ NetWeight: 1.0 }));
+    expect(result.weight).toBe(1.0);
+  });
+
+  it('sets weight to null when NetWeight is null', () => {
+    const result = mapProduct(makeItemResponse({ NetWeight: null }));
+    expect(result.weight).toBeNull();
+  });
+
+  it('syncs stock from Stock on every upsert', () => {
+    expect(mapProduct(makeItemResponse({ Stock: 42 })).stock).toBe(42);
+    expect(mapProduct(makeItemResponse({ Stock: 0 })).stock).toBe(0);
+    expect(mapProduct(makeItemResponse({ Stock: null })).stock).toBeNull();
+  });
+
+  it('maps null Exact fields to null', () => {
+    const result = mapProduct(makeItemResponse({
+      Barcode: null,
+      CostPriceCurrency: null,
+      StandardSalesPrice: null,
+      CostPriceStandard: null,
+      SalesVatCode: null,
+    }));
+
+    expect(result.barcode).toBeNull();
+    expect(result.currency).toBeNull();
+    expect(result.basePrice).toBeNull();
+    expect(result.purchasePrice).toBeNull();
+    expect(result.salesVatCode).toBeNull();
+  });
+
+  it('does not include pure internal/PIM-only fields', () => {
+    const result = mapProduct(makeItemResponse());
+
+    expect(result).not.toHaveProperty('status');
+    expect(result).not.toHaveProperty('backorder');
+    expect(result).not.toHaveProperty('description');
+    expect(result).not.toHaveProperty('endDate');
   });
 });
 

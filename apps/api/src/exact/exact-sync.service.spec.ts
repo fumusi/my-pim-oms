@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ExactSyncService } from './exact-sync.service';
 import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactItem } from './entities/exact-item.entity';
@@ -79,7 +80,6 @@ const makeGroupResponse = (id: string): ExactItemGroupResponse => ({
 
 type ForEachPageCallback<T> = (items: T[]) => Promise<void> | void;
 
-// Dispatches forEachPage calls to the right fixture based on the URL path.
 function makeForEachPageMock(
   groupItems: ExactItemGroupResponse[],
   productItems: ExactItemResponse[],
@@ -93,11 +93,24 @@ function makeForEachPageMock(
   };
 }
 
+function makeQbMock(executeResult: Promise<unknown> = Promise.resolve({})) {
+  const qb = {
+    insert: jest.fn().mockReturnThis(),
+    into: jest.fn().mockReturnThis(),
+    values: jest.fn().mockReturnThis(),
+    orUpdate: jest.fn().mockReturnThis(),
+    execute: jest.fn().mockReturnValue(executeResult),
+  };
+  return qb;
+}
+
 describe('ExactSyncService', () => {
   let service: ExactSyncService;
   let client: { forEachPage: jest.Mock };
   let itemRepo: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
   let itemGroupRepo: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let qb: ReturnType<typeof makeQbMock>;
+  let dataSource: { createQueryBuilder: jest.Mock };
 
   beforeEach(async () => {
     client = { forEachPage: jest.fn() };
@@ -111,6 +124,8 @@ describe('ExactSyncService', () => {
       create: jest.fn().mockImplementation((data) => data),
       save: jest.fn().mockResolvedValue([]),
     };
+    qb = makeQbMock();
+    dataSource = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -118,6 +133,7 @@ describe('ExactSyncService', () => {
         { provide: ExactOnlineClientService, useValue: client },
         { provide: getRepositoryToken(ExactItem), useValue: itemRepo },
         { provide: getRepositoryToken(ExactItemGroup), useValue: itemGroupRepo },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
@@ -139,6 +155,7 @@ describe('ExactSyncService', () => {
       expect(result.synced).toBe(2);
       expect(result.created).toBe(1);
       expect(result.updated).toBe(1);
+      expect(result.errors).toEqual([]);
     });
 
     it('syncs item groups before items (FK dependency)', async () => {
@@ -172,6 +189,7 @@ describe('ExactSyncService', () => {
       expect(result.synced).toBe(0);
       expect(result.created).toBe(0);
       expect(result.updated).toBe(0);
+      expect(result.errors).toEqual([]);
     });
 
     it('upserts items via itemRepo.save', async () => {
@@ -182,6 +200,77 @@ describe('ExactSyncService', () => {
       await service.syncProducts();
 
       expect(itemRepo.save).toHaveBeenCalled();
+    });
+
+    it('uses orUpdate with exact DB column names on conflict', async () => {
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [makeItemResponse('item-x')]),
+      );
+
+      await service.syncProducts();
+
+      expect(qb.orUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining(['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock']),
+        ['exact_id'],
+      );
+      const [updatedCols] = qb.orUpdate.mock.calls[0];
+      expect(updatedCols).not.toContain('name');
+      expect(updatedCols).not.toContain('weight');
+    });
+
+    it('inserts name and weight (seeded from Exact for initial INSERT)', async () => {
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [
+          makeItemResponse('item-x', {
+            Description: 'Ceramic Vase',
+            NetWeight: 0.5,
+            Barcode: 'BAR-1',
+            CostPriceCurrency: 'EUR',
+            StandardSalesPrice: 9.99,
+            CostPriceStandard: 5.0,
+            SalesVatCode: 'V21',
+          }),
+        ]),
+      );
+
+      await service.syncProducts();
+
+      const [values] = qb.values.mock.calls[0];
+      const product = values[0];
+      expect(product.exactId).toBe('item-x');
+      expect(product.barcode).toBe('BAR-1');
+      expect(product.currency).toBe('EUR');
+      expect(product.basePrice).toBe(9.99);
+      expect(product.purchasePrice).toBe(5.0);
+      expect(product.salesVatCode).toBe('V21');
+      expect(product.name).toEqual({ en: 'Ceramic Vase' });
+      expect(product.weight).toBe(0.5);
+      expect(product.stock).toBeNull();
+      expect(product.status).toBeUndefined();
+    });
+
+    it('captures per-product errors without stopping the sync', async () => {
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [makeItemResponse('ok-item'), makeItemResponse('bad-item')]),
+      );
+      qb.execute
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error('FK violation'));
+
+      const result = await service.syncProducts();
+
+      expect(result.synced).toBe(2);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].exactId).toBe('bad-item');
+      expect(result.errors[0].message).toBe('FK violation');
+    });
+
+    it('does not call QB on empty item page', async () => {
+      client.forEachPage.mockImplementation(makeForEachPageMock([], []));
+
+      await service.syncProducts();
+
+      expect(dataSource.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     it('returns all-created summary when no prior items exist', async () => {
@@ -195,6 +284,7 @@ describe('ExactSyncService', () => {
       expect(result.synced).toBe(3);
       expect(result.created).toBe(3);
       expect(result.updated).toBe(0);
+      expect(result.errors).toEqual([]);
     });
   });
 });

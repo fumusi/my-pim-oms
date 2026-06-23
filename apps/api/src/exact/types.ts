@@ -86,8 +86,14 @@ export interface ExactItemResponse {
   Modified: string | null;
 }
 
+export interface SyncError {
+  exactId: string;
+  message: string;
+}
+
 export interface SyncSummary {
   synced: number;
   created: number;
   updated: number;
+  errors: SyncError[];
 }

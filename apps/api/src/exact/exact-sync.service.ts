@@ -1,23 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
-import { mapItem, mapItemGroup } from './mappers/item.mapper';
-import { ExactItemResponse, ExactItemGroupResponse, SyncSummary } from './types';
+import { Product } from '../products/entities/product.entity';
+import { mapItem, mapItemGroup, mapProduct } from './mappers/item.mapper';
+import { ExactItemResponse, ExactItemGroupResponse, SyncError, SyncSummary } from './types';
 
 const PAGE_SIZE = 100;
 const MAX_ITEM_PAGES = 3;
+const CHUNK_SIZE = 50;
+
+// DB column names updated on conflict — name/weight are seeded on INSERT only; stock is live data from Exact
+const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock'];
 
 @Injectable()
 export class ExactSyncService {
+  private readonly logger = new Logger(ExactSyncService.name);
+
   constructor(
     private readonly client: ExactOnlineClientService,
     @InjectRepository(ExactItem)
     private readonly itemRepo: Repository<ExactItem>,
     @InjectRepository(ExactItemGroup)
     private readonly itemGroupRepo: Repository<ExactItemGroup>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async syncProducts(): Promise<SyncSummary> {
@@ -44,6 +52,7 @@ export class ExactSyncService {
     let synced = 0;
     let created = 0;
     let updated = 0;
+    const errors: SyncError[] = [];
 
     await this.client.forEachPage<ExactItemResponse>(
       `logistics/Items?$top=${PAGE_SIZE}`,
@@ -58,11 +67,28 @@ export class ExactSyncService {
 
         const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
         await this.itemRepo.save(entities, { chunk: 50 });
+
+        for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+          const chunk = items.slice(i, i + CHUNK_SIZE);
+          try {
+            await this.dataSource
+              .createQueryBuilder()
+              .insert()
+              .into(Product)
+              .values(chunk.map(mapProduct))
+              .orUpdate(EXACT_UPDATE_COLUMNS, ['exact_id'])
+              .execute();
+          } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            this.logger.error(`Product upsert chunk [${i}..${i + chunk.length - 1}] failed: ${message}`);
+            for (const item of chunk) errors.push({ exactId: item.ID, message });
+          }
+        }
       },
       150,
       MAX_ITEM_PAGES,
     );
 
-    return { synced, created, updated };
+    return { synced, created, updated, errors };
   }
 }
