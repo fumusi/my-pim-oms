@@ -4,6 +4,7 @@ import { ExactSyncService } from './exact-sync.service';
 import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
+import { Product } from '../products/entities/product.entity';
 import type { ExactItemResponse, ExactItemGroupResponse } from './types';
 
 const makeItemResponse = (id: string, overrides: Partial<ExactItemResponse> = {}): ExactItemResponse => ({
@@ -98,6 +99,7 @@ describe('ExactSyncService', () => {
   let client: { forEachPage: jest.Mock };
   let itemRepo: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
   let itemGroupRepo: { find: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let productRepo: { upsert: jest.Mock };
 
   beforeEach(async () => {
     client = { forEachPage: jest.fn() };
@@ -111,6 +113,9 @@ describe('ExactSyncService', () => {
       create: jest.fn().mockImplementation((data) => data),
       save: jest.fn().mockResolvedValue([]),
     };
+    productRepo = {
+      upsert: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -118,6 +123,7 @@ describe('ExactSyncService', () => {
         { provide: ExactOnlineClientService, useValue: client },
         { provide: getRepositoryToken(ExactItem), useValue: itemRepo },
         { provide: getRepositoryToken(ExactItemGroup), useValue: itemGroupRepo },
+        { provide: getRepositoryToken(Product), useValue: productRepo },
       ],
     }).compile();
 
@@ -182,6 +188,51 @@ describe('ExactSyncService', () => {
       await service.syncProducts();
 
       expect(itemRepo.save).toHaveBeenCalled();
+    });
+
+    it('upserts products with conflictPaths exactId after saving exact_items', async () => {
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [makeItemResponse('item-x')]),
+      );
+
+      await service.syncProducts();
+
+      expect(productRepo.upsert).toHaveBeenCalled();
+      const [, options] = productRepo.upsert.mock.calls[0];
+      expect(options).toEqual({ conflictPaths: ['exactId'] });
+    });
+
+    it('maps only Exact-sourced fields into the products upsert', async () => {
+      client.forEachPage.mockImplementation(
+        makeForEachPageMock([], [
+          makeItemResponse('item-x', {
+            Barcode: 'BAR-1',
+            CostPriceCurrency: 'EUR',
+            StandardSalesPrice: 9.99,
+            CostPriceStandard: 5.0,
+            SalesVatCode: 'V21',
+          }),
+        ]),
+      );
+
+      await service.syncProducts();
+
+      const [entities] = productRepo.upsert.mock.calls[0];
+      expect(entities[0].exactId).toBe('item-x');
+      expect(entities[0].barcode).toBe('BAR-1');
+      expect(entities[0].currency).toBe('EUR');
+      expect(entities[0].basePrice).toBe(9.99);
+      expect(entities[0].purchasePrice).toBe(5.0);
+      expect(entities[0].salesVatCode).toBe('V21');
+      expect(entities[0].status).toBeUndefined();
+    });
+
+    it('does not call productRepo.upsert on empty item page', async () => {
+      client.forEachPage.mockImplementation(makeForEachPageMock([], []));
+
+      await service.syncProducts();
+
+      expect(productRepo.upsert).not.toHaveBeenCalled();
     });
 
     it('returns all-created summary when no prior items exist', async () => {

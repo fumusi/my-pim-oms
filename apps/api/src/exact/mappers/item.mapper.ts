@@ -1,5 +1,6 @@
 import { ExactItem } from '../entities/exact-item.entity';
 import { ExactItemGroup } from '../entities/exact-item-group.entity';
+import { Product } from '../../products/entities/product.entity';
 import { ExactItemResponse, ExactItemGroupResponse } from '../types';
 import { parseDate } from '../utils/parse-date';
 
@@ -52,6 +53,17 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
     modifierFullName: i.ModifierFullName,
     created: parseDate(i.Created),
     modified: parseDate(i.Modified),
+  };
+}
+
+export function mapProduct(i: ExactItemResponse): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode'> {
+  return {
+    exactId: i.ID,
+    barcode: i.Barcode,
+    currency: i.CostPriceCurrency,
+    basePrice: i.StandardSalesPrice,
+    purchasePrice: i.CostPriceStandard,
+    salesVatCode: i.SalesVatCode,
   };
 }
 

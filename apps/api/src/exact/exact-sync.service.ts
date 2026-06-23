@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { ExactOnlineClientService } from './exact-online-client.service';
 import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
-import { mapItem, mapItemGroup } from './mappers/item.mapper';
+import { Product } from '../products/entities/product.entity';
+import { mapItem, mapItemGroup, mapProduct } from './mappers/item.mapper';
 import { ExactItemResponse, ExactItemGroupResponse, SyncSummary } from './types';
 
 const PAGE_SIZE = 100;
@@ -18,6 +19,8 @@ export class ExactSyncService {
     private readonly itemRepo: Repository<ExactItem>,
     @InjectRepository(ExactItemGroup)
     private readonly itemGroupRepo: Repository<ExactItemGroup>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
   ) {}
 
   async syncProducts(): Promise<SyncSummary> {
@@ -58,6 +61,9 @@ export class ExactSyncService {
 
         const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
         await this.itemRepo.save(entities, { chunk: 50 });
+
+        const products = items.map(mapProduct);
+        await this.productRepo.upsert(products, { conflictPaths: ['exactId'] });
       },
       150,
       MAX_ITEM_PAGES,

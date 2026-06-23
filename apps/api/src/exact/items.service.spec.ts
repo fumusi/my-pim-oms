@@ -89,7 +89,7 @@ describe('ItemsService', () => {
     create: jest.fn(),
     save: jest.fn(),
     manager: {
-      transaction: jest.fn().mockImplementation((cb: (em: typeof em) => unknown) => cb(em)),
+      transaction: jest.fn().mockImplementation((cb: (arg: typeof em) => unknown) => cb(em)),
       createQueryBuilder: jest.fn(),
     },
   };
@@ -103,7 +103,7 @@ describe('ItemsService', () => {
     repo.createQueryBuilder.mockReturnValue(qb);
     em.createQueryBuilder.mockReturnValue(qb);
     repo.manager.createQueryBuilder.mockReturnValue(qb);
-    repo.manager.transaction.mockImplementation((cb: (em: typeof em) => unknown) => cb(em));
+    repo.manager.transaction.mockImplementation((cb: (arg: typeof em) => unknown) => cb(em));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -120,7 +120,7 @@ describe('ItemsService', () => {
     repo.createQueryBuilder.mockReturnValue(qb);
     em.createQueryBuilder.mockReturnValue(qb);
     repo.manager.createQueryBuilder.mockReturnValue(qb);
-    repo.manager.transaction.mockImplementation((cb: (em: typeof em) => unknown) => cb(em));
+    repo.manager.transaction.mockImplementation((cb: (arg: typeof em) => unknown) => cb(em));
   });
 
   // ── assignToCategory ──────────────────────────────────────────────────────
