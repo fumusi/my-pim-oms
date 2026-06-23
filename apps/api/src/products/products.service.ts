@@ -1,12 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import * as XLSX from 'xlsx';
 import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
+import { mapImportRow, TEMPLATE_HEADERS } from './import/import-row.mapper';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
 import type { FindProductsQueryDto } from './dto/find-products-query.dto';
+import type { LocalizedText } from '../common/types/localized-text.interface';
 
 const MAX_LIMIT = 100;
 
@@ -20,6 +23,12 @@ export interface PaginatedProducts {
 export interface BulkActionResult {
   success: number[];
   skipped: { id: number; reason: string }[];
+}
+
+export interface ImportSummary {
+  imported: number;
+  updated: number;
+  errors: { row: number; reason: string }[];
 }
 
 @Injectable()
@@ -42,7 +51,13 @@ export class ProductsService {
       .skip((page - 1) * limit)
       .take(limit);
 
-    // Archived products excluded by default; opt-in via status=archived
+    this.applyFilters(qb, query);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, page, limit };
+  }
+
+  private applyFilters(qb: SelectQueryBuilder<Product>, query: FindProductsQueryDto): void {
     if (!query.status) {
       qb.andWhere('p.archivedAt IS NULL');
     } else if (query.status === 'archived') {
@@ -83,9 +98,6 @@ export class ProductsService {
         '(p.lowStockThreshold IS NOT NULL AND p.stock IS NOT NULL AND p.stock >= 0 AND p.stock < p.lowStockThreshold)',
       );
     }
-
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
   }
 
   async findById(id: number): Promise<Product> {
@@ -212,6 +224,159 @@ export class ProductsService {
     }
 
     return { success, skipped };
+  }
+
+  async importProducts(buffer: Buffer, _mimetype: string, updatedBy: string): Promise<ImportSummary> {
+    let workbook: XLSX.WorkBook;
+    try {
+      workbook = XLSX.read(buffer, { type: 'buffer' });
+    } catch {
+      throw new BadRequestException('Invalid file — upload a valid .xlsx or .csv file');
+    }
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+
+    let imported = 0;
+    let updated = 0;
+    const errors: ImportSummary['errors'] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNum = i + 2; // row 1 = header
+      const mapped = mapImportRow(rows[i]);
+
+      if (!mapped.ok) {
+        errors.push({ row: rowNum, reason: mapped.reason });
+        continue;
+      }
+
+      try {
+        const { exactId, barcode, categoryId, ...fields } = mapped.data;
+        let existing: Product | null = null;
+
+        if (exactId) {
+          existing = await this.repo.findOne({ where: { exactId }, relations: { category: true } });
+        } else if (barcode) {
+          existing = await this.repo.findOne({ where: { barcode }, relations: { category: true } });
+        }
+
+        const category = categoryId != null ? await this.resolveCategory(categoryId) : undefined;
+
+        if (existing) {
+          Object.assign(existing, fields, { updatedBy });
+          if (category !== undefined) existing.category = category;
+          await this.repo.save(existing);
+          updated++;
+        } else {
+          if (!fields.name?.nl && !fields.name?.en && !fields.name?.de) {
+            errors.push({ row: rowNum, reason: 'name is required for new products (provide name_nl, name_en, or name_de)' });
+            continue;
+          }
+          const product = this.repo.create({
+            ...fields,
+            exactId: exactId ?? null,
+            barcode: barcode ?? null,
+            category: category ?? null,
+            updatedBy,
+          });
+          await this.repo.save(product);
+          imported++;
+        }
+      } catch (err) {
+        errors.push({ row: rowNum, reason: err instanceof Error ? err.message : 'Unexpected error' });
+      }
+    }
+
+    return { imported, updated, errors };
+  }
+
+  async exportProducts(query: FindProductsQueryDto, isAdmin: boolean): Promise<Buffer> {
+    const qb = this.repo.createQueryBuilder('p').leftJoinAndSelect('p.category', 'c').orderBy('p.createdAt', 'DESC');
+    this.applyFilters(qb, query);
+    const products = await qb.getMany();
+
+    const rows = products.map((p) => {
+      const pick = (text: LocalizedText | null | undefined, lang: string) =>
+        text ? (text[lang as keyof LocalizedText] ?? '') : '';
+      const row: Record<string, unknown> = {
+        id: p.id,
+        exactId: p.exactId ?? '',
+        barcode: p.barcode ?? '',
+        name_nl: pick(p.name, 'nl'),
+        name_en: pick(p.name, 'en'),
+        name_de: pick(p.name, 'de'),
+        description_nl: pick(p.description, 'nl'),
+        description_en: pick(p.description, 'en'),
+        description_de: pick(p.description, 'de'),
+        status: p.status,
+        categoryId: p.category?.id ?? '',
+        stock: p.stock ?? '',
+        backorder: p.backorder,
+        lowStockThreshold: p.lowStockThreshold ?? '',
+        endDate: p.endDate ?? '',
+        weight: p.weight ?? '',
+        height: p.height ?? '',
+        width: p.width ?? '',
+        depth: p.depth ?? '',
+        length: p.length ?? '',
+        thickness: p.thickness ?? '',
+        capacity: p.capacity ?? '',
+        color: p.color ?? '',
+        material: p.material ?? '',
+        application: p.application ?? '',
+        countryOfOrigin: p.countryOfOrigin ?? '',
+        suitableFor: p.suitableFor ?? '',
+        finishing: p.finishing ?? '',
+        co2EmissionProduction: p.co2EmissionProduction ?? '',
+        co2EmissionTransport: p.co2EmissionTransport ?? '',
+        douProduct: p.douProduct ?? '',
+        biodegradable: p.biodegradable ?? '',
+        handmade: p.handmade ?? '',
+        scratchProne: p.scratchProne ?? '',
+        typeOfClosure: p.typeOfClosure ?? '',
+        gemstoneType: p.gemstoneType ?? '',
+        basePrice: p.basePrice ?? '',
+        currency: p.currency ?? '',
+        salesVatCode: p.salesVatCode ?? '',
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      };
+      if (isAdmin) {
+        row['purchasePrice'] = p.purchasePrice ?? '';
+        row['purchaseVatCode'] = p.purchaseVatCode ?? '';
+      }
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  }
+
+  getImportTemplate(): Buffer {
+    const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS as unknown as string[]]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Import Template');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'csv' }) as Buffer;
+  }
+
+  async deactivateExpiredProducts(): Promise<{ deactivated: number }> {
+    const today = new Date().toISOString().split('T')[0];
+    const products = await this.repo
+      .createQueryBuilder('p')
+      .where('p.endDate IS NOT NULL')
+      .andWhere('p.endDate <= :today', { today })
+      .andWhere('p.status = :status', { status: ProductStatus.Active })
+      .andWhere('p.archivedAt IS NULL')
+      .getMany();
+
+    if (products.length === 0) return { deactivated: 0 };
+
+    for (const p of products) p.status = ProductStatus.Inactive;
+    await this.repo.save(products);
+
+    Logger.log(`Deactivated ${products.length} expired product(s)`, 'ProductsScheduleService');
+    return { deactivated: products.length };
   }
 
   private async resolveCategory(categoryId: number): Promise<Category> {

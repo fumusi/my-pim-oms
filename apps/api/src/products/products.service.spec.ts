@@ -1,11 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import * as XLSX from 'xlsx';
 import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
 import { In } from 'typeorm';
+
+function makeXlsxBuffer(rows: Record<string, unknown>[]): Buffer {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
 
 function makeQbMock(result: [Product[], number] = [[], 0]) {
   const qb = {
@@ -13,8 +21,10 @@ function makeQbMock(result: [Product[], number] = [[], 0]) {
     orderBy: jest.fn().mockReturnThis(),
     skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     getManyAndCount: jest.fn().mockResolvedValue(result),
+    getMany: jest.fn().mockResolvedValue(result[0]),
   };
   return qb;
 }
@@ -491,6 +501,140 @@ describe('ProductsService', () => {
       expect(result.success).toEqual([]);
       expect(result.skipped).toHaveLength(2);
       expect(productRepo.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deactivateExpiredProducts', () => {
+    it('returns { deactivated: 0 } and does not save when no expired products found', async () => {
+      qb.getMany.mockResolvedValue([]);
+
+      const result = await service.deactivateExpiredProducts();
+
+      expect(result).toEqual({ deactivated: 0 });
+      expect(productRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('sets status to Inactive for each expired product and returns count', async () => {
+      const p1 = makeProduct({ id: 1, status: ProductStatus.Active });
+      const p2 = makeProduct({ id: 2, status: ProductStatus.Active });
+      qb.getMany.mockResolvedValue([p1, p2]);
+      productRepo.save.mockResolvedValue([p1, p2]);
+
+      const result = await service.deactivateExpiredProducts();
+
+      expect(p1.status).toBe(ProductStatus.Inactive);
+      expect(p2.status).toBe(ProductStatus.Inactive);
+      expect(productRepo.save).toHaveBeenCalledWith([p1, p2]);
+      expect(result).toEqual({ deactivated: 2 });
+    });
+
+    it('queries only active non-archived products with endDate <= today', async () => {
+      qb.getMany.mockResolvedValue([]);
+
+      await service.deactivateExpiredProducts();
+
+      const whereCalls = [
+        ...qb.where.mock.calls.map(([e]: [string]) => e),
+        ...qb.andWhere.mock.calls.map(([e]: [string]) => e),
+      ];
+      expect(whereCalls.some((c) => c.includes('endDate'))).toBe(true);
+      expect(whereCalls.some((c) => c.includes('archivedAt IS NULL'))).toBe(true);
+      expect(whereCalls.some((c) => c.includes('status'))).toBe(true);
+    });
+  });
+
+  describe('importProducts', () => {
+    it('creates a new product when no barcode/exactId match found', async () => {
+      const buffer = makeXlsxBuffer([{ name_en: 'New Vase' }]);
+      productRepo.findOne.mockResolvedValue(null);
+      productRepo.save.mockImplementation((p) => Promise.resolve(p));
+
+      const result = await service.importProducts(buffer, '', 'admin@test.com');
+
+      expect(result.imported).toBe(1);
+      expect(result.updated).toBe(0);
+      expect(result.errors).toHaveLength(0);
+      expect(productRepo.save).toHaveBeenCalled();
+    });
+
+    it('updates existing product when barcode matches', async () => {
+      const buffer = makeXlsxBuffer([{ barcode: 'BAR-001', name_en: 'Updated Name' }]);
+      const existing = makeProduct({ id: 5, barcode: 'BAR-001' });
+      productRepo.findOne.mockResolvedValue(existing);
+      productRepo.save.mockImplementation((p) => Promise.resolve(p));
+
+      const result = await service.importProducts(buffer, '', 'admin@test.com');
+
+      expect(result.imported).toBe(0);
+      expect(result.updated).toBe(1);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('adds a row error without stopping import when a row fails validation', async () => {
+      const buffer = makeXlsxBuffer([
+        { status: 'invalid' },      // row 2 — fails validation
+        { name_en: 'Good Product' }, // row 3 — succeeds
+      ]);
+      productRepo.findOne.mockResolvedValue(null);
+      productRepo.save.mockImplementation((p) => Promise.resolve(p));
+
+      const result = await service.importProducts(buffer, '', 'admin@test.com');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].row).toBe(2);
+      expect(result.imported).toBe(1);
+    });
+
+    it('adds row error when new product has no name in any language', async () => {
+      const buffer = makeXlsxBuffer([{ barcode: 'B-001' }]);
+      productRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.importProducts(buffer, '', 'admin@test.com');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].reason).toContain('name is required');
+      expect(result.imported).toBe(0);
+    });
+
+  });
+
+  describe('exportProducts', () => {
+    it('returns a Buffer', async () => {
+      qb.getMany.mockResolvedValue([]);
+
+      const result = await service.exportProducts({ page: 1, limit: 20 } as any, false);
+
+      expect(Buffer.isBuffer(result)).toBe(true);
+    });
+
+    it('includes purchasePrice column for admin', async () => {
+      const product = makeProduct({ purchasePrice: 5.99, basePrice: 9.99 });
+      qb.getMany.mockResolvedValue([product]);
+
+      const buffer = await service.exportProducts({ page: 1, limit: 20 } as any, true);
+      const wb = XLSX.read(buffer, { type: 'buffer' });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+
+      expect(rows[0]).toHaveProperty('purchasePrice');
+    });
+
+    it('excludes purchasePrice column for non-admin', async () => {
+      const product = makeProduct({ purchasePrice: 5.99, basePrice: 9.99 });
+      qb.getMany.mockResolvedValue([product]);
+
+      const buffer = await service.exportProducts({ page: 1, limit: 20 } as any, false);
+      const wb = XLSX.read(buffer, { type: 'buffer' });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+
+      expect(rows[0]).not.toHaveProperty('purchasePrice');
+    });
+
+    it('applies same filters as findAll', async () => {
+      qb.getMany.mockResolvedValue([]);
+
+      await service.exportProducts({ page: 1, limit: 20, status: 'active' } as any, false);
+
+      expect(qb.andWhere).toHaveBeenCalledWith('p.status = :status', { status: 'active' });
     });
   });
 });

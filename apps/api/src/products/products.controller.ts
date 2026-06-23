@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,7 +12,13 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
@@ -42,6 +49,37 @@ export class ProductsController {
   @Roles(Role.Admin)
   create(@Body() dto: CreateProductDto, @Req() req: AuthRequest) {
     return this.productsService.create(dto, req.user.email);
+  }
+
+  @Get('import/template')
+  getImportTemplate(@Res() res: Response) {
+    const buffer = this.productsService.getImportTemplate();
+    res.set({
+      'Content-Type': 'text/csv',
+      'Content-Disposition': 'attachment; filename="products-import-template.csv"',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Get('export')
+  async exportProducts(@Query() query: FindProductsQueryDto, @Req() req: AuthRequest, @Res() res: Response) {
+    const isAdmin = req.user.role === Role.Admin;
+    const buffer = await this.productsService.exportProducts(query, isAdmin);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="products-export.xlsx"',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Post('import')
+  @Roles(Role.Admin)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  importProducts(@UploadedFile() file: Express.Multer.File, @Req() req: AuthRequest) {
+    if (!file) throw new BadRequestException('File is required');
+    return this.productsService.importProducts(file.buffer, file.mimetype, req.user.email);
   }
 
   @Patch('bulk/archive')

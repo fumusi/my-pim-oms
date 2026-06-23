@@ -93,6 +93,12 @@ export class Product {
   @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
   stock!: number | null;
 
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_low_stock_notified_at' })
+  lastLowStockNotifiedAt!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_out_of_stock_notified_at' })
+  lastOutOfStockNotifiedAt!: Date | null;
+
   // ── Measurements ────────────────────────────────────────────────────────────
 
   @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
