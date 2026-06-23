@@ -53,13 +53,17 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersRepository.findOneBy({ email: dto.email });
+    const hashToCompare = user?.password ?? AuthService.DUMMY_HASH;
+    const passwordValid = await bcrypt.compare(dto.password, hashToCompare);
 
-    if (!user || !user.isActive || !user.password || !(await bcrypt.compare(dto.password, user.password))) {
+    if (!user || !user.isActive || !user.password || !passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     return this.issueTokens(user);
   }
+
+  private static readonly DUMMY_HASH = bcrypt.hashSync('dummy', 10);
 
   async findOrCreateGithubUser(profile: GithubProfile): Promise<{ accessToken: string; refreshToken: string }> {
     // Trusts GitHub's email verification as proof of ownership. If a user registered
