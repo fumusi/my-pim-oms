@@ -21,6 +21,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { GetProductQueryDto } from './dto/get-product-query.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
+import { BulkArchiveDto, BulkDeleteDto, BulkStatusDto } from './dto/bulk-action.dto';
 import type { Product } from './entities/product.entity';
 import type { LocalizedText } from '../common/types/localized-text.interface';
 
@@ -41,6 +42,24 @@ export class ProductsController {
   @Roles(Role.Admin)
   create(@Body() dto: CreateProductDto, @Req() req: AuthRequest) {
     return this.productsService.create(dto, req.user.email);
+  }
+
+  @Patch('bulk/archive')
+  @Roles(Role.Admin)
+  bulkArchive(@Body() dto: BulkArchiveDto) {
+    return this.productsService.bulkArchive(dto.ids);
+  }
+
+  @Patch('bulk/status')
+  @Roles(Role.Admin)
+  bulkUpdateStatus(@Body() dto: BulkStatusDto) {
+    return this.productsService.bulkUpdateStatus(dto.ids, dto.status);
+  }
+
+  @Delete('bulk')
+  @Roles(Role.Admin)
+  bulkRemove(@Body() dto: BulkDeleteDto) {
+    return this.productsService.bulkRemove(dto.ids);
   }
 
   @Get(':id')

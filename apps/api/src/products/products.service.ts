@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
@@ -15,6 +15,11 @@ export interface PaginatedProducts {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface BulkActionResult {
+  success: number[];
+  skipped: { id: number; reason: string }[];
 }
 
 @Injectable()
@@ -141,6 +146,72 @@ export class ProductsService {
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     product.status = status;
     return this.repo.save(product);
+  }
+
+  async bulkArchive(ids: number[]): Promise<BulkActionResult> {
+    const products = await this.repo.findBy({ id: In(ids) });
+    const foundIds = new Set(products.map((p) => p.id));
+    const success: number[] = [];
+    const skipped: { id: number; reason: string }[] = [];
+
+    for (const product of products) {
+      const openOrderCount = await this.countOrderReferences(product.id, true);
+      if (openOrderCount > 0) {
+        skipped.push({ id: product.id, reason: 'referenced in open order' });
+        continue;
+      }
+      product.archivedAt = new Date();
+      await this.repo.save(product);
+      success.push(product.id);
+    }
+
+    for (const id of ids) {
+      if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });
+    }
+
+    return { success, skipped };
+  }
+
+  async bulkUpdateStatus(ids: number[], status: ProductStatus): Promise<BulkActionResult> {
+    const products = await this.repo.findBy({ id: In(ids) });
+    const foundIds = new Set(products.map((p) => p.id));
+    const success: number[] = [];
+    const skipped: { id: number; reason: string }[] = [];
+
+    for (const product of products) {
+      product.status = status;
+      await this.repo.save(product);
+      success.push(product.id);
+    }
+
+    for (const id of ids) {
+      if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });
+    }
+
+    return { success, skipped };
+  }
+
+  async bulkRemove(ids: number[]): Promise<BulkActionResult> {
+    const products = await this.repo.findBy({ id: In(ids) });
+    const foundIds = new Set(products.map((p) => p.id));
+    const success: number[] = [];
+    const skipped: { id: number; reason: string }[] = [];
+
+    for (const product of products) {
+      const orderCount = await this.countOrderReferences(product.id, false);
+      if (orderCount > 0) {
+        skipped.push({ id: product.id, reason: 'referenced in an order' });
+        continue;
+      }
+      await this.repo.remove(product);
+      success.push(product.id);
+    }
+
+    for (const id of ids) {
+      if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });
+    }
+
+    return { success, skipped };
   }
 
   private async resolveCategory(categoryId: number): Promise<Category> {

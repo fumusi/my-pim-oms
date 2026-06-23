@@ -5,6 +5,7 @@ import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
+import { In } from 'typeorm';
 
 function makeQbMock(result: [Product[], number] = [[], 0]) {
   const qb = {
@@ -43,6 +44,7 @@ describe('ProductsService', () => {
     createQueryBuilder: jest.Mock;
     findOne: jest.Mock;
     findOneBy: jest.Mock;
+    findBy: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
     remove: jest.Mock;
@@ -56,6 +58,7 @@ describe('ProductsService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(qb),
       findOne: jest.fn(),
       findOneBy: jest.fn(),
+      findBy: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockImplementation((data) => ({ ...data })),
       save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
       remove: jest.fn().mockResolvedValue(undefined),
@@ -355,6 +358,139 @@ describe('ProductsService', () => {
       await service.findAll({ page: 1, limit: 9999 } as any);
 
       expect(qb.take).toHaveBeenCalledWith(100);
+    });
+  });
+
+  describe('bulkArchive', () => {
+    it('archives all found products with no order references', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      productRepo.findBy.mockResolvedValue(products);
+      productRepo.save.mockImplementation((p: Product) => Promise.resolve(p));
+
+      const result = await service.bulkArchive([1, 2]);
+
+      expect(result.success).toEqual([1, 2]);
+      expect(result.skipped).toEqual([]);
+      expect(products[0].archivedAt).not.toBeNull();
+      expect(products[1].archivedAt).not.toBeNull();
+    });
+
+    it('skips products referenced in open orders', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      productRepo.findBy.mockResolvedValue(products);
+      productRepo.save.mockImplementation((p: Product) => Promise.resolve(p));
+      jest
+        .spyOn(service as any, 'countOrderReferences')
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(2);
+
+      const result = await service.bulkArchive([1, 2]);
+
+      expect(result.success).toEqual([1]);
+      expect(result.skipped).toEqual([{ id: 2, reason: 'referenced in open order' }]);
+    });
+
+    it('marks not-found IDs as skipped', async () => {
+      productRepo.findBy.mockResolvedValue([makeProduct({ id: 1 })]);
+      productRepo.save.mockImplementation((p: Product) => Promise.resolve(p));
+
+      const result = await service.bulkArchive([1, 99]);
+
+      expect(result.success).toEqual([1]);
+      expect(result.skipped).toEqual([{ id: 99, reason: 'not found' }]);
+    });
+
+    it('queries by id In the provided array', async () => {
+      productRepo.findBy.mockResolvedValue([]);
+
+      await service.bulkArchive([3, 4, 5]);
+
+      expect(productRepo.findBy).toHaveBeenCalledWith({ id: In([3, 4, 5]) });
+    });
+  });
+
+  describe('bulkUpdateStatus', () => {
+    it('updates status for all found products', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      productRepo.findBy.mockResolvedValue(products);
+      productRepo.save.mockImplementation((p: Product) => Promise.resolve(p));
+
+      const result = await service.bulkUpdateStatus([1, 2], ProductStatus.Inactive);
+
+      expect(result.success).toEqual([1, 2]);
+      expect(result.skipped).toEqual([]);
+      expect(products[0].status).toBe(ProductStatus.Inactive);
+      expect(products[1].status).toBe(ProductStatus.Inactive);
+    });
+
+    it('marks not-found IDs as skipped', async () => {
+      productRepo.findBy.mockResolvedValue([makeProduct({ id: 1 })]);
+      productRepo.save.mockImplementation((p: Product) => Promise.resolve(p));
+
+      const result = await service.bulkUpdateStatus([1, 42], ProductStatus.Active);
+
+      expect(result.success).toEqual([1]);
+      expect(result.skipped).toEqual([{ id: 42, reason: 'not found' }]);
+    });
+
+    it('returns empty success and all skipped when no IDs found', async () => {
+      productRepo.findBy.mockResolvedValue([]);
+
+      const result = await service.bulkUpdateStatus([7, 8], ProductStatus.Active);
+
+      expect(result.success).toEqual([]);
+      expect(result.skipped).toEqual([
+        { id: 7, reason: 'not found' },
+        { id: 8, reason: 'not found' },
+      ]);
+    });
+  });
+
+  describe('bulkRemove', () => {
+    it('removes all found products with no order references', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      productRepo.findBy.mockResolvedValue(products);
+
+      const result = await service.bulkRemove([1, 2]);
+
+      expect(result.success).toEqual([1, 2]);
+      expect(result.skipped).toEqual([]);
+      expect(productRepo.remove).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips products referenced in any order', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      productRepo.findBy.mockResolvedValue(products);
+      jest
+        .spyOn(service as any, 'countOrderReferences')
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(0);
+
+      const result = await service.bulkRemove([1, 2]);
+
+      expect(result.success).toEqual([2]);
+      expect(result.skipped).toEqual([{ id: 1, reason: 'referenced in an order' }]);
+    });
+
+    it('marks not-found IDs as skipped', async () => {
+      productRepo.findBy.mockResolvedValue([makeProduct({ id: 1 })]);
+
+      const result = await service.bulkRemove([1, 100]);
+
+      expect(result.success).toEqual([1]);
+      expect(result.skipped).toEqual([{ id: 100, reason: 'not found' }]);
+    });
+
+    it('returns all skipped when all products are referenced in orders', async () => {
+      const products = [makeProduct({ id: 1 }), makeProduct({ id: 2 })];
+      productRepo.findBy.mockResolvedValue(products);
+      jest.spyOn(service as any, 'countOrderReferences').mockResolvedValue(3);
+
+      const result = await service.bulkRemove([1, 2]);
+
+      expect(result.success).toEqual([]);
+      expect(result.skipped).toHaveLength(2);
+      expect(productRepo.remove).not.toHaveBeenCalled();
     });
   });
 });
