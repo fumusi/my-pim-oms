@@ -174,4 +174,9 @@ export class Product {
 
   @Column({ type: 'varchar', nullable: true, name: 'gemstone_type' })
   gemstoneType!: string | null;
+
+  // ── Category template values (per-product) ──────────────────────────────────
+
+  @Column({ type: 'jsonb', nullable: true, name: 'pim_template' })
+  pimTemplate!: Record<string, unknown> | null;
 }

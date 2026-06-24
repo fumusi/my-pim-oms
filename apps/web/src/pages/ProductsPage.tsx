@@ -20,6 +20,7 @@ import {
 } from '../api/pim-products'
 import { getCategories } from '../api/categories'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { ProductDrawer } from '../components/ProductDrawer'
 import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 
 type ConfirmAction =
@@ -85,6 +86,14 @@ export function ProductsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [editProduct, setEditProduct] = useState<PimProduct | null>(null)
+
+  function exitBulkMode() {
+    setBulkMode(false)
+    setSelected(new Set())
+  }
 
   const debouncedSearch = useDebouncedCallback((value: string) => {
     const f = filtersRef.current
@@ -341,6 +350,31 @@ export function ProductsPage() {
               ))}
             </div>
 
+            {isAdmin && (
+              <button
+                className={`exact-btn exact-btn-outline${bulkMode ? ' exact-btn-outline--active' : ''}`}
+                onClick={() => (bulkMode ? exitBulkMode() : setBulkMode(true))}
+                title="Toggle bulk selection"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="4" height="4" rx="1" />
+                  <line x1="10" y1="7" x2="21" y2="7" />
+                  <rect x="3" y="13" width="4" height="4" rx="1" />
+                  <line x1="10" y1="15" x2="21" y2="15" />
+                </svg>
+                {bulkMode && selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select'}
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                className="exact-btn exact-btn-primary"
+                onClick={() => setCreateOpen(true)}
+              >
+                + New product
+              </button>
+            )}
+
             <button
               className="exact-btn exact-btn-outline"
               onClick={handleExport}
@@ -348,11 +382,7 @@ export function ProductsPage() {
               title="Export current view to Excel"
             >
               {isExporting ? (
-                <div
-                  className="spinner-border spinner-border-sm"
-                  role="status"
-                  style={{ width: 13, height: 13, borderWidth: 2 }}
-                />
+                <div className="spinner-border spinner-border-sm" role="status" style={{ width: 13, height: 13, borderWidth: 2 }} />
               ) : (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -431,39 +461,14 @@ export function ProductsPage() {
           </select>
         </div>
 
-        {/* Bulk actions bar (admin only, shown when rows selected) */}
-        {isAdmin && someSelected && (
+        {/* Bulk actions bar — only in bulk mode with selection */}
+        {isAdmin && bulkMode && someSelected && (
           <div className="products-bulk-bar">
             <span className="products-bulk-count">{selectedIds.length} selected</span>
-            <button
-              className="users-action-btn"
-              disabled={mutationLoading}
-              onClick={() => setConfirm({ type: 'bulk-archive', ids: selectedIds })}
-            >
-              Archive
-            </button>
-            <button
-              className="users-action-btn"
-              disabled={mutationLoading}
-              onClick={() => setConfirm({ type: 'bulk-deactivate', ids: selectedIds })}
-            >
-              Deactivate
-            </button>
-            <button
-              className="users-action-btn users-action-btn-danger"
-              disabled={mutationLoading}
-              onClick={() => setConfirm({ type: 'bulk-delete', ids: selectedIds })}
-            >
-              Delete
-            </button>
-            <button
-              className="users-action-btn"
-              disabled={mutationLoading}
-              onClick={() => setSelected(new Set())}
-              style={{ marginLeft: 'auto' }}
-            >
-              Clear
-            </button>
+            <button className="users-action-btn" disabled={mutationLoading} onClick={() => setConfirm({ type: 'bulk-archive', ids: selectedIds })}>Archive</button>
+            <button className="users-action-btn" disabled={mutationLoading} onClick={() => setConfirm({ type: 'bulk-deactivate', ids: selectedIds })}>Deactivate</button>
+            <button className="users-action-btn users-action-btn-danger" disabled={mutationLoading} onClick={() => setConfirm({ type: 'bulk-delete', ids: selectedIds })}>Delete</button>
+            <button className="users-action-btn" disabled={mutationLoading} onClick={() => setSelected(new Set())} style={{ marginLeft: 'auto' }}>Clear</button>
           </div>
         )}
 
@@ -513,22 +518,19 @@ export function ProductsPage() {
             <table className="users-table">
               <thead>
                 <tr>
-                  {isAdmin && (
-                    <th style={{ width: 40 }}>
+                  <th style={{ width: 48 }}>
+                    {isAdmin && bulkMode ? (
                       <input
                         type="checkbox"
                         className="modal-checkbox"
                         checked={allSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someSelected && !allSelected
-                        }}
+                        ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
                         onChange={toggleAll}
                         aria-label="Select all"
                       />
-                    </th>
-                  )}
+                    ) : null}
+                  </th>
                   <th>Name</th>
-                  <th>Barcode</th>
                   <th>Category</th>
                   <th>Status</th>
                   <th>Stock</th>
@@ -538,9 +540,17 @@ export function ProductsPage() {
               </thead>
               <tbody>
                 {products.map((p) => (
-                  <tr key={p.id}>
-                    {isAdmin && (
-                      <td>
+                  <tr
+                    key={p.id}
+                    style={{ cursor: bulkMode ? 'default' : 'pointer' }}
+                    onClick={
+                      bulkMode
+                        ? () => toggleRow(p.id)
+                        : () => navigate({ to: '/products/$id', params: { id: String(p.id) } })
+                    }
+                  >
+                    <td style={{ width: 48 }} onClick={(e) => e.stopPropagation()}>
+                      {isAdmin && bulkMode ? (
                         <input
                           type="checkbox"
                           className="modal-checkbox"
@@ -548,13 +558,14 @@ export function ProductsPage() {
                           onChange={() => toggleRow(p.id)}
                           aria-label={`Select ${getName(p)}`}
                         />
-                      </td>
-                    )}
+                      ) : (
+                        <div className="product-avatar">
+                          {(getName(p) || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </td>
                     <td>
-                      <div
-                        style={{ fontWeight: 500, color: '#a78bfa', cursor: 'pointer' }}
-                        onClick={() => navigate({ to: '/products/$id', params: { id: String(p.id) } })}
-                      >
+                      <div style={{ fontWeight: 500, color: '#e0e2f0' }}>
                         {p.name
                           ? resolveName(p.name, currentLang)
                           : <span className="users-td-muted">—</span>}
@@ -565,49 +576,44 @@ export function ProductsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="users-td-muted">{p.barcode ?? '—'}</td>
                     <td className="users-td-muted">
                       {p.category ? resolveName(p.category.name, currentLang) : '—'}
                     </td>
-                    <td>
-                      <StatusBadge status={p.status} archivedAt={p.archivedAt} />
-                    </td>
-                    <td>
-                      <StockCell stock={p.stock} threshold={p.lowStockThreshold} />
-                    </td>
+                    <td><StatusBadge status={p.status} archivedAt={p.archivedAt} /></td>
+                    <td><StockCell stock={p.stock} threshold={p.lowStockThreshold} /></td>
                     <td className="users-td-muted">{formatDate(p.createdAt)}</td>
                     {isAdmin && (
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <div className="users-actions">
-                          {!p.archivedAt && p.status === 'active' && (
+                          {!p.archivedAt && (
                             <button
                               className="users-action-btn"
-                              onClick={() => setConfirm({ type: 'deactivate', product: p })}
+                              title="Edit"
+                              onClick={() => setEditProduct(p)}
                             >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                              </svg>
+                              Edit
+                            </button>
+                          )}
+                          {!p.archivedAt && p.status === 'active' && (
+                            <button className="users-action-btn" onClick={() => setConfirm({ type: 'deactivate', product: p })}>
                               Deactivate
                             </button>
                           )}
                           {!p.archivedAt && p.status === 'inactive' && (
-                            <button
-                              className="users-action-btn"
-                              disabled={statusMutation.isPending}
-                              onClick={() => statusMutation.mutate({ id: p.id, s: 'active' })}
-                            >
+                            <button className="users-action-btn" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: p.id, s: 'active' })}>
                               Activate
                             </button>
                           )}
                           {!p.archivedAt && (
-                            <button
-                              className="users-action-btn"
-                              onClick={() => setConfirm({ type: 'archive', product: p })}
-                            >
+                            <button className="users-action-btn" onClick={() => setConfirm({ type: 'archive', product: p })}>
                               Archive
                             </button>
                           )}
-                          <button
-                            className="users-action-btn users-action-btn-danger"
-                            onClick={() => setConfirm({ type: 'delete', product: p })}
-                          >
+                          <button className="users-action-btn users-action-btn-danger" onClick={() => setConfirm({ type: 'delete', product: p })}>
                             Delete
                           </button>
                         </div>
@@ -645,6 +651,16 @@ export function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Create product drawer */}
+      {createOpen && (
+        <ProductDrawer onClose={() => setCreateOpen(false)} />
+      )}
+
+      {/* Edit product drawer */}
+      {editProduct && (
+        <ProductDrawer product={editProduct} onClose={() => setEditProduct(null)} />
+      )}
 
       {/* Confirm modal */}
       {confirm && (

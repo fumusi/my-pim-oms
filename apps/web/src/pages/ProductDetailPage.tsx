@@ -8,12 +8,12 @@ import {
   getPimProductById,
   archivePimProduct,
   updatePimProduct,
-  type PimProduct,
   type ProductStatus,
 } from '../api/pim-products'
-import { getExactItemById, type ExactItemDetail } from '../api/products'
+import { getExactItemById } from '../api/products'
 import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { ProductDrawer } from '../components/ProductDrawer'
 
 // ── Small reusable pieces ─────────────────────────────────────────────────────
 
@@ -92,6 +92,7 @@ export function ProductDetailPage() {
 
   const [lang, setLang] = useState<Lang>('nl')
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', productId],
@@ -171,7 +172,8 @@ export function ProductDetailPage() {
     <>
       {/* Back */}
       <div className="cat-detail-back">
-        <button className="cat-detail-back-btn" onClick={() => navigate({ to: '/products' })}>
+        <button className="cat-detail-back-btn" // eslint-disable-next-line @typescript-eslint/no-explicit-any
+onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, lang: 'nl', search: undefined, status: undefined, categoryId: undefined, inStock: undefined } as any })}>
           ← Products
         </button>
       </div>
@@ -209,7 +211,7 @@ export function ProductDetailPage() {
               <>
                 <button
                   className="exact-btn exact-btn-outline"
-                  onClick={() => toast.info('Edit page coming soon')}
+                  onClick={() => setEditOpen(true)}
                 >
                   Edit
                 </button>
@@ -311,28 +313,31 @@ export function ProductDetailPage() {
           </SectionCard>
         )}
 
-        {/* Category template fields — shown when product belongs to a category */}
+        {/* Category template fields — show per-product values from pimTemplate */}
         {product.category?.template && Object.keys(product.category.template).length > 0 && (
           <SectionCard title={`${resolveName(product.category.name, lang)} — template fields`} fullWidth>
             <div className="prod-detail-attrs-grid">
-              {Object.entries(product.category.template).map(([key, val]) => (
-                <div key={key} className="cat-detail-info-field">
-                  <span className="modal-label">{key}</span>
-                  <span className="cat-detail-info-value">
-                    {val === null || val === undefined || val === ''
-                      ? <span className="users-td-muted">—</span>
-                      : typeof val === 'object'
-                        ? <code style={{ fontSize: '0.78rem', color: '#a78bfa' }}>{JSON.stringify(val)}</code>
-                        : String(val)}
-                  </span>
-                </div>
-              ))}
+              {Object.keys(product.category.template).map((key) => {
+                const val = product.pimTemplate?.[key]
+                return (
+                  <div key={key} className="cat-detail-info-field">
+                    <span className="modal-label">{key}</span>
+                    <span className="cat-detail-info-value">
+                      {val === null || val === undefined || val === ''
+                        ? <span className="users-td-muted">—</span>
+                        : typeof val === 'object'
+                          ? <code style={{ fontSize: '0.78rem', color: '#a78bfa' }}>{JSON.stringify(val)}</code>
+                          : String(val)}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </SectionCard>
         )}
 
-        {/* Exact Online fields — shown only for products not yet in a category */}
-        {!product.category && exactItem && (
+        {/* Exact Online fields */}
+        {exactItem && (
           <SectionCard title="Exact Online data" fullWidth>
             <div className="prod-detail-attrs-grid">
               <Field label="SKU / Code" value={exactItem.code} />
@@ -504,6 +509,14 @@ export function ProductDetailPage() {
         </SectionCard>
 
       </div>
+
+      {/* Edit drawer */}
+      {editOpen && (
+        <ProductDrawer
+          product={product}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
 
       {/* Archive confirm */}
       {archiveOpen && (

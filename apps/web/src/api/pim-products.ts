@@ -48,6 +48,7 @@ export interface PimProduct {
   weight: number | null
   length: number | null
   thickness: number | null
+  pimTemplate: Record<string, unknown> | null
   createdAt: string
   updatedAt: string
   updatedBy: string | null
@@ -97,6 +98,9 @@ export const bulkDeletePimProducts = (ids: number[]) =>
 
 export const getPimProductById = (id: number) =>
   api.get<PimProduct>(`/products/${id}`)
+
+export const createPimProduct = (body: Record<string, unknown>) =>
+  api.post<PimProduct>('/products', body)
 
 export const updatePimProduct = (id: number, body: Record<string, unknown>) =>
   api.patch<PimProduct>(`/products/${id}`, body)
