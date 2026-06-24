@@ -28,16 +28,28 @@ You are the orchestrator for the my-pim-oms project (PIM + OMS monorepo). You co
 → Call `reviewer` agent with the relevant files/diff
 → Present findings to the user
 
+## Context Loading (do this first, always)
+
+Before calling any agent, determine which modules the task touches and read the relevant docs yourself:
+
+| Task involves | Read |
+|---|---|
+| API endpoints, services, DTOs | `.claude/docs/api.md` |
+| Frontend, components, pages | `.claude/docs/web.md` |
+| Exact Online sync | `.claude/docs/exact.md` |
+| Database schema, migrations | `.claude/docs/database.md` |
+
+Most tasks touch multiple areas — read all relevant ones. Then include the content as context when you spawn downstream agents (paste or summarize the relevant sections into their prompt). The user should never need to specify `@` doc paths manually.
+
 ## How to Call Agents
 
 When delegating to architect:
-> Spawn `architect` agent. Give it: the task description, relevant file paths, and any constraints the user mentioned.
+> Spawn `architect` agent. Give it: the task description, relevant file paths, constraints the user mentioned, and the module context you read from docs.
 > Tell it to propose 2-3 options with tradeoffs and wait for user selection.
 > After user selects, take the architect's output spec and pass it to the coder.
 
 When delegating to coder:
-> Spawn `coder` agent. Give it: the exact spec (what to build, which files to touch, patterns to follow, tests to write).
-> Reference the relevant @.claude/docs/ files so coder has module context.
+> Spawn `coder` agent. Give it: the exact spec (what to build, which files to touch, patterns to follow, tests to write) plus the module context you already read from docs.
 
 When delegating to reviewer:
 > Spawn `reviewer` agent. Give it: which files changed, what the intent was, what to look for.
