@@ -107,3 +107,20 @@ export const updatePimProduct = (id: number, body: Record<string, unknown>) =>
 
 export const exportPimProducts = (params?: Omit<PimProductFilters, 'page' | 'limit'>) =>
   api.get<Blob>('/products/export', { params, responseType: 'blob' })
+
+export interface ImportSummary {
+  imported: number
+  updated: number
+  errors: { row: number; reason: string }[]
+}
+
+export const importPimProducts = (file: File) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post<ImportSummary>('/products/import', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export const getImportTemplate = () =>
+  api.get<Blob>('/products/import/template', { responseType: 'blob' })

@@ -1,7 +1,20 @@
 import { api } from './client'
-import type { Product, PaginatedProducts } from './products'
 
 export type CategoryStatus = 'active' | 'inactive'
+
+export interface CategoryPimProduct {
+  id: number
+  exactId: string | null
+  name: Record<string, string> | null
+  barcode: string | null
+  status: string
+  stock: number | null
+}
+
+export interface PaginatedPimProducts {
+  data: CategoryPimProduct[]
+  meta: { page: number; limit: number; total: number; totalPages: number }
+}
 
 export interface LocalizedText {
   nl?: string
@@ -25,15 +38,13 @@ export interface Category {
 }
 
 export interface CategoryDetail extends Category {
-  products: PaginatedProducts
+  products: PaginatedPimProducts
 }
 
 export interface AssignResult {
   assigned: number
   skipped: { id: string; reason: string }[]
 }
-
-export type { Product }
 
 export interface CreateCategoryBody {
   name: LocalizedText

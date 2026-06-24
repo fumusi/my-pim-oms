@@ -34,8 +34,8 @@ interface Props {
 
 export function CategoryDrawer({ category, loading, onSave, onClose }: Props) {
   const isEdit = !!category
-  const [nameLang, setNameLang] = useState<LangTab>('nl')
-  const [descLang, setDescLang] = useState<LangTab>('nl')
+  const [nameLang, setNameLang] = useState<LangTab>('en')
+  const [descLang, setDescLang] = useState<LangTab>('en')
   const [template, setTemplate] = useState<Record<string, unknown> | null>(null)
 
   const {
@@ -133,7 +133,7 @@ export function CategoryDrawer({ category, loading, onSave, onClose }: Props) {
           <div className="modal-field">
             <label className="modal-label">Name *</label>
             <div className="lang-tabs">
-              {(['nl', 'en', 'de'] as LangTab[]).map((l) => (
+              {(['en', 'nl', 'de'] as LangTab[]).map((l) => (
                 <button
                   key={l}
                   type="button"
@@ -162,7 +162,7 @@ export function CategoryDrawer({ category, loading, onSave, onClose }: Props) {
           <div className="modal-field">
             <label className="modal-label">Description</label>
             <div className="lang-tabs">
-              {(['nl', 'en', 'de'] as LangTab[]).map((l) => (
+              {(['en', 'nl', 'de'] as LangTab[]).map((l) => (
                 <button
                   key={l}
                   type="button"

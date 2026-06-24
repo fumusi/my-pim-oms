@@ -79,6 +79,23 @@ export class ItemsService {
       qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)', { s: `%${search}%` });
     }
     const [data, total] = await qb.getManyAndCount();
+
+    // Prefer PIM product data over stale Exact data when a linked product exists.
+    if (data.length > 0) {
+      const exactIds = data.map((i) => i.id);
+      const rows = await this.repo.manager.query<{ exact_id: string; stock: string | null; status: string }[]>(
+        `SELECT exact_id, stock, status FROM products WHERE exact_id = ANY($1)`,
+        [exactIds],
+      );
+      const pimData = new Map(rows.map((r) => [r.exact_id, r]));
+      data.forEach((item) => {
+        const pim = pimData.get(item.id);
+        if (!pim) return;
+        if (pim.stock != null) item.stock = Number(pim.stock);
+        item.isSalesItem = pim.status === 'active';
+      });
+    }
+
     return { data, meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } };
   }
 

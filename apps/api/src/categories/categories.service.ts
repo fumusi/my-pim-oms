@@ -4,15 +4,29 @@ import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { ItemsService, AssignResult, PaginatedItems } from '../exact/items.service';
+import { ItemsService, AssignResult } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
+
+export interface CategoryPimProduct {
+  id: number;
+  exactId: string | null;
+  name: Record<string, string> | null;
+  barcode: string | null;
+  status: string;
+  stock: number | null;
+}
+
+export interface PaginatedPimProducts {
+  data: CategoryPimProduct[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
 
 export interface CategoryWithCount extends Category {
   productCount: number;
 }
 
 export interface CategoryDetail extends CategoryWithCount {
-  products: PaginatedItems;
+  products: PaginatedPimProducts;
 }
 
 @Injectable()
@@ -42,12 +56,46 @@ export class CategoriesService {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) return null;
 
-    const [productCount, products] = await Promise.all([
-      this.itemsService.countByCategory(id),
-      this.itemsService.findByCategoryId(id, page, limit, search),
+    const safeLimit = Math.min(limit, 100);
+    const offset = (page - 1) * safeLimit;
+    const manager = this.categoryRepo.manager;
+
+    const baseConditions = [`category_id = $1`];
+    const params: unknown[] = [id];
+
+    if (search) {
+      params.push(`%${search}%`);
+      const idx = params.length;
+      baseConditions.push(
+        `(name->>'en' ILIKE $${idx} OR name->>'nl' ILIKE $${idx} OR name->>'de' ILIKE $${idx} OR barcode ILIKE $${idx})`,
+      );
+    }
+
+    const where = baseConditions.join(' AND ');
+
+    const [countRows, rows] = await Promise.all([
+      manager.query<[{ count: string }]>(`SELECT COUNT(*) FROM products WHERE ${where}`, params),
+      manager.query<{ id: number; exact_id: string | null; name: Record<string, string> | null; barcode: string | null; status: string; stock: string | null }[]>(
+        `SELECT id, exact_id, name, barcode, status, stock FROM products WHERE ${where} ORDER BY id ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, safeLimit, offset],
+      ),
     ]);
 
-    return { ...category, productCount, products };
+    const total = Number(countRows[0]?.count ?? 0);
+
+    const products: PaginatedPimProducts = {
+      data: rows.map((r) => ({
+        id: r.id,
+        exactId: r.exact_id,
+        name: r.name,
+        barcode: r.barcode,
+        status: r.status,
+        stock: r.stock != null ? Number(r.stock) : null,
+      })),
+      meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) },
+    };
+
+    return { ...category, productCount: total, products };
   }
 
   async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {

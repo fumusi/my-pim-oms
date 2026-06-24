@@ -7,6 +7,8 @@ import type { RootState } from '../store'
 import {
   getPimProductById,
   archivePimProduct,
+  updatePimProductStatus,
+  deletePimProduct,
   updatePimProduct,
   type ProductStatus,
 } from '../api/pim-products'
@@ -17,21 +19,6 @@ import { ProductDrawer } from '../components/ProductDrawer'
 
 // ── Small reusable pieces ─────────────────────────────────────────────────────
 
-function LangSwitcher({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
-  return (
-    <div className="lang-switcher">
-      {(['nl', 'en', 'de'] as Lang[]).map((l) => (
-        <button
-          key={l}
-          className={`lang-switcher-btn${lang === l ? ' lang-switcher-btn--active' : ''}`}
-          onClick={() => setLang(l)}
-        >
-          {l.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 function StatusBadge({ status, archivedAt }: { status: ProductStatus; archivedAt: string | null }) {
   if (archivedAt) return <span className="cat-status-pill cat-status-archived">Archived</span>
@@ -90,9 +77,11 @@ export function ProductDetailPage() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
 
-  const [lang, setLang] = useState<Lang>('nl')
+  const lang = useSelector((s: RootState) => s.lang.current) as Lang
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', productId],
@@ -112,6 +101,27 @@ export function ProductDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['pim-products'] })
       setArchiveOpen(false)
       toast.success('Product archived')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: (s: ProductStatus) => updatePimProductStatus(productId, s),
+    onSuccess: (res) => {
+      queryClient.setQueryData(['product', productId], res.data)
+      queryClient.invalidateQueries({ queryKey: ['pim-products'] })
+      setDeactivateOpen(false)
+      toast.success(res.data.status === 'inactive' ? 'Product deactivated' : 'Product activated')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deletePimProduct(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pim-products'] })
+      toast.success('Product deleted')
+      navigate({ to: '/products', search: { page: 1, limit: 20, search: undefined, status: undefined, categoryId: undefined, inStock: undefined } as any })
     },
     onError: (err) => toast.error(getApiError(err)),
   })
@@ -173,7 +183,7 @@ export function ProductDetailPage() {
       {/* Back */}
       <div className="cat-detail-back">
         <button className="cat-detail-back-btn" // eslint-disable-next-line @typescript-eslint/no-explicit-any
-onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, lang: 'nl', search: undefined, status: undefined, categoryId: undefined, inStock: undefined } as any })}>
+onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, search: undefined, status: undefined, categoryId: undefined, inStock: undefined } as any })}>
           ← Products
         </button>
       </div>
@@ -206,22 +216,30 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, lang: '
           </div>
 
           <div className="cat-header-controls">
-            <LangSwitcher lang={lang} setLang={setLang} />
             {isAdmin && !product.archivedAt && (
               <>
-                <button
-                  className="exact-btn exact-btn-outline"
-                  onClick={() => setEditOpen(true)}
-                >
+                <button className="exact-btn exact-btn-outline" onClick={() => setEditOpen(true)}>
                   Edit
                 </button>
-                <button
-                  className="exact-btn exact-btn-outline"
-                  onClick={() => setArchiveOpen(true)}
-                >
+                {product.status === 'active' && (
+                  <button className="exact-btn exact-btn-outline" onClick={() => setDeactivateOpen(true)}>
+                    Deactivate
+                  </button>
+                )}
+                {product.status === 'inactive' && (
+                  <button className="exact-btn exact-btn-outline" onClick={() => statusMutation.mutate('active')} disabled={statusMutation.isPending}>
+                    Activate
+                  </button>
+                )}
+                <button className="exact-btn exact-btn-outline" onClick={() => setArchiveOpen(true)}>
                   Archive
                 </button>
               </>
+            )}
+            {isAdmin && (
+              <button className="exact-btn exact-btn-outline" style={{ color: '#f87171', borderColor: '#f87171' }} onClick={() => setDeleteOpen(true)}>
+                Delete
+              </button>
             )}
           </div>
         </div>
@@ -484,7 +502,7 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, lang: '
             <div className="prod-detail-trans-header">Name</div>
             <div className="prod-detail-trans-header">Description</div>
 
-            {(['nl', 'en', 'de'] as Lang[]).map((l) => (
+            {(['en', 'nl', 'de'] as Lang[]).map((l) => (
               <>
                 <div key={l + '-lang'} className="prod-detail-trans-lang">{l.toUpperCase()}</div>
                 <div key={l + '-name'} className={`prod-detail-trans-val${!product.name?.[l] ? ' prod-detail-trans-empty' : ''}`}>
@@ -527,6 +545,31 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, lang: '
           loading={archiveMutation.isPending}
           onConfirm={() => archiveMutation.mutate()}
           onCancel={() => setArchiveOpen(false)}
+        />
+      )}
+
+      {/* Deactivate confirm */}
+      {deactivateOpen && (
+        <ConfirmModal
+          title="Deactivate product"
+          message={`Deactivate "${displayName}"?`}
+          confirmLabel="Deactivate"
+          loading={statusMutation.isPending}
+          onConfirm={() => statusMutation.mutate('inactive')}
+          onCancel={() => setDeactivateOpen(false)}
+        />
+      )}
+
+      {/* Delete confirm */}
+      {deleteOpen && (
+        <ConfirmModal
+          title="Delete product"
+          message={`Permanently delete "${displayName}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          loading={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate()}
+          onCancel={() => setDeleteOpen(false)}
         />
       )}
     </>

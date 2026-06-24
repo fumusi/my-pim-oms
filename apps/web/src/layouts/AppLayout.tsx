@@ -3,6 +3,7 @@ import { Link, Outlet, useMatches, useNavigate, useRouterState } from '@tanstack
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { clearAccessToken } from '../store/authSlice'
+import { setLang, type Lang } from '../store/langSlice'
 import { logout } from '../api/auth'
 import type { AppDispatch, RootState } from '../store'
 
@@ -85,6 +86,7 @@ export function AppLayout() {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const user = useSelector((s: RootState) => s.auth.user)
+  const currentLang = useSelector((s: RootState) => s.lang.current)
   const { location } = useRouterState()
   const matches = useMatches()
   const pageTitle = matches.at(-1)?.staticData?.title ?? ''
@@ -161,6 +163,17 @@ export function AppLayout() {
           <h1 className="app-page-title">{pageTitle}</h1>
 
           <div className="header-user">
+            <div className="lang-switcher">
+              {(['en', 'nl', 'de'] as Lang[]).map((l) => (
+                <button
+                  key={l}
+                  className={`lang-switcher-btn${currentLang === l ? ' lang-switcher-btn--active' : ''}`}
+                  onClick={() => dispatch(setLang(l))}
+                >
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
             <Link to="/profile" className="header-user-email">
               {user?.email}
             </Link>

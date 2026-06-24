@@ -7,9 +7,6 @@ import { useDebouncedCallback } from 'use-debounce'
 import type { RootState } from '../store'
 import {
   getPimProducts,
-  archivePimProduct,
-  updatePimProductStatus,
-  deletePimProduct,
   bulkArchivePimProducts,
   bulkUpdatePimProductStatus,
   bulkDeletePimProducts,
@@ -21,12 +18,10 @@ import {
 import { getCategories } from '../api/categories'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ProductDrawer } from '../components/ProductDrawer'
+import { ImportModal } from '../components/ImportModal'
 import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 
 type ConfirmAction =
-  | { type: 'archive'; product: PimProduct }
-  | { type: 'deactivate'; product: PimProduct }
-  | { type: 'delete'; product: PimProduct }
   | { type: 'bulk-archive'; ids: number[] }
   | { type: 'bulk-deactivate'; ids: number[] }
   | { type: 'bulk-delete'; ids: number[] }
@@ -38,7 +33,6 @@ type ProductsSearch = {
   status: ProductStatus | undefined
   categoryId: number | undefined
   inStock: StockFilter | undefined
-  lang: 'nl' | 'en' | 'de'
 }
 
 function StatusBadge({ status, archivedAt }: { status: ProductStatus; archivedAt: string | null }) {
@@ -76,7 +70,8 @@ export function ProductsPage() {
 
   // '/app/products' is the route ID (parent has id: 'app', child path: '/products')
   const filters = useSearch({ from: '/app/products' })
-  const { page, limit, search, status, categoryId, inStock, lang } = filters
+  const { page, limit, search, status, categoryId, inStock } = filters
+  const currentLang = useSelector((s: RootState) => s.lang.current) as Lang
 
   // Keep a ref for the debounced callback to always see the latest filters
   const filtersRef = useRef(filters)
@@ -86,9 +81,9 @@ export function ProductsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [bulkMode, setBulkMode] = useState(false)
-  const [editProduct, setEditProduct] = useState<PimProduct | null>(null)
 
   function exitBulkMode() {
     setBulkMode(false)
@@ -129,40 +124,6 @@ export function ProductsPage() {
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: () => getCategories().then((r) => r.data),
-  })
-
-  // ── Single mutations ──────────────────────────────────────────────────────────
-
-  const archiveMutation = useMutation({
-    mutationFn: (id: number) => archivePimProduct(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pim-products'] })
-      setConfirm(null)
-      setSelected(new Set())
-      toast.success('Product archived')
-    },
-    onError: (err) => toast.error(getApiError(err)),
-  })
-
-  const statusMutation = useMutation({
-    mutationFn: ({ id, s }: { id: number; s: ProductStatus }) => updatePimProductStatus(id, s),
-    onSuccess: (_, { s }) => {
-      queryClient.invalidateQueries({ queryKey: ['pim-products'] })
-      setConfirm(null)
-      toast.success(s === 'inactive' ? 'Product deactivated' : 'Product activated')
-    },
-    onError: (err) => toast.error(getApiError(err)),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => deletePimProduct(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pim-products'] })
-      setConfirm(null)
-      setSelected(new Set())
-      toast.success('Product deleted')
-    },
-    onError: (err) => toast.error(getApiError(err)),
   })
 
   // ── Bulk mutations ────────────────────────────────────────────────────────────
@@ -230,9 +191,10 @@ export function ProductsPage() {
       const url = URL.createObjectURL(res.data)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'products-export.xlsx'
+      a.download = 'products-export.csv'
       a.click()
       URL.revokeObjectURL(url)
+      toast.success('Export ready')
     } catch (err) {
       toast.error(getApiError(err))
     } finally {
@@ -245,9 +207,6 @@ export function ProductsPage() {
   function handleConfirm() {
     if (!confirm) return
     switch (confirm.type) {
-      case 'archive': archiveMutation.mutate(confirm.product.id); break
-      case 'deactivate': statusMutation.mutate({ id: confirm.product.id, s: 'inactive' }); break
-      case 'delete': deleteMutation.mutate(confirm.product.id); break
       case 'bulk-archive': bulkArchiveMutation.mutate(confirm.ids); break
       case 'bulk-deactivate': bulkDeactivateMutation.mutate(confirm.ids); break
       case 'bulk-delete': bulkDeleteMutation.mutate(confirm.ids); break
@@ -280,10 +239,8 @@ export function ProductsPage() {
   }
 
   const mutationLoading =
-    archiveMutation.isPending || statusMutation.isPending || deleteMutation.isPending ||
     bulkArchiveMutation.isPending || bulkDeactivateMutation.isPending || bulkDeleteMutation.isPending
 
-  const currentLang = (lang ?? 'nl') as Lang
   const getName = (p: PimProduct) =>
     p.name ? resolveName(p.name, currentLang) : p.barcode ?? `#${p.id}`
 
@@ -292,9 +249,6 @@ export function ProductsPage() {
   const confirmTitle = (() => {
     if (!confirm) return ''
     switch (confirm.type) {
-      case 'archive': return 'Archive product'
-      case 'deactivate': return 'Deactivate product'
-      case 'delete': return 'Delete product'
       case 'bulk-archive': return `Archive ${confirm.ids.length} products`
       case 'bulk-deactivate': return `Deactivate ${confirm.ids.length} products`
       case 'bulk-delete': return `Delete ${confirm.ids.length} products`
@@ -304,19 +258,14 @@ export function ProductsPage() {
   const confirmMessage = (() => {
     if (!confirm) return ''
     switch (confirm.type) {
-      case 'archive': return `Archive "${getName(confirm.product)}"?`
-      case 'deactivate': return `Deactivate "${getName(confirm.product)}"?`
-      case 'delete': return `Permanently delete "${getName(confirm.product)}"? This cannot be undone.`
       case 'bulk-archive': return `Archive ${confirm.ids.length} selected products?`
       case 'bulk-deactivate': return `Deactivate ${confirm.ids.length} selected products?`
       case 'bulk-delete': return `Permanently delete ${confirm.ids.length} selected products? This cannot be undone.`
     }
   })()
 
-  const isDangerConfirm = confirm?.type === 'delete' || confirm?.type === 'bulk-delete'
-  const confirmLabel =
-    confirm?.type === 'delete' || confirm?.type === 'bulk-delete' ? 'Delete' :
-    confirm?.type === 'archive' || confirm?.type === 'bulk-archive' ? 'Archive' : 'Deactivate'
+  const isDangerConfirm = confirm?.type === 'bulk-delete'
+  const confirmLabel = confirm?.type === 'bulk-delete' ? 'Delete' : confirm?.type === 'bulk-archive' ? 'Archive' : 'Deactivate'
 
   const hasFilters = !!(search || status || categoryId || inStock)
 
@@ -338,33 +287,17 @@ export function ProductsPage() {
           </div>
 
           <div className="cat-header-controls">
-            <div className="lang-switcher">
-              {(['nl', 'en', 'de'] as const).map((l) => (
+            <div className="status-filter">
+              {STATUS_OPTIONS.map(({ value, label }) => (
                 <button
-                  key={l}
-                  className={`lang-switcher-btn${currentLang === l ? ' lang-switcher-btn--active' : ''}`}
-                  onClick={() => setFilter({ lang: l })}
+                  key={value ?? 'all'}
+                  className={`status-filter-btn${status === value ? ' status-filter-btn--active' : ''}`}
+                  onClick={() => setFilter({ status: value })}
                 >
-                  {l.toUpperCase()}
+                  {label}
                 </button>
               ))}
             </div>
-
-            {isAdmin && (
-              <button
-                className={`exact-btn exact-btn-outline${bulkMode ? ' exact-btn-outline--active' : ''}`}
-                onClick={() => (bulkMode ? exitBulkMode() : setBulkMode(true))}
-                title="Toggle bulk selection"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="3" y="5" width="4" height="4" rx="1" />
-                  <line x1="10" y1="7" x2="21" y2="7" />
-                  <rect x="3" y="13" width="4" height="4" rx="1" />
-                  <line x1="10" y1="15" x2="21" y2="15" />
-                </svg>
-                {bulkMode && selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select'}
-              </button>
-            )}
 
             {isAdmin && (
               <button
@@ -374,24 +307,6 @@ export function ProductsPage() {
                 + New product
               </button>
             )}
-
-            <button
-              className="exact-btn exact-btn-outline"
-              onClick={handleExport}
-              disabled={isExporting}
-              title="Export current view to Excel"
-            >
-              {isExporting ? (
-                <div className="spinner-border spinner-border-sm" role="status" style={{ width: 13, height: 13, borderWidth: 2 }} />
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              )}
-              Export
-            </button>
           </div>
         </div>
 
@@ -407,18 +322,6 @@ export function ProductsPage() {
               debouncedSearch(e.target.value)
             }}
           />
-
-          <div className="status-filter">
-            {STATUS_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value ?? 'all'}
-                className={`status-filter-btn${status === value ? ' status-filter-btn--active' : ''}`}
-                onClick={() => setFilter({ status: value })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
 
           <select
             className="products-filter-select"
@@ -459,16 +362,71 @@ export function ProductsPage() {
             <option value={50}>50 / page</option>
             <option value={100}>100 / page</option>
           </select>
+
+          <div className="products-filters-actions">
+            {isAdmin && (
+              <button
+                className={`exact-btn exact-btn-outline${bulkMode ? ' exact-btn-outline--active' : ''}`}
+                onClick={() => (bulkMode ? exitBulkMode() : setBulkMode(true))}
+                title="Toggle bulk selection"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="4" height="4" rx="1" />
+                  <line x1="10" y1="7" x2="21" y2="7" />
+                  <rect x="3" y="13" width="4" height="4" rx="1" />
+                  <line x1="10" y1="15" x2="21" y2="15" />
+                </svg>
+                {bulkMode && selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select'}
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                className="exact-btn exact-btn-outline"
+                onClick={() => setImportOpen(true)}
+                title="Import products from CSV"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Import
+              </button>
+            )}
+
+            <button
+              className="exact-btn exact-btn-outline"
+              onClick={handleExport}
+              disabled={isExporting}
+              title="Export current view to Excel"
+            >
+              {isExporting ? (
+                <div className="spinner-border spinner-border-sm" role="status" style={{ width: 13, height: 13, borderWidth: 2 }} />
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              )}
+              Export
+            </button>
+          </div>
         </div>
 
-        {/* Bulk actions bar — only in bulk mode with selection */}
-        {isAdmin && bulkMode && someSelected && (
+        {/* Bulk actions bar */}
+        {isAdmin && bulkMode && (
           <div className="products-bulk-bar">
-            <span className="products-bulk-count">{selectedIds.length} selected</span>
-            <button className="users-action-btn" disabled={mutationLoading} onClick={() => setConfirm({ type: 'bulk-archive', ids: selectedIds })}>Archive</button>
-            <button className="users-action-btn" disabled={mutationLoading} onClick={() => setConfirm({ type: 'bulk-deactivate', ids: selectedIds })}>Deactivate</button>
-            <button className="users-action-btn users-action-btn-danger" disabled={mutationLoading} onClick={() => setConfirm({ type: 'bulk-delete', ids: selectedIds })}>Delete</button>
-            <button className="users-action-btn" disabled={mutationLoading} onClick={() => setSelected(new Set())} style={{ marginLeft: 'auto' }}>Clear</button>
+            <span className="products-bulk-count">
+              {someSelected ? `${selectedIds.length} selected` : 'Select products below'}
+            </span>
+            <button className="users-action-btn" disabled={mutationLoading || !someSelected} onClick={() => setConfirm({ type: 'bulk-archive', ids: selectedIds })}>Archive</button>
+            <button className="users-action-btn" disabled={mutationLoading || !someSelected} onClick={() => setConfirm({ type: 'bulk-deactivate', ids: selectedIds })}>Deactivate</button>
+            <button className="users-action-btn users-action-btn-danger" disabled={mutationLoading || !someSelected} onClick={() => setConfirm({ type: 'bulk-delete', ids: selectedIds })}>Delete</button>
+            {someSelected && (
+              <button className="users-action-btn" disabled={mutationLoading} onClick={() => setSelected(new Set())} style={{ marginLeft: 'auto' }}>Clear</button>
+            )}
           </div>
         )}
 
@@ -535,7 +493,6 @@ export function ProductsPage() {
                   <th>Status</th>
                   <th>Stock</th>
                   <th>Created</th>
-                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -582,43 +539,6 @@ export function ProductsPage() {
                     <td><StatusBadge status={p.status} archivedAt={p.archivedAt} /></td>
                     <td><StockCell stock={p.stock} threshold={p.lowStockThreshold} /></td>
                     <td className="users-td-muted">{formatDate(p.createdAt)}</td>
-                    {isAdmin && (
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div className="users-actions">
-                          {!p.archivedAt && (
-                            <button
-                              className="users-action-btn"
-                              title="Edit"
-                              onClick={() => setEditProduct(p)}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                              Edit
-                            </button>
-                          )}
-                          {!p.archivedAt && p.status === 'active' && (
-                            <button className="users-action-btn" onClick={() => setConfirm({ type: 'deactivate', product: p })}>
-                              Deactivate
-                            </button>
-                          )}
-                          {!p.archivedAt && p.status === 'inactive' && (
-                            <button className="users-action-btn" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: p.id, s: 'active' })}>
-                              Activate
-                            </button>
-                          )}
-                          {!p.archivedAt && (
-                            <button className="users-action-btn" onClick={() => setConfirm({ type: 'archive', product: p })}>
-                              Archive
-                            </button>
-                          )}
-                          <button className="users-action-btn users-action-btn-danger" onClick={() => setConfirm({ type: 'delete', product: p })}>
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -652,14 +572,20 @@ export function ProductsPage() {
         )}
       </div>
 
+      {/* Import modal */}
+      {importOpen && (
+        <ImportModal
+          onClose={() => setImportOpen(false)}
+          onImported={() => {
+            setImportOpen(false)
+            queryClient.invalidateQueries({ queryKey: ['pim-products'] })
+          }}
+        />
+      )}
+
       {/* Create product drawer */}
       {createOpen && (
         <ProductDrawer onClose={() => setCreateOpen(false)} />
-      )}
-
-      {/* Edit product drawer */}
-      {editProduct && (
-        <ProductDrawer product={editProduct} onClose={() => setEditProduct(null)} />
       )}
 
       {/* Confirm modal */}

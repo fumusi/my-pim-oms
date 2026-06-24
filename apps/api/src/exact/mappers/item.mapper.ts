@@ -1,6 +1,7 @@
 import { ExactItem } from '../entities/exact-item.entity';
 import { ExactItemGroup } from '../entities/exact-item-group.entity';
 import { Product } from '../../products/entities/product.entity';
+import { ProductStatus } from '../../common/enums/product-status.enum';
 import { ExactItemResponse, ExactItemGroupResponse } from '../types';
 import { parseDate } from '../utils/parse-date';
 
@@ -58,7 +59,7 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
 
 export function mapProduct(
   i: ExactItemResponse,
-): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight' | 'stock'> {
+): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight' | 'stock' | 'status'> {
   return {
     exactId: i.ID,
     barcode: i.Barcode,
@@ -69,6 +70,7 @@ export function mapProduct(
     name: i.Description ? { en: i.Description } : null,
     weight: i.NetWeight,
     stock: i.Stock,
+    status: i.IsSalesItem === false ? ProductStatus.Inactive : ProductStatus.Active,
   };
 }
 

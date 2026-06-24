@@ -350,7 +350,7 @@ export class ProductsService {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    return XLSX.write(wb, { type: 'buffer', bookType: 'csv' }) as Buffer;
   }
 
   getImportTemplate(): Buffer {

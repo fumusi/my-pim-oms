@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux'
 import { Link } from '@tanstack/react-router'
 import type { RootState } from '../store'
 import { getExactStatus, getExactAuthorizeUrl, startExactSync, getExactSyncStatus } from '../api/exact'
-import { getProducts } from '../api/products'
+import { getPimProducts } from '../api/pim-products'
 import { getUsers } from '../api/admin'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -63,9 +63,10 @@ interface StatCardProps {
   icon: React.ReactNode
   loading?: boolean
   href?: string
+  search?: Record<string, unknown>
 }
 
-function StatCard({ label, value, note, accentColor, accentBg, icon, loading, href }: StatCardProps) {
+function StatCard({ label, value, note, accentColor, accentBg, icon, loading, href, search }: StatCardProps) {
   const inner = (
     <>
       <div className="dash-stat-top">
@@ -87,7 +88,7 @@ function StatCard({ label, value, note, accentColor, accentBg, icon, loading, hr
 
   if (href) {
     return (
-      <Link to={href} style={{ textDecoration: 'none' }}>
+      <Link to={href} search={search as any} style={{ textDecoration: 'none' }}>
         <div className="dash-stat-card dash-stat-card--link">{inner}</div>
       </Link>
     )
@@ -290,7 +291,7 @@ export function DashboardPage() {
 
   const { data: productsPage, isLoading: productsLoading } = useQuery({
     queryKey: ['product-count'],
-    queryFn: () => getProducts({ page: 1, limit: 1 }).then((r) => r.data),
+    queryFn: () => getPimProducts({ page: 1, limit: 1 }).then((r) => r.data),
   })
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
@@ -299,18 +300,44 @@ export function DashboardPage() {
     enabled: isAdmin,
   })
 
-  const productCount = productsPage != null ? String(productsPage.meta.total) : null
+  const { data: lowStockData, isLoading: lowStockLoading } = useQuery({
+    queryKey: ['pim-products-low-stock-count'],
+    queryFn: () => getPimProducts({ page: 1, limit: 1, inStock: 'low_stock' }).then((r) => r.data),
+  })
+
+  const productCount = productsPage != null ? String(productsPage.total) : null
   const userCount = usersData != null ? String(usersData.meta.total) : null
+  const lowStockCount = lowStockData != null ? String(lowStockData.total) : null
+
+  if (!isAdmin) {
+    return (
+      <div>
+        <div className="row g-3 mb-4">
+          <div className="col-12">
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <div>
+                  <div className="dash-card-title">My Recent Orders</div>
+                  <div className="dash-card-sub">Your latest orders will appear here</div>
+                </div>
+              </div>
+              <NoData message="You haven't placed any orders yet" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
-      {/* Stat cards */}
+      {/* Admin stat cards */}
       <div className="row g-3 mb-4">
         <div className="col-6 col-xl-3">
           <StatCard
             label="Total Products"
             value={productCount}
-            note="synced from Exact Online"
+            note="in product catalogue"
             accentColor="#7c3aed"
             accentBg="rgba(124, 58, 237, 0.14)"
             icon={<BoxIcon />}
@@ -328,35 +355,35 @@ export function DashboardPage() {
             icon={<ClipboardIcon />}
           />
         </div>
-        {isAdmin && (
-          <div className="col-6 col-xl-3">
-            <StatCard
-              label="Registered Users"
-              value={userCount}
-              note="total accounts"
-              accentColor="#10b981"
-              accentBg="rgba(16, 185, 129, 0.14)"
-              icon={<UsersIcon />}
-              loading={usersLoading}
-              href="/users"
-            />
-          </div>
-        )}
+        <div className="col-6 col-xl-3">
+          <StatCard
+            label="Registered Users"
+            value={userCount}
+            note="total accounts"
+            accentColor="#10b981"
+            accentBg="rgba(16, 185, 129, 0.14)"
+            icon={<UsersIcon />}
+            loading={usersLoading}
+            href="/users"
+          />
+        </div>
         <div className="col-6 col-xl-3">
           <StatCard
             label="Low Stock Items"
-            value={null}
-            note="coming soon"
+            value={lowStockCount}
+            note="below threshold"
             accentColor="#f59e0b"
             accentBg="rgba(245, 158, 11, 0.14)"
             icon={<AlertIcon />}
+            loading={lowStockLoading}
+            href="/products"
+            search={{ page: 1, limit: 20, inStock: 'low_stock' }}
           />
         </div>
       </div>
 
-      {/* Content row */}
+      {/* Admin content row */}
       <div className="row g-3 mb-4">
-        {/* Revenue chart */}
         <div className="col-12 col-xl-8">
           <div className="dash-card">
             <div className="dash-card-header">
@@ -369,7 +396,6 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent orders */}
         <div className="col-12 col-xl-4">
           <div className="dash-card h-100">
             <div className="dash-card-header">

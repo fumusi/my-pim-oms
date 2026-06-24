@@ -107,7 +107,7 @@ function ExactField({ label, value }: { label: string; value: string | number | 
 function LangTabs({ active, setActive }: { active: LangTab; setActive: (l: LangTab) => void }) {
   return (
     <div className="lang-tabs">
-      {(['nl', 'en', 'de'] as LangTab[]).map((l) => (
+      {(['en', 'nl', 'de'] as LangTab[]).map((l) => (
         <button key={l} type="button"
           className={`lang-tab${active === l ? ' lang-tab--active' : ''}`}
           onClick={() => setActive(l)}
@@ -211,8 +211,8 @@ export function ProductDrawer({ product, onClose }: Props) {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
 
-  const [nameLang, setNameLang] = useState<LangTab>('nl')
-  const [descLang, setDescLang] = useState<LangTab>('nl')
+  const [nameLang, setNameLang] = useState<LangTab>('en')
+  const [descLang, setDescLang] = useState<LangTab>('en')
   const [countryRestriction, setCountryRestriction] = useState<string[]>([])
   const [certificates, setCertificates] = useState<Record<string, string> | null>(null)
   // Per-product template field values (keyed by template field name)

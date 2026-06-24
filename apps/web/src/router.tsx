@@ -127,7 +127,6 @@ const productsRoute = createRoute({
       s.inStock === 'in_stock' || s.inStock === 'out_of_stock' || s.inStock === 'low_stock'
         ? (s.inStock as 'in_stock' | 'out_of_stock' | 'low_stock')
         : undefined,
-    lang: s.lang === 'nl' || s.lang === 'en' || s.lang === 'de' ? (s.lang as 'nl' | 'en' | 'de') : 'nl',
   }),
   component: ProductsPage,
 })
