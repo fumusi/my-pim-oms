@@ -53,9 +53,13 @@ export function ImportModal({ onClose, onImported }: Props) {
       if (hasErrors) {
         toast.warning(msg)
         setErrorsExpanded(true)
+        if (summary.imported > 0 || summary.updated > 0) {
+          onImported()
+        }
       } else {
         toast.success(msg)
         onImported()
+        onClose()
       }
     } catch (err) {
       toast.error(getApiError(err))

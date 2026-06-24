@@ -60,7 +60,7 @@ export class CategoriesService {
     const offset = (page - 1) * safeLimit;
     const manager = this.categoryRepo.manager;
 
-    const baseConditions = [`category_id = $1`];
+    const baseConditions = [`category_id = $1`, `archived_at IS NULL`];
     const params: unknown[] = [id];
 
     if (search) {

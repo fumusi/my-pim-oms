@@ -79,6 +79,9 @@ export class Product {
   @Column({ type: 'timestamptz', nullable: true, name: 'archived_at' })
   archivedAt!: Date | null;
 
+  @Column({ type: 'boolean', default: false, name: 'status_locked' })
+  statusLocked!: boolean;
+
   @Column({ type: 'varchar', nullable: true, name: 'updated_by' })
   updatedBy!: string | null;
 

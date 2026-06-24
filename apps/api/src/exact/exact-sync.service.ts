@@ -13,7 +13,9 @@ const MAX_ITEM_PAGES = 3;
 const CHUNK_SIZE = 50;
 
 // DB column names updated on conflict — name/weight are seeded on INSERT only; stock is live data from Exact
-const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock', 'status'];
+// status and end_date are intentionally excluded — they are updated separately
+// via a conditional UPDATE that skips rows where status_locked = true.
+const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock'];
 
 @Injectable()
 export class ExactSyncService {
@@ -70,14 +72,31 @@ export class ExactSyncService {
 
         for (let i = 0; i < items.length; i += CHUNK_SIZE) {
           const chunk = items.slice(i, i + CHUNK_SIZE);
+          const mapped = chunk.map(mapProduct);
           try {
+            // Upsert core fields; status/end_date excluded to avoid overwriting locked rows.
             await this.dataSource
               .createQueryBuilder()
               .insert()
               .into(Product)
-              .values(chunk.map(mapProduct))
+              .values(mapped)
               .orUpdate(EXACT_UPDATE_COLUMNS, ['exact_id'])
               .execute();
+
+            // Update status + end_date only for products where admin has not manually locked the status.
+            const params: unknown[] = [];
+            const rows = mapped.map((p) => {
+              params.push(p.exactId, p.endDate ?? null, p.status);
+              const base = params.length - 2;
+              return `($${base - 1}::uuid, $${base}::date, $${base + 1}::product_status)`;
+            });
+            await this.dataSource.query(
+              `UPDATE products p
+               SET end_date = v.end_date, status = v.status
+               FROM (VALUES ${rows.join(', ')}) AS v(exact_id, end_date, status)
+               WHERE p.exact_id = v.exact_id AND p.status_locked = false`,
+              params,
+            );
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
             this.logger.error(`Product upsert chunk [${i}..${i + chunk.length - 1}] failed: ${message}`);

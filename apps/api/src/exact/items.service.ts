@@ -80,19 +80,17 @@ export class ItemsService {
     }
     const [data, total] = await qb.getManyAndCount();
 
-    // Prefer PIM product data over stale Exact data when a linked product exists.
+    // Override stale Exact stock with live PIM stock when a linked product exists.
     if (data.length > 0) {
       const exactIds = data.map((i) => i.id);
-      const rows = await this.repo.manager.query<{ exact_id: string; stock: string | null; status: string }[]>(
-        `SELECT exact_id, stock, status FROM products WHERE exact_id = ANY($1)`,
+      const rows = await this.repo.manager.query<{ exact_id: string; stock: string | null }[]>(
+        `SELECT exact_id, stock FROM products WHERE exact_id = ANY($1)`,
         [exactIds],
       );
-      const pimData = new Map(rows.map((r) => [r.exact_id, r]));
+      const pimStock = new Map(rows.map((r) => [r.exact_id, r.stock]));
       data.forEach((item) => {
-        const pim = pimData.get(item.id);
-        if (!pim) return;
-        if (pim.stock != null) item.stock = Number(pim.stock);
-        item.isSalesItem = pim.status === 'active';
+        const stock = pimStock.get(item.id);
+        if (stock != null) item.stock = Number(stock);
       });
     }
 

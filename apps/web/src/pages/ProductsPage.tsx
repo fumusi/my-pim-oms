@@ -577,7 +577,6 @@ export function ProductsPage() {
         <ImportModal
           onClose={() => setImportOpen(false)}
           onImported={() => {
-            setImportOpen(false)
             queryClient.invalidateQueries({ queryKey: ['pim-products'] })
           }}
         />

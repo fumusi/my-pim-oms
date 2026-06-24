@@ -157,6 +157,7 @@ export class ProductsService {
     const product = await this.repo.findOneBy({ id });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     product.status = status;
+    product.statusLocked = true;
     return this.repo.save(product);
   }
 
@@ -192,6 +193,7 @@ export class ProductsService {
 
     for (const product of products) {
       product.status = status;
+      product.statusLocked = true;
       await this.repo.save(product);
       success.push(product.id);
     }
