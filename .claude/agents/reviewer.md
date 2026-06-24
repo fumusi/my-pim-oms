@@ -1,6 +1,7 @@
 ---
 name: reviewer
 description: Code review agent. Reads changed files and reports correctness bugs, security issues, pattern violations, and simplification opportunities. Never modifies code.
+model: haiku
 tools: Read, Bash
 ---
 

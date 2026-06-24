@@ -28,17 +28,7 @@ Turborepo manages builds. Root `npm run dev` starts both.
 - **buyer** — read-only access + "purchase later" list
 - **admin** — full catalogue management, Exact sync control, user management
 
-## API Modules
-`auth` `users` `products` `categories` `exact` `mail` `redis` `health` `common`
-
-Each module follows standard NestJS structure: `*.module.ts` `*.controller.ts` `*.service.ts` `dto/` `entities/`
-
-## Frontend Structure
-`pages/` `components/` `hooks/` `services/` `store/` `layouts/` `utils/`
-Global state in Redux (`authSlice`, `langSlice`). Server state via TanStack Query.
-
 ## Agents Available
-Use these agents via the Agent tool or by asking the orchestrator:
 - `orchestrator` — task coordinator, entry point for complex work
 - `architect` — proposes architecture options, waits for user approval before proceeding
 - `coder` — implements approved specs
@@ -52,8 +42,5 @@ When working on a specific area, add to your prompt:
 - Database/migrations → `@.claude/docs/database.md`
 
 ## Key Conventions
-- TypeORM migrations for all schema changes (never `synchronize: true` in prod)
-- DTOs validated with class-validator + nestjs-zod at controller level
-- No mock DB in tests — Testcontainers spins real PostgreSQL
-- Commits follow conventional commits format
+- Conventional commits format
 - No comments unless the WHY is non-obvious
