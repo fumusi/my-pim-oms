@@ -86,9 +86,9 @@ export class ExactSyncService {
             // Update status + end_date only for products where admin has not manually locked the status.
             const params: unknown[] = [];
             const rows = mapped.map((p) => {
+              const base = params.length + 1;
               params.push(p.exactId, p.endDate ?? null, p.status);
-              const base = params.length - 2;
-              return `($${base - 1}::uuid, $${base}::date, $${base + 1}::product_status)`;
+              return `($${base}::uuid, $${base + 1}::date, $${base + 2}::product_status)`;
             });
             await this.dataSource.query(
               `UPDATE products p

@@ -44,3 +44,24 @@ When working on a specific area, add to your prompt:
 ## Key Conventions
 - Conventional commits format
 - No comments unless the WHY is non-obvious
+
+## Agent Rules
+The main agent must never write or edit source files directly. All implementation goes through `@coder`, all planning through `@architect`. The main agent may read files, run bash commands, spawn agents, and answer questions.
+
+## Pre-Implementation Checklist
+Before spawning `@coder`, confirm:
+- [ ] Is the spec complete enough to start without back-and-forth? If not, spawn `@architect` first.
+- [ ] Does this touch a schema, API contract, or new package? `@architect` must approve first.
+- [ ] Is `main` clean — no uncommitted changes that would conflict?
+- [ ] Have you read the relevant module doc (see "How to Load Module Context")?
+- [ ] Does this task touch shared conventions or styles? Check existing patterns first.
+
+## Monorepo Commands
+Run from repo root:
+```
+npm run dev          # start both api and web
+npm run build        # build all apps
+npm run lint         # lint all apps
+npm run check-types  # tsc across all apps
+npm run format       # prettier (ts, tsx, md)
+```
