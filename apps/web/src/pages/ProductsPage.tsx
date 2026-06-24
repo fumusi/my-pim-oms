@@ -551,7 +551,10 @@ export function ProductsPage() {
                       </td>
                     )}
                     <td>
-                      <div style={{ fontWeight: 500, color: '#e0e2f0' }}>
+                      <div
+                        style={{ fontWeight: 500, color: '#a78bfa', cursor: 'pointer' }}
+                        onClick={() => navigate({ to: '/products/$id', params: { id: String(p.id) } })}
+                      >
                         {p.name
                           ? resolveName(p.name, currentLang)
                           : <span className="users-td-muted">—</span>}

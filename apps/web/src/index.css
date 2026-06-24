@@ -1749,3 +1749,128 @@ body {
   background: rgba(248, 113, 113, 0.12);
   color: #f87171;
 }
+
+/* ── Product detail page ─────────────────────────────────── */
+.prod-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.prod-detail-full {
+  grid-column: 1 / -1;
+}
+
+.prod-detail-stock-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.prod-detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #6b6e83;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.prod-detail-toggle--on {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.25);
+  color: #34d399;
+}
+
+.prod-detail-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.prod-detail-attrs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.prod-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.prod-detail-tag {
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  color: #a78bfa;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 2px 9px;
+  border-radius: 4px;
+}
+
+.prod-detail-cert-link {
+  font-size: 0.8125rem;
+  color: #7c3aed;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.prod-detail-cert-link:hover { color: #a78bfa; text-decoration: underline; }
+
+.prod-detail-trans-grid {
+  display: grid;
+  grid-template-columns: 48px 1fr 1fr;
+  gap: 0.625rem 1.25rem;
+  align-items: start;
+}
+
+.prod-detail-trans-header {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #3d3f57;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.prod-detail-trans-lang {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 3px;
+}
+
+.prod-detail-trans-val {
+  font-size: 0.8375rem;
+  color: #c5c7d8;
+  line-height: 1.55;
+}
+
+.prod-detail-trans-empty {
+  color: #3d3f57;
+}
+
+.prod-detail-json {
+  font-size: 0.75rem;
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.1);
+  border-radius: 6px;
+  padding: 0.625rem 0.875rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}

@@ -14,12 +14,40 @@ export interface PimProduct {
   basePrice: number | null
   purchasePrice: number | null
   salesVatCode: string | null
+  purchaseVatCode: string | null
   status: ProductStatus
   backorder: boolean
   stock: number | null
   lowStockThreshold: number | null
+  endDate: string | null
   archivedAt: string | null
-  category: { id: number; name: LocalizedText } | null
+  category: { id: number; name: LocalizedText; template: Record<string, unknown> | null } | null
+  countryRestriction: string[] | null
+  certificates: Record<string, string> | null
+  color: string | null
+  material: string | null
+  application: string | null
+  countryOfOrigin: string | null
+  suitableFor: string | null
+  finishing: string | null
+  co2EmissionProduction: string | null
+  co2EmissionTransport: string | null
+  douProduct: boolean | null
+  biodegradable: boolean | null
+  handmade: boolean | null
+  scratchProne: boolean | null
+  typeOfClosure: string | null
+  gemstoneType: string | null
+  customizable: Record<string, unknown> | null
+  accessories: unknown[] | null
+  ringSizing: Record<string, unknown> | null
+  capacity: number | null
+  height: number | null
+  width: number | null
+  depth: number | null
+  weight: number | null
+  length: number | null
+  thickness: number | null
   createdAt: string
   updatedAt: string
   updatedBy: string | null
@@ -66,6 +94,12 @@ export const bulkUpdatePimProductStatus = (ids: number[], status: ProductStatus)
 
 export const bulkDeletePimProducts = (ids: number[]) =>
   api.delete<BulkActionResult>('/products/bulk', { data: { ids } })
+
+export const getPimProductById = (id: number) =>
+  api.get<PimProduct>(`/products/${id}`)
+
+export const updatePimProduct = (id: number, body: Record<string, unknown>) =>
+  api.patch<PimProduct>(`/products/${id}`, body)
 
 export const exportPimProducts = (params?: Omit<PimProductFilters, 'page' | 'limit'>) =>
   api.get<Blob>('/products/export', { params, responseType: 'blob' })

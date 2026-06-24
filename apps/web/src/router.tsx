@@ -24,6 +24,7 @@ import { ProfilePage } from './pages/ProfilePage'
 import { UsersPage } from './pages/UsersPage'
 import { CategoriesPage } from './pages/CategoriesPage'
 import { CategoryDetailPage } from './pages/CategoryDetailPage'
+import { ProductDetailPage } from './pages/ProductDetailPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 
 function getToken() {
@@ -172,6 +173,13 @@ const categoryDetailRoute = createRoute({
   component: CategoryDetailPage,
 })
 
+const productDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/products/$id',
+  staticData: { title: 'Product' },
+  component: ProductDetailPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -182,6 +190,7 @@ const routeTree = rootRoute.addChildren([
   appLayoutRoute.addChildren([
     dashboardRoute,
     productsRoute,
+    productDetailRoute,
     categoriesRoute,
     categoryDetailRoute,
     ordersRoute,

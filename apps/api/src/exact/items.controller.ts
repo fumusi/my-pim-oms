@@ -27,6 +27,11 @@ export class ItemsController {
     );
   }
 
+  @Get(':id')
+  findById(@Param('id') id: string) {
+    return this.itemsService.findById(id);
+  }
+
   @Post()
   @Roles(Role.Admin)
   create(@Body() dto: CreateItemDto, @Req() req: AuthRequest) {

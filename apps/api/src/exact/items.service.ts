@@ -60,6 +60,12 @@ export class ItemsService {
       .execute();
   }
 
+  async findById(id: string): Promise<ExactItem> {
+    const item = await this.repo.findOne({ where: { id }, relations: { itemGroup: true } });
+    if (!item) throw new NotFoundException(`Item ${id} not found`);
+    return item;
+  }
+
   async findByCategoryId(categoryId: number, page = 1, limit = 20, search?: string): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
     const qb = this.repo
