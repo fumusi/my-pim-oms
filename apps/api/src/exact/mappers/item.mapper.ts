@@ -72,7 +72,7 @@ export function mapProduct(
     name: i.Description ? { en: i.Description } : null,
     weight: i.NetWeight,
     stock: i.Stock,
-    endDate: endDateObj ? endDateObj.toISOString().slice(0, 10) : null,
+    endDate: endDateObj ? endDateObj.toLocaleDateString('sv') : null,
     status: isExpired ? ProductStatus.Inactive : ProductStatus.Active,
   };
 }

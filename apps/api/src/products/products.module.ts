@@ -16,6 +16,6 @@ import { MailModule } from '../mail/mail.module';
   ],
   controllers: [ProductsController],
   providers: [ProductsService, StockNotificationService, ProductsScheduleService],
-  exports: [StockNotificationService],
+  exports: [StockNotificationService, ProductsService],
 })
 export class ProductsModule {}

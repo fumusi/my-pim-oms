@@ -191,12 +191,11 @@ export class ProductsService {
     const success: number[] = [];
     const skipped: { id: number; reason: string }[] = [];
 
-    for (const product of products) {
-      product.status = status;
-      product.statusLocked = true;
-      await this.repo.save(product);
-      success.push(product.id);
+    const eligibleIds = products.map((p) => p.id);
+    if (eligibleIds.length > 0) {
+      await this.repo.update({ id: In(eligibleIds) }, { status, statusLocked: true });
     }
+    success.push(...eligibleIds);
 
     for (const id of ids) {
       if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });

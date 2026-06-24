@@ -6,11 +6,12 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ItemsService, AssignResult } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
+import { ProductsService } from '../products/products.service';
 
 export interface CategoryPimProduct {
   id: number;
   exactId: string | null;
-  name: Record<string, string> | null;
+  name: { nl?: string; en?: string; de?: string } | null;
   barcode: string | null;
   status: string;
   stock: number | null;
@@ -35,6 +36,7 @@ export class CategoriesService {
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
     private readonly itemsService: ItemsService,
+    private readonly productsService: ProductsService,
   ) {}
 
   async findAll(statusFilter?: CategoryStatus): Promise<CategoryWithCount[]> {
@@ -57,45 +59,30 @@ export class CategoriesService {
     if (!category) return null;
 
     const safeLimit = Math.min(limit, 100);
-    const offset = (page - 1) * safeLimit;
-    const manager = this.categoryRepo.manager;
 
-    const baseConditions = [`category_id = $1`, `archived_at IS NULL`];
-    const params: unknown[] = [id];
-
-    if (search) {
-      params.push(`%${search}%`);
-      const idx = params.length;
-      baseConditions.push(
-        `(name->>'en' ILIKE $${idx} OR name->>'nl' ILIKE $${idx} OR name->>'de' ILIKE $${idx} OR barcode ILIKE $${idx})`,
-      );
-    }
-
-    const where = baseConditions.join(' AND ');
-
-    const [countRows, rows] = await Promise.all([
-      manager.query<[{ count: string }]>(`SELECT COUNT(*) FROM products WHERE ${where}`, params),
-      manager.query<{ id: number; exact_id: string | null; name: Record<string, string> | null; barcode: string | null; status: string; stock: string | null }[]>(
-        `SELECT id, exact_id, name, barcode, status, stock FROM products WHERE ${where} ORDER BY id ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-        [...params, safeLimit, offset],
-      ),
+    const [unfilteredResult, pagedResult] = await Promise.all([
+      this.productsService.findAll({ categoryId: id, page: 1, limit: 1 }),
+      this.productsService.findAll({ categoryId: id, search, page, limit: safeLimit }),
     ]);
 
-    const total = Number(countRows[0]?.count ?? 0);
-
     const products: PaginatedPimProducts = {
-      data: rows.map((r) => ({
-        id: r.id,
-        exactId: r.exact_id,
-        name: r.name,
-        barcode: r.barcode,
-        status: r.status,
-        stock: r.stock != null ? Number(r.stock) : null,
+      data: pagedResult.data.map((p) => ({
+        id: p.id,
+        exactId: p.exactId,
+        name: p.name,
+        barcode: p.barcode,
+        status: p.status,
+        stock: p.stock != null ? Number(p.stock) : null,
       })),
-      meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) },
+      meta: {
+        page,
+        limit: safeLimit,
+        total: pagedResult.total,
+        totalPages: Math.ceil(pagedResult.total / safeLimit),
+      },
     };
 
-    return { ...category, productCount: total, products };
+    return { ...category, productCount: unfilteredResult.total, products };
   }
 
   async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {

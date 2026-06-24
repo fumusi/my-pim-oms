@@ -74,29 +74,31 @@ export class ExactSyncService {
           const chunk = items.slice(i, i + CHUNK_SIZE);
           const mapped = chunk.map(mapProduct);
           try {
-            // Upsert core fields; status/end_date excluded to avoid overwriting locked rows.
-            await this.dataSource
-              .createQueryBuilder()
-              .insert()
-              .into(Product)
-              .values(mapped)
-              .orUpdate(EXACT_UPDATE_COLUMNS, ['exact_id'])
-              .execute();
+            await this.dataSource.transaction(async (em) => {
+              // Upsert core fields; status/end_date excluded to avoid overwriting locked rows.
+              await em
+                .createQueryBuilder()
+                .insert()
+                .into(Product)
+                .values(mapped)
+                .orUpdate(EXACT_UPDATE_COLUMNS, ['exact_id'])
+                .execute();
 
-            // Update status + end_date only for products where admin has not manually locked the status.
-            const params: unknown[] = [];
-            const rows = mapped.map((p) => {
-              const base = params.length + 1;
-              params.push(p.exactId, p.endDate ?? null, p.status);
-              return `($${base}::uuid, $${base + 1}::date, $${base + 2}::product_status)`;
+              // Update status + end_date only for products where admin has not manually locked the status.
+              const params: unknown[] = [];
+              const rows = mapped.map((p) => {
+                const base = params.length + 1;
+                params.push(p.exactId, p.endDate ?? null, p.status);
+                return `($${base}::uuid, $${base + 1}::date, $${base + 2}::product_status)`;
+              });
+              await em.query(
+                `UPDATE products p
+                 SET end_date = v.end_date, status = v.status
+                 FROM (VALUES ${rows.join(', ')}) AS v(exact_id, end_date, status)
+                 WHERE p.exact_id = v.exact_id AND p.status_locked = false`,
+                params,
+              );
             });
-            await this.dataSource.query(
-              `UPDATE products p
-               SET end_date = v.end_date, status = v.status
-               FROM (VALUES ${rows.join(', ')}) AS v(exact_id, end_date, status)
-               WHERE p.exact_id = v.exact_id AND p.status_locked = false`,
-              params,
-            );
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
             this.logger.error(`Product upsert chunk [${i}..${i + chunk.length - 1}] failed: ${message}`);
