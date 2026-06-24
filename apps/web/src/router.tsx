@@ -115,7 +115,7 @@ const productsRoute = createRoute({
   path: '/products',
   staticData: { title: 'Products' },
   validateSearch: (s: Record<string, unknown>) => ({
-    page: typeof s.page === 'number' ? s.page : 1,
+    page: typeof s.page === 'number' && (s.page as number) >= 1 ? s.page : 1,
     limit: typeof s.limit === 'number' && [10, 20, 50, 100].includes(s.limit as number) ? (s.limit as number) : 20,
     search: typeof s.search === 'string' ? s.search : undefined,
     status:

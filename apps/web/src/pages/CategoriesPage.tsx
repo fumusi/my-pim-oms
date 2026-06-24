@@ -56,26 +56,28 @@ export function CategoriesPage() {
           </div>
 
           <div className="cat-header-controls">
-            <div className="status-filter">
-              <button
-                className={`status-filter-btn${statusFilter === undefined ? ' status-filter-btn--active' : ''}`}
-                onClick={() => setStatusFilter(undefined)}
-              >
-                All
-              </button>
-              <button
-                className={`status-filter-btn${statusFilter === 'active' ? ' status-filter-btn--active' : ''}`}
-                onClick={() => setStatusFilter('active')}
-              >
-                Active
-              </button>
-              <button
-                className={`status-filter-btn${statusFilter === 'inactive' ? ' status-filter-btn--active' : ''}`}
-                onClick={() => setStatusFilter('inactive')}
-              >
-                Inactive
-              </button>
-            </div>
+            {isAdmin && (
+              <div className="status-filter">
+                <button
+                  className={`status-filter-btn${statusFilter === undefined ? ' status-filter-btn--active' : ''}`}
+                  onClick={() => setStatusFilter(undefined)}
+                >
+                  All
+                </button>
+                <button
+                  className={`status-filter-btn${statusFilter === 'active' ? ' status-filter-btn--active' : ''}`}
+                  onClick={() => setStatusFilter('active')}
+                >
+                  Active
+                </button>
+                <button
+                  className={`status-filter-btn${statusFilter === 'inactive' ? ' status-filter-btn--active' : ''}`}
+                  onClick={() => setStatusFilter('inactive')}
+                >
+                  Inactive
+                </button>
+              </div>
+            )}
 
             {isAdmin && (
               <button

@@ -5,26 +5,15 @@ import type { AuthRequest } from '../common/types/auth-request.type';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdatePimTemplateDto } from './dto/update-pim-template.dto';
+import { FindAllItemsQueryDto } from './dto/find-all-items-query.dto';
 
 @Controller('items')
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
   @Get()
-  findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('excludeCategoryId') excludeCategoryId?: string,
-    @Query('search') search?: string,
-    @Query('withCategory') withCategory?: string,
-  ) {
-    return this.itemsService.findAll(
-      page ? parseInt(page, 10) : undefined,
-      limit ? parseInt(limit, 10) : undefined,
-      excludeCategoryId ? parseInt(excludeCategoryId, 10) : undefined,
-      search || undefined,
-      withCategory === 'true',
-    );
+  findAll(@Query() query: FindAllItemsQueryDto) {
+    return this.itemsService.findAll(query.page, query.limit, query.excludeCategoryId, query.search, query.withCategory);
   }
 
   @Get(':id')

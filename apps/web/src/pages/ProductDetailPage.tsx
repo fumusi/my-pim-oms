@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -503,15 +503,15 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, search:
             <div className="prod-detail-trans-header">Description</div>
 
             {(['en', 'nl', 'de'] as Lang[]).map((l) => (
-              <>
-                <div key={l + '-lang'} className="prod-detail-trans-lang">{l.toUpperCase()}</div>
-                <div key={l + '-name'} className={`prod-detail-trans-val${!product.name?.[l] ? ' prod-detail-trans-empty' : ''}`}>
+              <React.Fragment key={l}>
+                <div className="prod-detail-trans-lang">{l.toUpperCase()}</div>
+                <div className={`prod-detail-trans-val${!product.name?.[l] ? ' prod-detail-trans-empty' : ''}`}>
                   {product.name?.[l] || '—'}
                 </div>
-                <div key={l + '-desc'} className={`prod-detail-trans-val${!product.description?.[l] ? ' prod-detail-trans-empty' : ''}`}>
+                <div className={`prod-detail-trans-val${!product.description?.[l] ? ' prod-detail-trans-empty' : ''}`}>
                   {product.description?.[l] || '—'}
                 </div>
-              </>
+              </React.Fragment>
             ))}
           </div>
         </SectionCard>
