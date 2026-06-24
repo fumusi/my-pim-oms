@@ -67,8 +67,8 @@ export class ProductsController {
     const isAdmin = req.user.role === Role.Admin;
     const buffer = await this.productsService.exportProducts(query, isAdmin);
     res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename="products-export.xlsx"',
+      'Content-Type': 'text/csv',
+      'Content-Disposition': 'attachment; filename="products-export.csv"',
       'Content-Length': buffer.length,
     });
     res.end(buffer);

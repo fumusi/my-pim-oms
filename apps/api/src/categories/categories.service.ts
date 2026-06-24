@@ -4,15 +4,30 @@ import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { ItemsService, AssignResult, PaginatedItems } from '../exact/items.service';
+import { ItemsService, AssignResult } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
+import { ProductsService } from '../products/products.service';
+
+export interface CategoryPimProduct {
+  id: number;
+  exactId: string | null;
+  name: { nl?: string; en?: string; de?: string } | null;
+  barcode: string | null;
+  status: string;
+  stock: number | null;
+}
+
+export interface PaginatedPimProducts {
+  data: CategoryPimProduct[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
 
 export interface CategoryWithCount extends Category {
   productCount: number;
 }
 
 export interface CategoryDetail extends CategoryWithCount {
-  products: PaginatedItems;
+  products: PaginatedPimProducts;
 }
 
 @Injectable()
@@ -21,6 +36,7 @@ export class CategoriesService {
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
     private readonly itemsService: ItemsService,
+    private readonly productsService: ProductsService,
   ) {}
 
   async findAll(statusFilter?: CategoryStatus): Promise<CategoryWithCount[]> {
@@ -42,12 +58,31 @@ export class CategoriesService {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) return null;
 
-    const [productCount, products] = await Promise.all([
-      this.itemsService.countByCategory(id),
-      this.itemsService.findByCategoryId(id, page, limit, search),
+    const safeLimit = Math.min(limit, 100);
+
+    const [unfilteredResult, pagedResult] = await Promise.all([
+      this.productsService.findAll({ categoryId: id, page: 1, limit: 1 }),
+      this.productsService.findAll({ categoryId: id, search, page, limit: safeLimit }),
     ]);
 
-    return { ...category, productCount, products };
+    const products: PaginatedPimProducts = {
+      data: pagedResult.data.map((p) => ({
+        id: p.id,
+        exactId: p.exactId,
+        name: p.name,
+        barcode: p.barcode,
+        status: p.status,
+        stock: p.stock != null ? Number(p.stock) : null,
+      })),
+      meta: {
+        page,
+        limit: safeLimit,
+        total: pagedResult.total,
+        totalPages: Math.ceil(pagedResult.total / safeLimit),
+      },
+    };
+
+    return { ...category, productCount: unfilteredResult.total, products };
   }
 
   async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {

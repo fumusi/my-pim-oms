@@ -9,10 +9,13 @@ import {
   getCategoryDetail,
   updateCategory,
   archiveCategory,
+  setCategoryStatus,
+  deleteCategory,
   assignProducts,
   unassignProducts,
   type UpdateCategoryBody,
   type AssignResult,
+  type CategoryStatus,
 } from '../api/categories'
 import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -27,7 +30,7 @@ export function CategoryDetailPage() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
 
-  const [lang, setLang] = useState<Lang>('nl')
+  const lang = useSelector((s: RootState) => s.lang.current) as Lang
   const [productPage, setProductPage] = useState(1)
   const [productSearch, setProductSearch] = useState('')
   const [debouncedSearch] = useDebounce(productSearch, 300)
@@ -35,6 +38,8 @@ export function CategoryDetailPage() {
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<string | null>(null)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const { data: category, isLoading, isError } = useQuery({
     queryKey: ['category', categoryId, productPage, debouncedSearch],
@@ -65,6 +70,27 @@ export function CategoryDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['categories'] })
       setArchiveConfirmOpen(false)
       toast.success('Category archived')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: (status: CategoryStatus) => setCategoryStatus(categoryId, status),
+    onSuccess: (_, status) => {
+      queryClient.invalidateQueries({ queryKey: ['category', categoryId] })
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      setDeactivateConfirmOpen(false)
+      toast.success(status === 'inactive' ? 'Category deactivated' : 'Category activated')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCategory(categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      toast.success('Category deleted')
+      navigate({ to: '/categories' })
     },
     onError: (err) => toast.error(getApiError(err)),
   })
@@ -143,27 +169,22 @@ export function CategoryDetailPage() {
           </div>
 
           <div className="cat-header-controls">
-            <div className="lang-switcher">
-              {(['nl', 'en', 'de'] as Lang[]).map((l) => (
-                <button
-                  key={l}
-                  className={`lang-switcher-btn${lang === l ? ' lang-switcher-btn--active' : ''}`}
-                  onClick={() => setLang(l)}
-                >
-                  {l.toUpperCase()}
-                </button>
-              ))}
-            </div>
-
             {isAdmin && !category.archivedAt && (
               <>
                 <button className="exact-btn exact-btn-outline" onClick={() => setDrawerOpen(true)}>
                   Edit
                 </button>
-                <button
-                  className="exact-btn exact-btn-outline"
-                  onClick={() => setArchiveConfirmOpen(true)}
-                >
+                {category.status === 'active' && (
+                  <button className="exact-btn exact-btn-outline" onClick={() => setDeactivateConfirmOpen(true)}>
+                    Deactivate
+                  </button>
+                )}
+                {category.status === 'inactive' && (
+                  <button className="exact-btn exact-btn-outline" onClick={() => statusMutation.mutate('active')} disabled={statusMutation.isPending}>
+                    Activate
+                  </button>
+                )}
+                <button className="exact-btn exact-btn-outline" onClick={() => setArchiveConfirmOpen(true)}>
                   Archive
                 </button>
                 <button
@@ -173,6 +194,15 @@ export function CategoryDetailPage() {
                   + Assign products
                 </button>
               </>
+            )}
+            {isAdmin && (
+              <button
+                className="exact-btn exact-btn-outline"
+                style={{ color: '#f87171', borderColor: '#f87171' }}
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                Delete
+              </button>
             )}
           </div>
         </div>
@@ -257,13 +287,13 @@ export function CategoryDetailPage() {
               <tbody>
                 {products.map((p) => (
                   <tr key={p.id}>
-                    <td style={{ color: '#e0e2f0' }}>{p.description ?? '—'}</td>
-                    <td className="users-td-muted">{p.code ?? '—'}</td>
+                    <td style={{ color: '#e0e2f0' }}>{resolveName(p.name ?? {}, lang) || '—'}</td>
+                    <td className="users-td-muted">{p.barcode ?? '—'}</td>
                     <td>
-                      {p.isSalesItem === null ? (
-                        <span className="users-status-pill" style={{ color: '#6b6e83', background: 'rgba(107,110,131,0.12)' }}>—</span>
-                      ) : p.isSalesItem ? (
+                      {p.status === 'active' ? (
                         <span className="users-status-pill users-status-active">Active</span>
+                      ) : p.status === 'archived' ? (
+                        <span className="users-status-pill" style={{ color: '#6b6e83', background: 'rgba(107,110,131,0.12)' }}>Archived</span>
                       ) : (
                         <span className="users-status-pill users-status-inactive">Inactive</span>
                       )}
@@ -273,7 +303,8 @@ export function CategoryDetailPage() {
                       <td>
                         <button
                           className="users-action-btn users-action-btn-danger"
-                          onClick={() => setRemoveTarget(p.id)}
+                          onClick={() => setRemoveTarget(p.exactId)}
+                          disabled={!p.exactId}
                         >
                           Remove
                         </button>
@@ -336,6 +367,39 @@ export function CategoryDetailPage() {
           loading={archiveMutation.isPending}
           onConfirm={() => archiveMutation.mutate()}
           onCancel={() => setArchiveConfirmOpen(false)}
+        />
+      )}
+
+      {/* Deactivate confirm */}
+      {deactivateConfirmOpen && (
+        <ConfirmModal
+          title="Deactivate category"
+          message={
+            category.productCount > 0
+              ? `This will deactivate all ${category.productCount} product${category.productCount === 1 ? '' : 's'} in "${resolveName(category.name, lang)}".`
+              : `Deactivate "${resolveName(category.name, lang)}"?`
+          }
+          confirmLabel="Deactivate"
+          loading={statusMutation.isPending}
+          onConfirm={() => statusMutation.mutate('inactive')}
+          onCancel={() => setDeactivateConfirmOpen(false)}
+        />
+      )}
+
+      {/* Delete confirm */}
+      {deleteConfirmOpen && (
+        <ConfirmModal
+          title="Delete category"
+          message={
+            category.productCount > 0
+              ? `Cannot delete: ${category.productCount} product${category.productCount === 1 ? '' : 's'} still assigned. Remove all products first.`
+              : `Permanently delete "${resolveName(category.name, lang)}"? This cannot be undone.`
+          }
+          confirmLabel={category.productCount > 0 ? 'OK' : 'Delete'}
+          danger={category.productCount === 0}
+          loading={deleteMutation.isPending}
+          onConfirm={() => category.productCount > 0 ? setDeleteConfirmOpen(false) : deleteMutation.mutate()}
+          onCancel={() => setDeleteConfirmOpen(false)}
         />
       )}
 

@@ -55,6 +55,8 @@ export const CreateProductSchema = z.object({
   ringSizing: z.record(z.string(), z.unknown()).nullable().optional(),
   typeOfClosure: z.string().nullable().optional(),
   gemstoneType: z.string().nullable().optional(),
+
+  pimTemplate: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export class CreateProductDto extends createZodDto(CreateProductSchema) {}

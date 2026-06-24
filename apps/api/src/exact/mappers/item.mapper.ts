@@ -1,6 +1,7 @@
 import { ExactItem } from '../entities/exact-item.entity';
 import { ExactItemGroup } from '../entities/exact-item-group.entity';
 import { Product } from '../../products/entities/product.entity';
+import { ProductStatus } from '../../common/enums/product-status.enum';
 import { ExactItemResponse, ExactItemGroupResponse } from '../types';
 import { parseDate } from '../utils/parse-date';
 
@@ -58,7 +59,9 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
 
 export function mapProduct(
   i: ExactItemResponse,
-): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight' | 'stock'> {
+): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight' | 'stock' | 'status' | 'endDate'> {
+  const endDateObj = parseDate(i.EndDate);
+  const isExpired = endDateObj !== null && endDateObj < new Date();
   return {
     exactId: i.ID,
     barcode: i.Barcode,
@@ -69,6 +72,8 @@ export function mapProduct(
     name: i.Description ? { en: i.Description } : null,
     weight: i.NetWeight,
     stock: i.Stock,
+    endDate: endDateObj ? endDateObj.toISOString().slice(0, 10) : null,
+    status: isExpired ? ProductStatus.Inactive : ProductStatus.Active,
   };
 }
 

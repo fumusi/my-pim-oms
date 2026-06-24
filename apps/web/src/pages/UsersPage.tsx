@@ -94,12 +94,12 @@ export function UsersPage() {
                     <th>Role</th>
                     <th>Status</th>
                     <th>Member since</th>
-                    <th>Actions</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((u, i) => (
-                    <tr key={u.id}>
+                    <tr key={u.id} style={{ cursor: 'pointer' }} onClick={() => setEditTarget(u)}>
                       <td className="users-td-muted">{(page - 1) * PAGE_SIZE + i + 1}</td>
                       <td>
                         <div>{u.email}</div>
@@ -118,19 +118,8 @@ export function UsersPage() {
                         </span>
                       </td>
                       <td className="users-td-muted">{formatDate(u.createdAt)}</td>
-                      <td>
+                      <td onClick={(e) => e.stopPropagation()}>
                         <div className="users-actions">
-                          <button
-                            className="users-action-btn"
-                            onClick={() => setEditTarget(u)}
-                            title="Edit user"
-                          >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                            Edit
-                          </button>
                           <button
                             className="users-action-btn users-action-btn-danger"
                             onClick={() => setDeleteTarget(u)}

@@ -24,6 +24,7 @@ import { ProfilePage } from './pages/ProfilePage'
 import { UsersPage } from './pages/UsersPage'
 import { CategoriesPage } from './pages/CategoriesPage'
 import { CategoryDetailPage } from './pages/CategoryDetailPage'
+import { ProductDetailPage } from './pages/ProductDetailPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 
 function getToken() {
@@ -113,6 +114,20 @@ const productsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/products',
   staticData: { title: 'Products' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    page: typeof s.page === 'number' && (s.page as number) >= 1 ? s.page : 1,
+    limit: typeof s.limit === 'number' && [10, 20, 50, 100].includes(s.limit as number) ? (s.limit as number) : 20,
+    search: typeof s.search === 'string' ? s.search : undefined,
+    status:
+      s.status === 'active' || s.status === 'inactive' || s.status === 'archived'
+        ? (s.status as 'active' | 'inactive' | 'archived')
+        : undefined,
+    categoryId: typeof s.categoryId === 'number' ? s.categoryId : undefined,
+    inStock:
+      s.inStock === 'in_stock' || s.inStock === 'out_of_stock' || s.inStock === 'low_stock'
+        ? (s.inStock as 'in_stock' | 'out_of_stock' | 'low_stock')
+        : undefined,
+  }),
   component: ProductsPage,
 })
 
@@ -157,6 +172,13 @@ const categoryDetailRoute = createRoute({
   component: CategoryDetailPage,
 })
 
+const productDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/products/$id',
+  staticData: { title: 'Product' },
+  component: ProductDetailPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -167,6 +189,7 @@ const routeTree = rootRoute.addChildren([
   appLayoutRoute.addChildren([
     dashboardRoute,
     productsRoute,
+    productDetailRoute,
     categoriesRoute,
     categoryDetailRoute,
     ordersRoute,

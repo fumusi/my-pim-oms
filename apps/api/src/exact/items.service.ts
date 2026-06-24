@@ -60,6 +60,12 @@ export class ItemsService {
       .execute();
   }
 
+  async findById(id: string): Promise<ExactItem> {
+    const item = await this.repo.findOne({ where: { id }, relations: { itemGroup: true } });
+    if (!item) throw new NotFoundException(`Item ${id} not found`);
+    return item;
+  }
+
   async findByCategoryId(categoryId: number, page = 1, limit = 20, search?: string): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
     const qb = this.repo
@@ -70,9 +76,24 @@ export class ItemsService {
       .skip((page - 1) * safeLimit)
       .take(safeLimit);
     if (search) {
-      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s)', { s: `%${search}%` });
+      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)', { s: `%${search}%` });
     }
     const [data, total] = await qb.getManyAndCount();
+
+    // Override stale Exact stock with live PIM stock when a linked product exists.
+    if (data.length > 0) {
+      const exactIds = data.map((i) => i.id);
+      const rows = await this.repo.manager.query<{ exact_id: string; stock: string | null }[]>(
+        `SELECT exact_id, stock FROM products WHERE exact_id = ANY($1)`,
+        [exactIds],
+      );
+      const pimStock = new Map(rows.map((r) => [r.exact_id, r.stock]));
+      data.forEach((item) => {
+        const stock = pimStock.get(item.id);
+        if (stock != null) item.stock = Number(stock);
+      });
+    }
+
     return { data, meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } };
   }
 
@@ -117,6 +138,11 @@ export class ItemsService {
           `UPDATE exact_items SET category_id = $1, pim_template = $2 WHERE id = ANY($3::uuid[])`,
           [categoryId, categoryTemplate ? JSON.stringify(categoryTemplate) : null, toAssign],
         );
+        // Mirror to products table so category filter on the PIM products page works.
+        await em.query(
+          `UPDATE products SET category_id = $1 WHERE exact_id = ANY($2::uuid[])`,
+          [categoryId, toAssign],
+        );
       }
 
       return { assigned: toAssign.length, skipped };
@@ -143,6 +169,11 @@ export class ItemsService {
       // Clear pim_template alongside category_id — template was stamped on assign, must be cleared on unassign.
       await em.query(
         `UPDATE exact_items SET category_id = NULL, pim_template = NULL WHERE id = ANY($1::uuid[])`,
+        [toUnassign],
+      );
+      // Mirror to products table.
+      await em.query(
+        `UPDATE products SET category_id = NULL WHERE exact_id = ANY($1::uuid[])`,
         [toUnassign],
       );
 
@@ -200,7 +231,7 @@ export class ItemsService {
       qb.andWhere('("category_id" IS NULL OR "category_id" != :cid)', { cid: excludeCategoryId });
     }
     if (search) {
-      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s)', { s: `%${search}%` });
+      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)', { s: `%${search}%` });
     }
     const [data, total] = await qb.getManyAndCount();
     return {

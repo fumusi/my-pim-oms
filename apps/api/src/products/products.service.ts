@@ -157,6 +157,7 @@ export class ProductsService {
     const product = await this.repo.findOneBy({ id });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     product.status = status;
+    product.statusLocked = true;
     return this.repo.save(product);
   }
 
@@ -190,11 +191,11 @@ export class ProductsService {
     const success: number[] = [];
     const skipped: { id: number; reason: string }[] = [];
 
-    for (const product of products) {
-      product.status = status;
-      await this.repo.save(product);
-      success.push(product.id);
+    const eligibleIds = products.map((p) => p.id);
+    if (eligibleIds.length > 0) {
+      await this.repo.update({ id: In(eligibleIds) }, { status, statusLocked: true });
     }
+    success.push(...eligibleIds);
 
     for (const id of ids) {
       if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });
@@ -350,7 +351,7 @@ export class ProductsService {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    return XLSX.write(wb, { type: 'buffer', bookType: 'csv' }) as Buffer;
   }
 
   getImportTemplate(): Buffer {

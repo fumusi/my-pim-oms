@@ -79,6 +79,9 @@ export class Product {
   @Column({ type: 'timestamptz', nullable: true, name: 'archived_at' })
   archivedAt!: Date | null;
 
+  @Column({ type: 'boolean', default: false, name: 'status_locked' })
+  statusLocked!: boolean;
+
   @Column({ type: 'varchar', nullable: true, name: 'updated_by' })
   updatedBy!: string | null;
 
@@ -174,4 +177,9 @@ export class Product {
 
   @Column({ type: 'varchar', nullable: true, name: 'gemstone_type' })
   gemstoneType!: string | null;
+
+  // ── Category template values (per-product) ──────────────────────────────────
+
+  @Column({ type: 'jsonb', nullable: true, name: 'pim_template' })
+  pimTemplate!: Record<string, unknown> | null;
 }
