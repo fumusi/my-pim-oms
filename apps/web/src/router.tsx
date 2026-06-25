@@ -27,6 +27,7 @@ import { CategoryDetailPage } from './pages/CategoryDetailPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { CustomersPage } from './pages/CustomersPage'
+import { CustomerDetailPage } from './pages/CustomerDetailPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -180,6 +181,13 @@ const productDetailRoute = createRoute({
   component: ProductDetailPage,
 })
 
+const customerDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/customers/$id',
+  staticData: { title: 'Customer' },
+  component: CustomerDetailPage,
+})
+
 const customersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/customers',
@@ -219,6 +227,7 @@ const routeTree = rootRoute.addChildren([
     profileRoute,
     usersRoute,
     customersRoute,
+    customerDetailRoute,
   ]),
 ])
 

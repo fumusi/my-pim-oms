@@ -1,25 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useSearch, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../store'
-import type { AxiosError } from 'axios'
 import {
   getCustomers,
-  updateCustomerStatus,
-  deleteCustomer,
-  archiveCustomer,
   type Customer,
   type CustomerStatus,
 } from '../api/customers'
-import { ConfirmModal } from '../components/ConfirmModal'
 import { CustomerDrawer } from '../components/CustomerDrawer'
-import { formatDate, getApiError } from '../utils/format'
-
-type ConfirmAction =
-  | { type: 'delete'; customer: Customer }
-  | { type: 'archive'; customer: Customer }
+import { formatDate } from '../utils/format'
 
 function StatusBadge({ status }: { status: CustomerStatus }) {
   if (status === 'active') return <span className="cust-status-badge cust-status-active">Active</span>
@@ -38,8 +28,7 @@ export function CustomersPage() {
 
   const [searchInput, setSearchInput] = useState(search ?? '')
 
-  const [drawerCustomer, setDrawerCustomer] = useState<Customer | null | undefined>(undefined)
-  const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -57,51 +46,6 @@ export function CustomersPage() {
       getCustomers({ page, limit, search: search || undefined, status, country }).then((r) => r.data),
   })
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, s }: { id: number; s: CustomerStatus }) => updateCustomerStatus(id, s),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] })
-      toast.success('Status updated')
-    },
-    onError: (err) => {
-      toast.error(getApiError(err))
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => deleteCustomer(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] })
-      setConfirm(null)
-      toast.success('Customer deleted')
-    },
-    onError: (err) => {
-      if ((err as AxiosError)?.response?.status === 501) {
-        toast.error('Delete is not yet available')
-      } else {
-        toast.error(getApiError(err))
-      }
-      setConfirm(null)
-    },
-  })
-
-  const archiveMutation = useMutation({
-    mutationFn: (id: number) => archiveCustomer(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] })
-      setConfirm(null)
-      toast.success('Customer archived')
-    },
-    onError: (err) => {
-      if ((err as AxiosError)?.response?.status === 501) {
-        toast.error('Archive is not yet available')
-      } else {
-        toast.error(getApiError(err))
-      }
-      setConfirm(null)
-    },
-  })
-
   function setFilter(updates: Partial<{ status: CustomerStatus | undefined; country: string | undefined }>) {
     navigate({
       to: '/customers',
@@ -113,21 +57,8 @@ export function CustomersPage() {
     navigate({ to: '/customers', search: (prev) => ({ ...prev, page: p }) })
   }
 
-  function handleConfirm() {
-    if (!confirm) return
-    if (confirm.type === 'delete') deleteMutation.mutate(confirm.customer.id)
-    if (confirm.type === 'archive') archiveMutation.mutate(confirm.customer.id)
-  }
-
   const customers = data?.data ?? []
   const totalPages = data ? Math.ceil(data.total / limit) : 0
-  const mutationLoading = deleteMutation.isPending || archiveMutation.isPending
-
-  const confirmTitle = confirm?.type === 'delete' ? 'Delete customer' : 'Archive customer'
-  const confirmMessage =
-    confirm?.type === 'delete'
-      ? 'This will permanently delete the customer and all their data. This action cannot be undone.'
-      : 'Archived customers will no longer appear in active lists.'
 
   return (
     <>
@@ -142,7 +73,7 @@ export function CustomersPage() {
           {isAdmin && (
             <button
               className="exact-btn exact-btn-primary"
-              onClick={() => setDrawerCustomer(null)}
+              onClick={() => setCreateOpen(true)}
             >
               + New customer
             </button>
@@ -208,12 +139,15 @@ export function CustomersPage() {
                   <th>Status</th>
                   <th>Orders</th>
                   <th>Created</th>
-                  {isAdmin && <th />}
                 </tr>
               </thead>
               <tbody>
                 {customers.map((c) => (
-                  <tr key={c.id}>
+                  <tr
+                    key={c.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate({ to: '/customers/$id', params: { id: String(c.id) } })}
+                  >
                     <td className="users-td-muted" style={{ fontSize: '0.78rem' }}>
                       {c.customerNumber}
                     </td>
@@ -232,50 +166,6 @@ export function CustomersPage() {
                     </td>
                     <td className="users-td-muted">—</td>
                     <td className="users-td-muted">{formatDate(c.createdAt)}</td>
-                    {isAdmin && (
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-                          <button
-                            className="users-action-btn"
-                            onClick={() => setDrawerCustomer(c)}
-                          >
-                            Edit
-                          </button>
-                          {c.status === 'active' && (
-                            <button
-                              className="users-action-btn"
-                              disabled={statusMutation.isPending}
-                              onClick={() => statusMutation.mutate({ id: c.id, s: 'inactive' })}
-                            >
-                              Deactivate
-                            </button>
-                          )}
-                          {c.status === 'inactive' && (
-                            <button
-                              className="users-action-btn"
-                              disabled={statusMutation.isPending}
-                              onClick={() => statusMutation.mutate({ id: c.id, s: 'active' })}
-                            >
-                              Activate
-                            </button>
-                          )}
-                          {c.status !== 'archived' && (
-                            <button
-                              className="users-action-btn"
-                              onClick={() => setConfirm({ type: 'archive', customer: c })}
-                            >
-                              Archive
-                            </button>
-                          )}
-                          <button
-                            className="users-action-btn users-action-btn-danger"
-                            onClick={() => setConfirm({ type: 'delete', customer: c })}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -308,26 +198,14 @@ export function CustomersPage() {
         )}
       </div>
 
-      {drawerCustomer !== undefined && (
+      {createOpen && (
         <CustomerDrawer
-          customer={drawerCustomer}
-          onClose={() => setDrawerCustomer(undefined)}
+          customer={null}
+          onClose={() => setCreateOpen(false)}
           onSaved={() => {
             queryClient.invalidateQueries({ queryKey: ['customers'] })
-            setDrawerCustomer(undefined)
+            setCreateOpen(false)
           }}
-        />
-      )}
-
-      {confirm && (
-        <ConfirmModal
-          title={confirmTitle}
-          message={confirmMessage}
-          confirmLabel={confirm.type === 'delete' ? 'Delete' : 'Archive'}
-          danger={confirm.type === 'delete'}
-          loading={mutationLoading}
-          onConfirm={handleConfirm}
-          onCancel={() => setConfirm(null)}
         />
       )}
     </>
