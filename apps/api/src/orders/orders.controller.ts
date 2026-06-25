@@ -11,11 +11,14 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
 import { OrdersService } from './orders.service';
+import { OrderInvoiceService } from './order-invoice.service';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateLineItemDto } from './dto/create-order.dto';
@@ -26,7 +29,10 @@ import { ArchiveOrderDto } from './dto/archive-order.dto';
 
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly service: OrdersService) {}
+  constructor(
+    private readonly service: OrdersService,
+    private readonly invoiceService: OrderInvoiceService,
+  ) {}
 
   @Get()
   findAll(@Query() query: FindOrdersQueryDto) {
@@ -36,6 +42,21 @@ export class OrdersController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.service.findById(id);
+  }
+
+  @Get(':id/invoice')
+  async getInvoice(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const order = await this.service.findById(id);
+    const pdf = await this.invoiceService.generateInvoice(order);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="invoice-${order.orderNumber}.pdf"`,
+      'Content-Length': pdf.length,
+    });
+    res.end(pdf);
   }
 
   @Post()
