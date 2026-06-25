@@ -159,8 +159,7 @@ export class CustomersService {
     } catch (err: unknown) {
       const pgErr = err as { code?: string; constraint?: string };
       if (pgErr.code === '23505') {
-        if (pgErr.constraint === 'UQ_6fbe8c55d8dd968877d296493e3') {
-          // customerNumber collision — MAX+1 race, caller should retry
+        if (pgErr.constraint?.includes('customer_number')) {
           throw new ConflictException('Customer number collision — please retry');
         }
         throw new ConflictException('A customer with this email already exists');
@@ -170,7 +169,8 @@ export class CustomersService {
   }
 
   async update(id: number, dto: UpdateCustomerDto, updatedBy: string): Promise<Customer> {
-    const customer = await this.findById(id);
+    const customer = await this.customerRepo.findOne({ where: { id } });
+    if (!customer) throw new NotFoundException(`Customer ${id} not found`);
     const { customerNumber: _cn, status, endDate, ...rest } = dto as Record<string, unknown>;
 
     Object.assign(customer, rest);
@@ -195,7 +195,8 @@ export class CustomersService {
   }
 
   async updateStatus(id: number, status: CustomerStatus, updatedBy: string): Promise<Customer> {
-    const customer = await this.findById(id);
+    const customer = await this.customerRepo.findOne({ where: { id } });
+    if (!customer) throw new NotFoundException(`Customer ${id} not found`);
 
     if (status === CustomerStatus.Active && customer.endDate) {
       const today = new Date();
@@ -275,7 +276,7 @@ export class CustomersService {
       await em.createQueryBuilder()
         .update(Contact)
         .set({ isPrimary: false })
-        .where('customerId = :customerId', { customerId })
+        .where('customer_id = :customerId', { customerId })
         .execute();
       await em.createQueryBuilder()
         .update(Contact)
@@ -354,7 +355,7 @@ export class CustomersService {
       await em.createQueryBuilder()
         .update(Address)
         .set({ isPrimary: false })
-        .where('customerId = :customerId', { customerId })
+        .where('customer_id = :customerId', { customerId })
         .execute();
       await em.createQueryBuilder()
         .update(Address)
@@ -380,11 +381,8 @@ export class CustomersService {
   }
 
   private async generateCustomerNumber(em: EntityManager): Promise<string> {
-    const result = await em.query(
-      `SELECT MAX(CAST(SUBSTRING(customer_number FROM 6) AS INTEGER)) AS max FROM customers`,
-    );
-    const max: number | null = result[0]?.max ?? null;
-    const next = max !== null ? max + 1 : 1;
+    const result = await em.query(`SELECT nextval('customer_number_seq') AS next`);
+    const next: number = result[0].next;
     return `CUST-${String(next).padStart(4, '0')}`;
   }
 }

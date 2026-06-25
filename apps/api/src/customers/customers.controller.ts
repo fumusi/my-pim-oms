@@ -30,6 +30,7 @@ export class CustomersController {
   constructor(private readonly service: CustomersService) {}
 
   @Get()
+  @Roles(Role.Admin)
   findAll(@Query() query: FindCustomersQueryDto) {
     return this.service.findAll(query);
   }
@@ -41,6 +42,7 @@ export class CustomersController {
   }
 
   @Get(':id')
+  @Roles(Role.Admin)
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.service.findById(id);
   }

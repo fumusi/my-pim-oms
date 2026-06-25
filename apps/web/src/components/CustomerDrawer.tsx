@@ -49,12 +49,7 @@ type GeneralValues = z.infer<typeof generalSchema>
 const contactSchema = z.object({
   firstName: z.string().min(1, 'First name required').max(100),
   lastName: z.string().min(1, 'Last name required').max(100),
-  email: z
-    .string()
-    .max(255)
-    .nullable()
-    .optional()
-    .or(z.literal('')),
+  email: z.union([z.string().email('Invalid email').max(255), z.literal('')]).optional(),
   phoneNumber: z.string().max(50).nullable().optional(),
 })
 
