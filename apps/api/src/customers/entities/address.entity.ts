@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -12,6 +13,7 @@ export class Address {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  @Index()
   @Column({ name: 'customer_id' })
   customerId!: number;
 

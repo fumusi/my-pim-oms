@@ -15,10 +15,10 @@ export class Customer {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'varchar', unique: true, name: 'customer_number' })
+  @Column({ type: 'varchar', unique: true, name: 'customer_number', update: false })
   customerNumber!: string;
 
-  @Column({ type: 'varchar', length: 250 })
+  @Column({ type: 'varchar' })
   name!: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'company_name' })
@@ -39,8 +39,16 @@ export class Customer {
   @Column({ type: 'enum', enum: CustomerStatus, enumName: 'customer_status', default: CustomerStatus.Active })
   status!: CustomerStatus;
 
-  @Column({ type: 'date', nullable: true, name: 'end_date' })
-  endDate!: string | null;
+  @Column({
+    type: 'date',
+    nullable: true,
+    name: 'end_date',
+    transformer: {
+      to: (v: Date | null): Date | null => v,
+      from: (v: string | null): Date | null => (v ? new Date(v) : null),
+    },
+  })
+  endDate!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
