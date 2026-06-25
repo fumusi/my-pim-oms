@@ -29,12 +29,21 @@ export function CategoriesPage() {
   const lang = useSelector((s: RootState) => s.lang.current) as Lang
   const [statusFilter, setStatusFilter] = useState<CategoryStatus | undefined>(undefined)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
 
   const { data: categories = [], isLoading, isError } = useQuery({
     queryKey: ['categories', isAdmin ? statusFilter : null],
     queryFn: () =>
       getCategories(isAdmin && statusFilter ? { status: statusFilter } : undefined).then((r) => r.data),
   })
+
+  const filtered = searchInput
+    ? categories.filter((c) =>
+        Object.values(c.name).some((n) =>
+          typeof n === 'string' && n.toLowerCase().includes(searchInput.toLowerCase()),
+        ),
+      )
+    : categories
 
   const createMutation = useMutation({
     mutationFn: (body: CreateCategoryBody) => createCategory(body),
@@ -52,7 +61,9 @@ export function CategoriesPage() {
         <div className="dash-card-header">
           <div>
             <div className="dash-card-title">Categories</div>
-            <div className="dash-card-sub">{categories.length} total</div>
+            <div className="dash-card-sub">
+              {searchInput ? `${filtered.length} of ${categories.length}` : `${filtered.length} total`}
+            </div>
           </div>
 
           <div className="cat-header-controls">
@@ -90,6 +101,16 @@ export function CategoriesPage() {
           </div>
         </div>
 
+        <div className="cust-filters">
+          <input
+            className="cust-filter-input"
+            type="text"
+            placeholder="Search categories…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+
         {isLoading && (
           <div className="profile-loading">
             <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
@@ -102,7 +123,7 @@ export function CategoriesPage() {
           </div>
         )}
 
-        {!isLoading && !isError && categories.length === 0 && (
+        {!isLoading && !isError && filtered.length === 0 && (
           <div className="shell-empty-state">
             <p className="shell-empty-title">No categories yet</p>
             {isAdmin && (
@@ -111,7 +132,7 @@ export function CategoriesPage() {
           </div>
         )}
 
-        {!isLoading && !isError && categories.length > 0 && (
+        {!isLoading && !isError && filtered.length > 0 && (
           <div className="users-table-wrap">
             <table className="users-table">
               <thead>
@@ -124,7 +145,7 @@ export function CategoriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {categories.map((cat) => (
+                {filtered.map((cat) => (
                   <tr
                     key={cat.id}
                     onClick={() => navigate({ to: '/categories/$id', params: { id: String(cat.id) } })}

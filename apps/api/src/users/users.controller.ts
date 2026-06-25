@@ -27,7 +27,7 @@ import type { AuthRequest } from '../common/types/auth-request.type';
 import { UsersService } from './users.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
-import { PaginationDto } from './dto/pagination.dto';
+import { FindUsersQueryDto } from './dto/pagination.dto';
 
 @Controller('users')
 export class UsersController {
@@ -58,8 +58,8 @@ export class UsersController {
 
   @Get()
   @Roles(Role.Admin)
-  findAll(@Query() query: PaginationDto) {
-    return this.usersService.findAll(query.page ?? 1, query.limit ?? 20);
+  findAll(@Query() query: FindUsersQueryDto) {
+    return this.usersService.findAll(query);
   }
 
   @Get('import/template')

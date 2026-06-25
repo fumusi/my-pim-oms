@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getUsers, adminUpdateUser, adminDeleteUser, type AdminUser } from '../api/admin'
@@ -23,10 +23,28 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [roleFilter, setRoleFilter] = useState<string>('')
+  const [statusFilter, setStatusFilter] = useState<string>('')
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  useEffect(() => { setPage(1) }, [roleFilter, statusFilter])
 
   const { data: result, isLoading, isError } = useQuery({
-    queryKey: ['users', page],
-    queryFn: () => getUsers(page, PAGE_SIZE).then((r) => r.data),
+    queryKey: ['users', page, search, roleFilter, statusFilter],
+    queryFn: () => getUsers(page, PAGE_SIZE, {
+      search: search || undefined,
+      role: roleFilter || undefined,
+      isActive: statusFilter === '' ? undefined : statusFilter === 'true',
+    }).then((r) => r.data),
   })
 
   const editMutation = useMutation({
@@ -53,22 +71,6 @@ export function UsersPage() {
   const users = result?.data ?? []
   const meta = result?.meta
 
-  if (isLoading) {
-    return (
-      <div className="profile-loading">
-        <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
-      </div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div className="profile-loading">
-        <p style={{ color: '#f87171' }}>Failed to load users.</p>
-      </div>
-    )
-  }
-
   return (
     <>
       <div>
@@ -93,11 +95,53 @@ export function UsersPage() {
             </button>
           </div>
 
-          {users.length === 0 ? (
+          <div className="cust-filters">
+            <input
+              className="cust-filter-input"
+              type="text"
+              placeholder="Search by email or name…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <select
+              className="cust-filter-select"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+            >
+              <option value="">All roles</option>
+              <option value="admin">Admin</option>
+              <option value="user">User</option>
+            </select>
+            <select
+              className="cust-filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All statuses</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+
+          {isLoading && (
+            <div className="profile-loading">
+              <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
+            </div>
+          )}
+
+          {isError && (
+            <div className="profile-loading">
+              <p style={{ color: '#f87171' }}>Failed to load users.</p>
+            </div>
+          )}
+
+          {!isLoading && !isError && users.length === 0 && (
             <div className="shell-empty-state" style={{ padding: '3rem 1rem' }}>
               <p className="shell-empty-title">No users yet</p>
             </div>
-          ) : (
+          )}
+
+          {!isLoading && !isError && users.length > 0 && (
             <div className="users-table-wrap">
               <table className="users-table">
                 <thead>

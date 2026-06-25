@@ -18,6 +18,7 @@ import { RedisService } from '../redis/redis.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import type { UpdateMeDto } from './dto/update-me.dto';
 import type { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import type { FindUsersQueryDto } from './dto/pagination.dto';
 
 const FIRST_NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack'];
 const LAST_NAMES = ['Smith', 'Jones', 'Williams', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson'];
@@ -96,12 +97,32 @@ export class UsersService {
     await this.redis.del(`rt:${userId}`);
   }
 
-  async findAll(page: number, limit: number): Promise<PaginatedUsers> {
-    const [users, total] = await this.repo.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async findAll(query: FindUsersQueryDto): Promise<PaginatedUsers> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const qb = this.repo.createQueryBuilder('u')
+      .orderBy('u.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (query.search) {
+      const s = `%${query.search}%`;
+      qb.andWhere(
+        '(u.email ILIKE :s OR u.firstName ILIKE :s OR u.lastName ILIKE :s)',
+        { s },
+      );
+    }
+
+    if (query.role !== undefined) {
+      qb.andWhere('u.role = :role', { role: query.role });
+    }
+
+    if (query.isActive !== undefined) {
+      qb.andWhere('u.isActive = :isActive', { isActive: query.isActive });
+    }
+
+    const [users, total] = await qb.getManyAndCount();
 
     return {
       data: users.map((u) => this.toProfile(u)),

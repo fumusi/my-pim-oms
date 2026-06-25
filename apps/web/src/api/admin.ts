@@ -21,8 +21,16 @@ export interface PaginatedUsers {
   }
 }
 
-export const getUsers = (page = 1, limit = 20) =>
-  api.get<PaginatedUsers>('/users', { params: { page, limit } })
+export interface GetUsersParams {
+  page?: number
+  limit?: number
+  search?: string
+  role?: string
+  isActive?: boolean
+}
+
+export const getUsers = (page = 1, limit = 20, params?: Omit<GetUsersParams, 'page' | 'limit'>) =>
+  api.get<PaginatedUsers>('/users', { params: { page, limit, ...params } })
 
 export const adminUpdateUser = (
   id: number,
