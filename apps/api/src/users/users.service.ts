@@ -31,6 +31,7 @@ export interface UserProfile {
   avatarUrl: string | null;
   isActive: boolean;
   createdAt: Date;
+  customerId: number | null;
 }
 
 export interface PaginatedUsers {
@@ -134,6 +135,7 @@ export class UsersService {
     if (dto.email !== undefined) patch.email = dto.email;
     if (dto.role !== undefined) patch.role = dto.role;
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
+    if (dto.customerId !== undefined) patch.customerId = dto.customerId;
 
     await this.repo.update(targetId, patch);
 
@@ -375,6 +377,7 @@ export class UsersService {
       avatarUrl: user.avatarUrl,
       isActive: user.isActive,
       createdAt: user.createdAt,
+      customerId: user.customerId ?? null,
     };
   }
 }

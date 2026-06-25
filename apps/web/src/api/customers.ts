@@ -44,8 +44,16 @@ export interface Customer {
   addresses: Address[]
 }
 
+export interface MemberUser {
+  id: number
+  email: string
+  firstName: string | null
+  lastName: string | null
+}
+
 export interface CustomerDetail extends Customer {
   orderCount: number
+  members: MemberUser[]
 }
 
 export interface PaginatedCustomers {

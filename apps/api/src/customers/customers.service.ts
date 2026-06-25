@@ -10,6 +10,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Customer } from './entities/customer.entity';
 import { Contact } from './entities/contact.entity';
 import { Address } from './entities/address.entity';
+import { User } from '../users/entities/user.entity';
 import { CustomerStatus } from '../common/enums/customer-status.enum';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -26,8 +27,16 @@ export interface PaginatedCustomers {
   limit: number;
 }
 
-export interface CustomerDetail extends Customer {
+export interface MemberUser {
+  id: number;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+export interface CustomerDetail extends Omit<Customer, 'members'> {
   orderCount: number;
+  members: MemberUser[];
 }
 
 export interface DeactivateResult {
@@ -40,6 +49,7 @@ export class CustomersService {
     @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
     @InjectRepository(Contact) private readonly contactRepo: Repository<Contact>,
     @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -84,7 +94,12 @@ export class CustomersService {
       relations: { contacts: true, addresses: true },
     });
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
-    return Object.assign(customer, { orderCount: 0 });
+    const members = await this.userRepo.find({
+      where: { customerId: id },
+      select: { id: true, email: true, firstName: true, lastName: true },
+      order: { createdAt: 'ASC' },
+    });
+    return Object.assign(customer, { orderCount: 0, members });
   }
 
   async create(dto: CreateCustomerDto, createdBy: string): Promise<Customer> {

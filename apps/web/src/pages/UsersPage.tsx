@@ -30,7 +30,7 @@ export function UsersPage() {
   })
 
   const editMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: { email: string; role: string; isActive: boolean } }) =>
+    mutationFn: ({ id, body }: { id: number; body: { email: string; role: string; isActive: boolean; customerId: number | null } }) =>
       adminUpdateUser(id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -105,6 +105,7 @@ export function UsersPage() {
                     <th>#</th>
                     <th>Email</th>
                     <th>Role</th>
+                    <th>Customer</th>
                     <th>Status</th>
                     <th>Member since</th>
                     <th />
@@ -124,6 +125,9 @@ export function UsersPage() {
                       </td>
                       <td>
                         <RoleBadge role={u.role} />
+                      </td>
+                      <td className="users-td-muted" style={{ fontSize: '0.78rem' }}>
+                        {u.customerId ? `#${u.customerId}` : '—'}
                       </td>
                       <td>
                         <span className={`users-status-pill${u.isActive ? ' users-status-active' : ' users-status-inactive'}`}>

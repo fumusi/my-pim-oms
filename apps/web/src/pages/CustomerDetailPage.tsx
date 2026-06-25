@@ -24,6 +24,7 @@ import {
   type Contact,
   type Address,
 } from '../api/customers'
+import { getUsers, adminUpdateUser } from '../api/admin'
 import { formatDate, getApiError } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CustomerDrawer } from '../components/CustomerDrawer'
@@ -243,6 +244,8 @@ export function CustomerDetailPage() {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [showMemberPicker, setShowMemberPicker] = useState(false)
+  const [memberSearch, setMemberSearch] = useState('')
 
   // Contact state
   const [showContactForm, setShowContactForm] = useState(false)
@@ -304,6 +307,34 @@ export function CustomerDetailPage() {
       }
       setArchiveOpen(false)
     },
+  })
+
+  // ── Member mutations ──────────────────────────────────────────────────────
+
+  const { data: allUsersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['users-for-customer-picker'],
+    queryFn: () => getUsers(1, 100).then((r) => r.data),
+    enabled: showMemberPicker,
+  })
+
+  const addMemberMutation = useMutation({
+    mutationFn: (userId: number) => adminUpdateUser(userId, { customerId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
+      setShowMemberPicker(false)
+      setMemberSearch('')
+      toast.success('User added to customer')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: number) => adminUpdateUser(userId, { customerId: null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
+      toast.success('User removed from customer')
+    },
+    onError: (err) => toast.error(getApiError(err)),
   })
 
   // ── Contact mutations ─────────────────────────────────────────────────────
@@ -690,6 +721,105 @@ export function CustomerDetailPage() {
           >
             + Add address
           </button>
+        )}
+      </SectionCard>
+
+      {/* Members section */}
+      <SectionCard
+        title="Members"
+        action={
+          isAdmin ? (
+            <button
+              className="cust-add-btn"
+              style={{ width: 'auto', padding: '0.3rem 0.85rem' }}
+              onClick={() => setShowMemberPicker((v) => !v)}
+            >
+              + Add user
+            </button>
+          ) : undefined
+        }
+      >
+        {isAdmin && showMemberPicker && (
+          <div className="cust-sub-form" style={{ marginBottom: '0.75rem' }}>
+            <input
+              className="cust-filter-input"
+              style={{ width: '100%', marginBottom: '0.5rem' }}
+              placeholder="Search users…"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              autoFocus
+            />
+            <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {(() => {
+                const memberIds = new Set(customer.members.map((m) => m.id))
+                const filtered = (allUsersData?.data ?? []).filter(
+                  (u) =>
+                    !memberIds.has(u.id) &&
+                    (memberSearch === '' ||
+                      u.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
+                      [u.firstName, u.lastName].filter(Boolean).join(' ').toLowerCase().includes(memberSearch.toLowerCase())),
+                )
+                if (usersLoading) return <p style={{ color: '#6b6e87', fontSize: '0.8rem' }}>Loading…</p>
+                if (filtered.length === 0) return <p style={{ color: '#6b6e87', fontSize: '0.8rem' }}>No users found</p>
+                return filtered.map((u) => (
+                  <button
+                    key={u.id}
+                    className="cust-sub-btn"
+                    style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}
+                    disabled={addMemberMutation.isPending}
+                    onClick={() => addMemberMutation.mutate(u.id)}
+                  >
+                    <span style={{ color: '#e0e2f0' }}>{u.email}</span>
+                    {(u.firstName || u.lastName) && (
+                      <span style={{ color: '#6b6e87', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                        {[u.firstName, u.lastName].filter(Boolean).join(' ')}
+                      </span>
+                    )}
+                  </button>
+                ))
+              })()}
+            </div>
+            <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+              <button className="users-action-btn" onClick={() => { setShowMemberPicker(false); setMemberSearch('') }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {customer.members.length === 0 ? (
+          <p style={{ color: '#6b6e87', fontSize: '0.825rem' }}>No users assigned to this customer.</p>
+        ) : (
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                {isAdmin && <th />}
+              </tr>
+            </thead>
+            <tbody>
+              {customer.members.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.email}</td>
+                  <td className="users-td-muted">
+                    {[m.firstName, m.lastName].filter(Boolean).join(' ') || '—'}
+                  </td>
+                  {isAdmin && (
+                    <td>
+                      <button
+                        className="cust-sub-btn cust-sub-btn-danger"
+                        disabled={removeMemberMutation.isPending}
+                        onClick={() => removeMemberMutation.mutate(m.id)}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </SectionCard>
 

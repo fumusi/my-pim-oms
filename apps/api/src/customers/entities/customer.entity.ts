@@ -70,4 +70,7 @@ export class Customer {
 
   @OneToMany(() => Address, (a) => a.customer)
   addresses!: Address[];
+
+  @OneToMany('User', (u: any) => u.customer)
+  members!: import('../../users/entities/user.entity').User[];
 }
