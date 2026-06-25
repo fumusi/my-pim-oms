@@ -13,6 +13,7 @@ import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CustomersModule } from './customers/customers.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { CustomersModule } from './customers/customers.module';
     ProductsModule,
     CategoriesModule,
     CustomersModule,
+    OrdersModule,
     HealthModule,
   ],
   providers: [
