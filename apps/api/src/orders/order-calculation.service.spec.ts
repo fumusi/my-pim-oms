@@ -62,6 +62,7 @@ describe('OrderCalculationService', () => {
       const r = svc.calcTotals(items, null, 20);
       expect(r.freeShippingApplied).toBe(false);
       expect(r.shippingCost).toBe(20);
+      expect(r.totalInclVat).toBe(210); // 190 totalExclVat + 0 vat + 20 shipping
     });
 
     it('no VAT when vatPercentage is null', () => {

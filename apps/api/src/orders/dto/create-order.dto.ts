@@ -15,6 +15,7 @@ export const CreateOrderSchema = z.object({
   deliveryOption: z.nativeEnum(DeliveryOption),
   description: z.string().max(1000).nullable().optional(),
   vatPercentage: z.number().min(0).max(100).nullable().optional(),
+  shippingCost: z.number().min(0).default(0),
   lineItems: z.array(CreateLineItemSchema).min(1),
 });
 

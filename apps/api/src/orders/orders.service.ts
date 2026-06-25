@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { LineItem } from './entities/line-item.entity';
 import { Product } from '../products/entities/product.entity';
@@ -113,6 +113,8 @@ export class OrdersService {
     return this.dataSource.transaction(async (em) => {
       const orderNumber = await this.generateOrderNumber(em);
 
+      const nominalShippingCost = dto.shippingCost ?? 0;
+
       const order = em.create(Order, {
         orderNumber,
         customerId: dto.customerId,
@@ -122,7 +124,8 @@ export class OrdersService {
         vatPercentage: dto.vatPercentage ?? null,
         status: OrderStatus.Draft,
         orderSource: 'manual',
-        shippingCost: 0,
+        nominalShippingCost,
+        shippingCost: nominalShippingCost,
         freeShippingApplied: false,
         totalExclVat: null,
         vatAmount: null,
@@ -134,11 +137,13 @@ export class OrdersService {
       });
       const savedOrder = await em.save(Order, order);
 
+      const productIds = dto.lineItems.map((li) => li.productId);
+      const products = await em.find(Product, { where: { id: In(productIds) } });
+      const productMap = new Map(products.map((p) => [p.id, p]));
+
       const lineItems: LineItem[] = [];
       for (const liDto of dto.lineItems) {
-        const product = await this.productRepo.findOne({
-          where: { id: liDto.productId },
-        });
+        const product = productMap.get(liDto.productId);
         if (!product)
           throw new NotFoundException(`Product ${liDto.productId} not found`);
 
@@ -172,7 +177,7 @@ export class OrdersService {
           discount: li.discount,
         })),
         savedOrder.vatPercentage,
-        0,
+        nominalShippingCost,
       );
       savedOrder.totalExclVat = totals.totalExclVat;
       savedOrder.vatAmount = totals.vatAmount;
@@ -206,6 +211,8 @@ export class OrdersService {
       order.trackingUrl = dto.trackingUrl ?? null;
     if (dto.shippingAddressId !== undefined)
       order.shippingAddressId = dto.shippingAddressId;
+    if (dto.shippingCost !== undefined)
+      order.nominalShippingCost = dto.shippingCost;
 
     order.updatedBy = updatedBy;
 
@@ -217,7 +224,7 @@ export class OrdersService {
         discount: li.discount,
       })),
       order.vatPercentage,
-      order.shippingCost,
+      order.nominalShippingCost,
     );
     order.totalExclVat = totals.totalExclVat;
     order.vatAmount = totals.vatAmount;
@@ -250,45 +257,54 @@ export class OrdersService {
     dto: CreateLineItemDto,
     updatedBy: string,
   ): Promise<Order> {
-    const order = await this.findById(orderId);
+    return this.dataSource.transaction(async (em) => {
+      const order = await em.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      });
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
-    if (TERMINAL_STATUSES.includes(order.status)) {
-      throw new BadRequestException(
-        'Order cannot be modified in its current status',
-      );
-    }
+      if (TERMINAL_STATUSES.includes(order.status)) {
+        throw new BadRequestException(
+          'Order cannot be modified in its current status',
+        );
+      }
 
-    const product = await this.productRepo.findOne({
-      where: { id: dto.productId },
+      const product = await em.findOne(Product, {
+        where: { id: dto.productId },
+      });
+      if (!product)
+        throw new NotFoundException(`Product ${dto.productId} not found`);
+
+      const lineTotal = this.calc.calcLineTotal({
+        unitPrice: dto.unitPrice,
+        quantity: dto.quantity,
+        discount: dto.discount ?? 0,
+      });
+
+      const lineItem = em.create(LineItem, {
+        orderId,
+        productId: dto.productId,
+        productName:
+          product.name?.en ?? product.name?.nl ?? String(dto.productId),
+        sku: product.barcode ?? null,
+        quantity: dto.quantity,
+        unitPrice: dto.unitPrice,
+        discount: dto.discount ?? 0,
+        lineTotalExclVat: lineTotal,
+        isFulfillable: this.calc.isFulfillable(product.stock, dto.quantity),
+      });
+      await em.save(LineItem, lineItem);
+
+      order.lineItems = await em.find(LineItem, { where: { orderId } });
+      order.updatedBy = updatedBy;
+
+      await this.recalculateAndSaveOrder(order, em);
+      return em.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      }) as Promise<Order>;
     });
-    if (!product)
-      throw new NotFoundException(`Product ${dto.productId} not found`);
-
-    const lineTotal = this.calc.calcLineTotal({
-      unitPrice: dto.unitPrice,
-      quantity: dto.quantity,
-      discount: dto.discount ?? 0,
-    });
-
-    const lineItem = this.lineItemRepo.create({
-      orderId,
-      productId: dto.productId,
-      productName:
-        product.name?.en ?? product.name?.nl ?? String(dto.productId),
-      sku: product.barcode ?? null,
-      quantity: dto.quantity,
-      unitPrice: dto.unitPrice,
-      discount: dto.discount ?? 0,
-      lineTotalExclVat: lineTotal,
-      isFulfillable: this.calc.isFulfillable(product.stock, dto.quantity),
-    });
-    await this.lineItemRepo.save(lineItem);
-
-    order.lineItems = await this.lineItemRepo.find({ where: { orderId } });
-    order.updatedBy = updatedBy;
-
-    await this.recalculateAndSaveOrder(order);
-    return this.findById(orderId);
   }
 
   async updateLineItem(
@@ -297,82 +313,96 @@ export class OrdersService {
     dto: UpdateLineItemDto,
     updatedBy: string,
   ): Promise<Order> {
-    const order = await this.findById(orderId);
+    return this.dataSource.transaction(async (em) => {
+      const order = await em.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      });
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
-    if (TERMINAL_STATUSES.includes(order.status)) {
-      throw new BadRequestException(
-        'Order cannot be modified in its current status',
+      if (TERMINAL_STATUSES.includes(order.status)) {
+        throw new BadRequestException(
+          'Order cannot be modified in its current status',
+        );
+      }
+
+      const lineItem = await em.findOne(LineItem, { where: { id: itemId } });
+      if (!lineItem || lineItem.orderId !== orderId) {
+        throw new NotFoundException(
+          `Line item ${itemId} not found for order ${orderId}`,
+        );
+      }
+
+      if (dto.quantity !== undefined) lineItem.quantity = dto.quantity;
+      if (dto.unitPrice !== undefined) lineItem.unitPrice = dto.unitPrice;
+      if (dto.discount !== undefined) lineItem.discount = dto.discount;
+
+      lineItem.lineTotalExclVat = this.calc.calcLineTotal({
+        unitPrice: lineItem.unitPrice,
+        quantity: lineItem.quantity,
+        discount: lineItem.discount,
+      });
+
+      const product = await em.findOne(Product, {
+        where: { id: lineItem.productId },
+      });
+      lineItem.isFulfillable = this.calc.isFulfillable(
+        product?.stock ?? null,
+        lineItem.quantity,
       );
-    }
 
-    const lineItem = await this.lineItemRepo.findOne({ where: { id: itemId } });
-    if (!lineItem || lineItem.orderId !== orderId) {
-      throw new NotFoundException(
-        `Line item ${itemId} not found for order ${orderId}`,
-      );
-    }
+      await em.save(LineItem, lineItem);
 
-    if (dto.quantity !== undefined) lineItem.quantity = dto.quantity;
-    if (dto.unitPrice !== undefined) lineItem.unitPrice = dto.unitPrice;
-    if (dto.discount !== undefined) lineItem.discount = dto.discount;
+      order.lineItems = await em.find(LineItem, { where: { orderId } });
+      order.updatedBy = updatedBy;
 
-    lineItem.lineTotalExclVat = this.calc.calcLineTotal({
-      unitPrice: lineItem.unitPrice,
-      quantity: lineItem.quantity,
-      discount: lineItem.discount,
+      await this.recalculateAndSaveOrder(order, em);
+      return em.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      }) as Promise<Order>;
     });
-
-    const product = await this.productRepo.findOne({
-      where: { id: lineItem.productId },
-    });
-    lineItem.isFulfillable = this.calc.isFulfillable(
-      product?.stock ?? null,
-      lineItem.quantity,
-    );
-
-    await this.lineItemRepo.save(lineItem);
-
-    order.lineItems = await this.lineItemRepo.find({ where: { orderId } });
-    order.updatedBy = updatedBy;
-
-    await this.recalculateAndSaveOrder(order);
-    return this.findById(orderId);
   }
 
   async removeLineItem(
     orderId: number,
     itemId: number,
     updatedBy: string,
-  ): Promise<Order> {
-    const order = await this.findById(orderId);
+  ): Promise<void> {
+    return this.dataSource.transaction(async (em) => {
+      const order = await em.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      });
+      if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
-    if (TERMINAL_STATUSES.includes(order.status)) {
-      throw new BadRequestException(
-        'Order cannot be modified in its current status',
-      );
-    }
+      if (TERMINAL_STATUSES.includes(order.status)) {
+        throw new BadRequestException(
+          'Order cannot be modified in its current status',
+        );
+      }
 
-    const lineItems = await this.lineItemRepo.find({ where: { orderId } });
-    if (lineItems.length <= 1) {
-      throw new BadRequestException(
-        'Cannot remove the only line item from an order',
-      );
-    }
+      const lineItems = await em.find(LineItem, { where: { orderId } });
+      if (lineItems.length <= 1) {
+        throw new BadRequestException(
+          'Cannot remove the only line item from an order',
+        );
+      }
 
-    const target = lineItems.find((li) => li.id === itemId);
-    if (!target) {
-      throw new NotFoundException(
-        `Line item ${itemId} not found for order ${orderId}`,
-      );
-    }
+      const target = lineItems.find((li) => li.id === itemId);
+      if (!target) {
+        throw new NotFoundException(
+          `Line item ${itemId} not found for order ${orderId}`,
+        );
+      }
 
-    await this.lineItemRepo.remove(target);
+      await em.remove(LineItem, target);
 
-    order.lineItems = lineItems.filter((li) => li.id !== itemId);
-    order.updatedBy = updatedBy;
+      order.lineItems = lineItems.filter((li) => li.id !== itemId);
+      order.updatedBy = updatedBy;
 
-    await this.recalculateAndSaveOrder(order);
-    return this.findById(orderId);
+      await this.recalculateAndSaveOrder(order, em);
+    });
   }
 
   async archive(id: number, reason: string, updatedBy: string): Promise<Order> {
@@ -394,7 +424,7 @@ export class OrdersService {
     return this.orderRepo.save(order);
   }
 
-  private async recalculateAndSaveOrder(order: Order): Promise<void> {
+  private async recalculateAndSaveOrder(order: Order, em?: EntityManager): Promise<void> {
     const totals = this.calc.calcTotals(
       order.lineItems.map((li) => ({
         unitPrice: li.unitPrice,
@@ -402,14 +432,18 @@ export class OrdersService {
         discount: li.discount,
       })),
       order.vatPercentage,
-      order.shippingCost,
+      order.nominalShippingCost,
     );
     order.totalExclVat = totals.totalExclVat;
     order.vatAmount = totals.vatAmount;
     order.totalInclVat = totals.totalInclVat;
     order.shippingCost = totals.shippingCost;
     order.freeShippingApplied = totals.freeShippingApplied;
-    await this.orderRepo.save(order);
+    if (em) {
+      await em.save(Order, order);
+    } else {
+      await this.orderRepo.save(order);
+    }
   }
 
   private async generateOrderNumber(em: EntityManager): Promise<string> {

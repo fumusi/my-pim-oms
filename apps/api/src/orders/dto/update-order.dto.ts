@@ -7,6 +7,7 @@ const UpdateOrderSchema = z.object({
   deliveryOption: z.nativeEnum(DeliveryOption).optional(),
   trackingUrl: z.string().url().max(2048).nullable().optional(),
   shippingAddressId: z.number().int().positive().optional(),
+  shippingCost: z.number().min(0).optional(),
 });
 
 export class UpdateOrderDto extends createZodDto(UpdateOrderSchema) {}
