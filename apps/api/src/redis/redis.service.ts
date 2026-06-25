@@ -32,4 +32,16 @@ export class RedisService {
   async expire(key: string, ttlSeconds: number): Promise<void> {
     await this.client.expire(key, ttlSeconds);
   }
+
+  async incrWithExpireOnCreate(key: string, ttlSeconds: number): Promise<number> {
+    const result = await this.client.eval(
+      `local n = redis.call('INCR', KEYS[1])
+       if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+       return n`,
+      1,
+      key,
+      String(ttlSeconds),
+    );
+    return result as number;
+  }
 }

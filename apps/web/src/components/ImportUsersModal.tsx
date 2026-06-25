@@ -9,6 +9,8 @@ interface Props {
 }
 
 export function ImportUsersModal({ onClose, onImported }: Props) {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -23,7 +25,7 @@ export function ImportUsersModal({ onClose, onImported }: Props) {
     const prev = document.activeElement as HTMLElement | null
     modalRef.current?.focus()
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
       if (e.key === 'Tab') {
         const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
           'button, [href], input, [tabindex]:not([tabindex="-1"])',
@@ -43,7 +45,7 @@ export function ImportUsersModal({ onClose, onImported }: Props) {
       document.removeEventListener('keydown', handleKeyDown)
       prev?.focus()
     }
-  }, [onClose])
+  }, [])
 
   function pickFile(f: File | null | undefined) {
     if (!f) return

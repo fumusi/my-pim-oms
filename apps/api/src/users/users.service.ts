@@ -12,13 +12,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import ms from 'ms';
 import * as XLSX from 'xlsx';
-import { faker } from '@faker-js/faker';
 import { User } from './entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 import { RedisService } from '../redis/redis.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import type { UpdateMeDto } from './dto/update-me.dto';
 import type { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+
+const FIRST_NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack'];
+const LAST_NAMES = ['Smith', 'Jones', 'Williams', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson'];
 
 export interface UserProfile {
   id: number;
@@ -159,12 +161,11 @@ export class UsersService {
   }
 
   getUserImportTemplate(): Buffer {
-    faker.seed(42);
     const adminIndices = new Set([0, 5, 10, 15, 20]);
     const rows = Array.from({ length: 50 }, (_, i) => ({
-      first_name: faker.person.firstName(),
-      last_name: faker.person.lastName(),
-      email: faker.internet.email({ firstName: `test${i}` }),
+      first_name: FIRST_NAMES[i % FIRST_NAMES.length],
+      last_name: LAST_NAMES[Math.floor(i / FIRST_NAMES.length) % LAST_NAMES.length],
+      email: `test${i}@example.com`,
       role: adminIndices.has(i) ? 'admin' : 'user',
       status: i % 2 === 0 ? 'active' : 'inactive',
     }));
@@ -180,8 +181,7 @@ export class UsersService {
     adminEmail: string,
   ): Promise<ImportUsersResult> {
     const key = `rl:users:import:${adminId}`;
-    const count = await this.redis.incr(key);
-    if (count === 1) await this.redis.expire(key, 600);
+    const count = await this.redis.incrWithExpireOnCreate(key, 600);
     if (count > 5) {
       throw new HttpException(
         'Rate limit: max 5 imports per 10 minutes',
@@ -284,7 +284,18 @@ export class UsersService {
       });
     }
 
-    const validEmails = validRows.map((r) => r.email);
+    const seenInFile = new Set<string>();
+    const dedupedRows: ValidRow[] = [];
+    for (const row of validRows) {
+      if (seenInFile.has(row.email)) {
+        errors.push({ row: row.rowIndex, email: row.email, reason: 'Duplicate email in file' });
+      } else {
+        seenInFile.add(row.email);
+        dedupedRows.push(row);
+      }
+    }
+
+    const validEmails = dedupedRows.map((r) => r.email);
     const existing =
       validEmails.length > 0
         ? await this.repo.find({
@@ -296,7 +307,7 @@ export class UsersService {
     const rowsToInsert: ValidRow[] = [];
     let skipped = 0;
 
-    for (const row of validRows) {
+    for (const row of dedupedRows) {
       if (takenEmails.has(row.email)) {
         errors.push({
           row: row.rowIndex,
@@ -309,19 +320,21 @@ export class UsersService {
       }
     }
 
-    await this.repo.manager.transaction(async (em) => {
-      for (const row of rowsToInsert) {
-        const user = em.create(User, {
-          firstName: row.first_name,
-          lastName: row.last_name,
-          email: row.email,
-          role: row.role as Role,
-          isActive: row.status !== 'inactive',
-          password: null,
-        });
-        await em.save(User, user);
-      }
-    });
+    if (rowsToInsert.length > 0) {
+      await this.repo.manager.transaction(async (em) => {
+        const users = rowsToInsert.map((row) =>
+          em.create(User, {
+            firstName: row.first_name,
+            lastName: row.last_name,
+            email: row.email,
+            role: row.role as Role,
+            isActive: row.status !== 'inactive',
+            password: null,
+          }),
+        );
+        await em.save(User, users);
+      });
+    }
 
     const imported = rowsToInsert.length;
 
