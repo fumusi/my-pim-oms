@@ -160,12 +160,13 @@ export class UsersService {
 
   getUserImportTemplate(): Buffer {
     faker.seed(42);
+    const adminIndices = new Set([0, 5, 10, 15, 20]);
     const rows = Array.from({ length: 50 }, (_, i) => ({
       first_name: faker.person.firstName(),
       last_name: faker.person.lastName(),
       email: faker.internet.email({ firstName: `test${i}` }),
-      role: i === 0 ? 'admin' : 'user',
-      status: 'active',
+      role: adminIndices.has(i) ? 'admin' : 'user',
+      status: i % 2 === 0 ? 'active' : 'inactive',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();

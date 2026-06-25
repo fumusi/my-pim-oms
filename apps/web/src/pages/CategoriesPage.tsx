@@ -82,7 +82,7 @@ export function CategoriesPage() {
             {isAdmin && (
               <button
                 className="exact-btn exact-btn-primary"
-                onClick={() => { setEditTarget(null); setDrawerOpen(true) }}
+                onClick={() => setDrawerOpen(true)}
               >
                 + New category
               </button>

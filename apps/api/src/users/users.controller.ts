@@ -80,6 +80,10 @@ export class UsersController {
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const ok = file.mimetype === 'text/csv' || file.originalname.toLowerCase().endsWith('.csv');
+        cb(ok ? null : new BadRequestException('Only CSV files are accepted'), ok);
+      },
     }),
   )
   async importUsers(

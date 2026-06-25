@@ -29,3 +29,20 @@ export const adminUpdateUser = (
 ) => api.patch<AdminUser>(`/users/${id}`, body)
 
 export const adminDeleteUser = (id: number) => api.delete(`/users/${id}`)
+
+export interface ImportUsersResult {
+  imported: number
+  skipped: number
+  errors: { row: number; email: string; reason: string }[]
+}
+
+export const importUsers = (file: File) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post<ImportUsersResult>('/users/import', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export const getUsersImportTemplate = () =>
+  api.get<Blob>('/users/import/template', { responseType: 'blob' })
