@@ -32,7 +32,7 @@ export function ImportModal({ onClose, onImported }: Props) {
       a.href = url
       a.download = 'products-import-template.csv'
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => URL.revokeObjectURL(url), 0)
     } catch (err) {
       toast.error(getApiError(err))
     } finally {

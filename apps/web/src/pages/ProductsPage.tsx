@@ -193,7 +193,7 @@ export function ProductsPage() {
       a.href = url
       a.download = 'products-export.csv'
       a.click()
-      URL.revokeObjectURL(url)
+      setTimeout(() => URL.revokeObjectURL(url), 0)
       toast.success('Export ready')
     } catch (err) {
       toast.error(getApiError(err))

@@ -200,6 +200,10 @@ export class UsersService {
       defval: '',
     });
 
+    if (rows.length > 2000) {
+      throw new BadRequestException('CSV must not exceed 2000 rows');
+    }
+
     const str = (v: unknown): string | undefined => {
       const s = String(v).trim();
       return s.length > 0 ? s : undefined;
@@ -320,29 +324,42 @@ export class UsersService {
       }
     }
 
+    let imported = 0;
+
     if (rowsToInsert.length > 0) {
       await this.repo.manager.transaction(async (em) => {
-        const users = rowsToInsert.map((row) =>
-          em.create(User, {
-            firstName: row.first_name,
-            lastName: row.last_name,
-            email: row.email,
-            role: row.role as Role,
-            isActive: row.status !== 'inactive',
-            password: null,
-          }),
-        );
-        await em.save(User, users);
+        for (const row of rowsToInsert) {
+          try {
+            const user = em.create(User, {
+              firstName: row.first_name,
+              lastName: row.last_name,
+              email: row.email,
+              role: row.role as Role,
+              isActive: row.status !== 'inactive',
+              password: null,
+            });
+            await em.save(User, user);
+            imported++;
+          } catch (err: unknown) {
+            const e = err as { code?: string };
+            if (e?.code === '23505') {
+              errors.push({ row: row.rowIndex, email: row.email, reason: 'Email already exists' });
+              skipped++;
+            } else {
+              throw err;
+            }
+          }
+        }
       });
     }
-
-    const imported = rowsToInsert.length;
 
     this.logger.log(
       `User import by ${adminEmail} (id=${adminId}): imported=${imported}, skipped=${skipped}, errors=${errors.length}`,
     );
     if (errors.length > 0) {
-      this.logger.warn(`Import errors: ${JSON.stringify(errors)}`);
+      this.logger.warn(
+        `Import errors: ${JSON.stringify(errors.map(({ row, reason }) => ({ row, reason })))}`,
+      );
     }
 
     return { imported, skipped, errors };

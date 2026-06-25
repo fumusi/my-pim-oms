@@ -39,9 +39,7 @@ export interface ImportUsersResult {
 export const importUsers = (file: File) => {
   const fd = new FormData()
   fd.append('file', file)
-  return api.post<ImportUsersResult>('/users/import', fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  return api.post<ImportUsersResult>('/users/import', fd)
 }
 
 export const getUsersImportTemplate = () =>
