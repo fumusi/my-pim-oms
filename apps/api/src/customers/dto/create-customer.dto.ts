@@ -13,7 +13,7 @@ export const CreateCustomerSchema = z.object({
   vatNumber: z.string().max(50).nullable().optional(),
   status: z.nativeEnum(CustomerStatus).optional(),
   endDate: z.string().date().nullable().optional(),
-  addresses: z.array(CreateAddressSchema).min(1),
+  addresses: z.array(CreateAddressSchema).min(1).max(10),
   contacts: z.array(CreateContactSchema).max(10).optional(),
 });
 

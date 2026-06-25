@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotImplementedException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -25,6 +26,10 @@ export interface PaginatedCustomers {
   limit: number;
 }
 
+export interface CustomerDetail extends Customer {
+  orderCount: number;
+}
+
 export interface DeactivateResult {
   deactivated: number;
 }
@@ -44,8 +49,6 @@ export class CustomersService {
 
     const qb = this.customerRepo
       .createQueryBuilder('c')
-      .leftJoinAndSelect('c.contacts', 'contacts')
-      .leftJoinAndSelect('c.addresses', 'addresses')
       .orderBy('c.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -75,13 +78,13 @@ export class CustomersService {
     return { data, total, page, limit };
   }
 
-  async findById(id: number): Promise<Customer> {
+  async findById(id: number): Promise<CustomerDetail> {
     const customer = await this.customerRepo.findOne({
       where: { id },
       relations: { contacts: true, addresses: true },
     });
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
-    return customer;
+    return Object.assign(customer, { orderCount: 0 });
   }
 
   async create(dto: CreateCustomerDto, createdBy: string): Promise<Customer> {
@@ -139,7 +142,12 @@ export class CustomersService {
         return savedCustomer;
       });
     } catch (err: unknown) {
-      if ((err as { code?: string }).code === '23505') {
+      const pgErr = err as { code?: string; constraint?: string };
+      if (pgErr.code === '23505') {
+        if (pgErr.constraint === 'UQ_6fbe8c55d8dd968877d296493e3') {
+          // customerNumber collision — MAX+1 race, caller should retry
+          throw new ConflictException('Customer number collision — please retry');
+        }
         throw new ConflictException('A customer with this email already exists');
       }
       throw err;
@@ -148,19 +156,30 @@ export class CustomersService {
 
   async update(id: number, dto: UpdateCustomerDto, updatedBy: string): Promise<Customer> {
     const customer = await this.findById(id);
-    const { ...fields } = dto as Record<string, unknown>;
-    delete fields['customerNumber'];
+    const { customerNumber: _cn, status, endDate, ...rest } = dto as Record<string, unknown>;
 
-    Object.assign(customer, fields);
-    if (fields['endDate'] !== undefined) {
-      customer.endDate = fields['endDate'] ? new Date(fields['endDate'] as string) : null;
+    Object.assign(customer, rest);
+
+    if (endDate !== undefined) {
+      customer.endDate = endDate ? new Date(endDate as string) : null;
     }
-    customer.updatedBy = updatedBy;
 
+    if (status !== undefined) {
+      if (status === CustomerStatus.Active && customer.endDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (new Date(customer.endDate) <= today) {
+          throw new BadRequestException('Cannot activate customer with a past end date');
+        }
+      }
+      customer.status = status as CustomerStatus;
+    }
+
+    customer.updatedBy = updatedBy;
     return this.customerRepo.save(customer);
   }
 
-  async updateStatus(id: number, status: CustomerStatus): Promise<Customer> {
+  async updateStatus(id: number, status: CustomerStatus, updatedBy: string): Promise<Customer> {
     const customer = await this.findById(id);
 
     if (status === CustomerStatus.Active && customer.endDate) {
@@ -172,18 +191,18 @@ export class CustomersService {
     }
 
     customer.status = status;
+    customer.updatedBy = updatedBy;
     return this.customerRepo.save(customer);
   }
 
   async remove(id: number): Promise<void> {
-    const customer = await this.findById(id);
-    await this.customerRepo.remove(customer);
+    // TODO: block if customer has any orders (orders module not yet implemented)
+    throw new NotImplementedException('Delete is blocked until order integration is complete');
   }
 
   async archive(id: number): Promise<Customer> {
-    const customer = await this.findById(id);
-    customer.archivedAt = new Date();
-    return this.customerRepo.save(customer);
+    // TODO: block if customer has active orders (orders module not yet implemented)
+    throw new NotImplementedException('Archive is blocked until order integration is complete');
   }
 
   async createContact(customerId: number, dto: CreateContactDto): Promise<Contact> {
@@ -192,15 +211,24 @@ export class CustomersService {
     if (count >= 10) {
       throw new BadRequestException('Cannot add more than 10 contacts');
     }
-    const contact = this.contactRepo.create({
-      customerId,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      email: dto.email ?? null,
-      phoneNumber: dto.phoneNumber ?? null,
-      isPrimary: dto.isPrimary ?? false,
+    return this.dataSource.transaction(async (em) => {
+      if (dto.isPrimary) {
+        await em.createQueryBuilder()
+          .update(Contact)
+          .set({ isPrimary: false })
+          .where('customer_id = :customerId', { customerId })
+          .execute();
+      }
+      const contact = em.create(Contact, {
+        customerId,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        email: dto.email ?? null,
+        phoneNumber: dto.phoneNumber ?? null,
+        isPrimary: dto.isPrimary ?? false,
+      });
+      return em.save(Contact, contact);
     });
-    return this.contactRepo.save(contact);
   }
 
   async updateContact(customerId: number, contactId: number, dto: UpdateContactDto): Promise<Contact> {
@@ -208,7 +236,8 @@ export class CustomersService {
     if (!contact || contact.customerId !== customerId) {
       throw new NotFoundException(`Contact ${contactId} not found for customer ${customerId}`);
     }
-    Object.assign(contact, dto);
+    const { isPrimary: _ignored, ...fields } = dto as Record<string, unknown>;
+    Object.assign(contact, fields);
     return this.contactRepo.save(contact);
   }
 
@@ -250,17 +279,26 @@ export class CustomersService {
     if (count >= 10) {
       throw new BadRequestException('Cannot add more than 10 addresses');
     }
-    const address = this.addressRepo.create({
-      customerId,
-      street: dto.street,
-      houseNumber: dto.houseNumber,
-      postalCode: dto.postalCode,
-      city: dto.city,
-      province: dto.province ?? null,
-      country: dto.country,
-      isPrimary: dto.isPrimary ?? false,
+    return this.dataSource.transaction(async (em) => {
+      if (dto.isPrimary) {
+        await em.createQueryBuilder()
+          .update(Address)
+          .set({ isPrimary: false })
+          .where('customer_id = :customerId', { customerId })
+          .execute();
+      }
+      const address = em.create(Address, {
+        customerId,
+        street: dto.street,
+        houseNumber: dto.houseNumber,
+        postalCode: dto.postalCode,
+        city: dto.city,
+        province: dto.province ?? null,
+        country: dto.country,
+        isPrimary: dto.isPrimary ?? false,
+      });
+      return em.save(Address, address);
     });
-    return this.addressRepo.save(address);
   }
 
   async updateAddress(customerId: number, addressId: number, dto: UpdateAddressDto): Promise<Address> {
@@ -268,7 +306,8 @@ export class CustomersService {
     if (!address || address.customerId !== customerId) {
       throw new NotFoundException(`Address ${addressId} not found for customer ${customerId}`);
     }
-    Object.assign(address, dto);
+    const { isPrimary: _ignored, ...fields } = dto as Record<string, unknown>;
+    Object.assign(address, fields);
     return this.addressRepo.save(address);
   }
 

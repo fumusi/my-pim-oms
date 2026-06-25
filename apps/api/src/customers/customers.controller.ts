@@ -60,8 +60,9 @@ export class CustomersController {
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCustomerStatusDto,
+    @Req() req: AuthRequest,
   ) {
-    return this.service.updateStatus(id, dto.status);
+    return this.service.updateStatus(id, dto.status, req.user.email);
   }
 
   @Delete(':id')

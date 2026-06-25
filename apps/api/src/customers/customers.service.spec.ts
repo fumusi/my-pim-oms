@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotImplementedException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CustomersService } from './customers.service';
 import { Customer } from './entities/customer.entity';
@@ -10,7 +10,6 @@ import { CustomerStatus } from '../common/enums/customer-status.enum';
 
 function makeQbMock(result: [Customer[], number] = [[], 0]) {
   const qb: Record<string, jest.Mock> = {
-    leftJoinAndSelect: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
@@ -196,7 +195,7 @@ describe('CustomersService', () => {
   });
 
   describe('findById', () => {
-    it('returns customer with relations', async () => {
+    it('returns customer with relations and orderCount stub', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
 
@@ -206,7 +205,7 @@ describe('CustomersService', () => {
         where: { id: 1 },
         relations: { contacts: true, addresses: true },
       });
-      expect(result).toBe(customer);
+      expect(result.orderCount).toBe(0);
     });
 
     it('throws NotFoundException when customer does not exist', async () => {
@@ -317,6 +316,17 @@ describe('CustomersService', () => {
 
       expect(customer.customerNumber).toBe('CUST-0001');
     });
+
+    it('throws BadRequestException when setting status Active with past endDate', async () => {
+      const pastDate = new Date();
+      pastDate.setFullYear(pastDate.getFullYear() - 1);
+      const customer = makeCustomer({ status: CustomerStatus.Inactive, endDate: pastDate });
+      customerRepo.findOne.mockResolvedValue(customer);
+
+      await expect(
+        service.update(1, { status: CustomerStatus.Active } as any, 'admin@example.com'),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('updateStatus', () => {
@@ -325,9 +335,10 @@ describe('CustomersService', () => {
       customerRepo.findOne.mockResolvedValue(customer);
       customerRepo.save.mockImplementation((c: Customer) => Promise.resolve(c));
 
-      const result = await service.updateStatus(1, CustomerStatus.Active);
+      const result = await service.updateStatus(1, CustomerStatus.Active, 'admin@example.com');
 
       expect(result.status).toBe(CustomerStatus.Active);
+      expect(result.updatedBy).toBe('admin@example.com');
     });
 
     it('throws BadRequestException when activating with a past endDate', async () => {
@@ -336,48 +347,74 @@ describe('CustomersService', () => {
       const customer = makeCustomer({ status: CustomerStatus.Inactive, endDate: pastDate });
       customerRepo.findOne.mockResolvedValue(customer);
 
-      await expect(service.updateStatus(1, CustomerStatus.Active)).rejects.toThrow(BadRequestException);
+      await expect(service.updateStatus(1, CustomerStatus.Active, 'admin@example.com')).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('remove', () => {
-    it('calls repo.remove', async () => {
-      const customer = makeCustomer();
-      customerRepo.findOne.mockResolvedValue(customer);
-
-      await service.remove(1);
-
-      expect(customerRepo.remove).toHaveBeenCalledWith(customer);
+    it('throws NotImplementedException', async () => {
+      await expect(service.remove(1)).rejects.toThrow(NotImplementedException);
     });
   });
 
   describe('archive', () => {
-    it('sets archivedAt', async () => {
-      const customer = makeCustomer({ archivedAt: null });
-      customerRepo.findOne.mockResolvedValue(customer);
-      customerRepo.save.mockImplementation((c: Customer) => Promise.resolve(c));
-
-      const result = await service.archive(1);
-
-      expect(result.archivedAt).toBeInstanceOf(Date);
+    it('throws NotImplementedException', async () => {
+      await expect(service.archive(1)).rejects.toThrow(NotImplementedException);
     });
   });
 
   describe('createContact', () => {
-    it('saves a new contact', async () => {
+    it('saves a new contact via transaction', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
       contactRepo.count.mockResolvedValue(0);
       const contact = makeContact();
-      contactRepo.save.mockResolvedValue(contact);
+      const emMock = {
+        createQueryBuilder: jest.fn().mockReturnValue({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        }),
+        create: jest.fn().mockReturnValue(contact),
+        save: jest.fn().mockResolvedValue(contact),
+      };
+      dataSource.transaction.mockImplementation((cb: (em: typeof emMock) => Promise<Contact>) =>
+        cb(emMock),
+      );
 
       const result = await service.createContact(1, {
         firstName: 'John',
         lastName: 'Doe',
       } as any);
 
-      expect(contactRepo.save).toHaveBeenCalled();
+      expect(emMock.save).toHaveBeenCalled();
       expect(result).toBe(contact);
+    });
+
+    it('clears existing primaries in transaction when isPrimary is true', async () => {
+      const customer = makeCustomer();
+      customerRepo.findOne.mockResolvedValue(customer);
+      contactRepo.count.mockResolvedValue(1);
+      const contact = makeContact({ isPrimary: true });
+      const txQb: Record<string, jest.Mock> = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      const emMock = {
+        createQueryBuilder: jest.fn().mockReturnValue(txQb),
+        create: jest.fn().mockReturnValue(contact),
+        save: jest.fn().mockResolvedValue(contact),
+      };
+      dataSource.transaction.mockImplementation((cb: (em: typeof emMock) => Promise<Contact>) =>
+        cb(emMock),
+      );
+
+      await service.createContact(1, { firstName: 'John', lastName: 'Doe', isPrimary: true } as any);
+
+      expect(txQb.set).toHaveBeenCalledWith({ isPrimary: false });
     });
 
     it('throws BadRequestException when customer already has 10 contacts', async () => {
@@ -413,6 +450,19 @@ describe('CustomersService', () => {
     });
   });
 
+  describe('updateContact', () => {
+    it('ignores isPrimary field in payload', async () => {
+      const contact = makeContact({ id: 2, customerId: 1, isPrimary: false });
+      contactRepo.findOne.mockResolvedValue(contact);
+      contactRepo.save.mockImplementation((c: Contact) => Promise.resolve(c));
+
+      const result = await service.updateContact(1, 2, { firstName: 'Jane', isPrimary: true } as any);
+
+      expect(result.isPrimary).toBe(false);
+      expect(result.firstName).toBe('Jane');
+    });
+  });
+
   describe('setPrimaryContact', () => {
     it('clears others and sets target as primary', async () => {
       const customer = makeCustomer();
@@ -439,12 +489,24 @@ describe('CustomersService', () => {
   });
 
   describe('createAddress', () => {
-    it('saves a new address', async () => {
+    it('saves a new address via transaction', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
       addressRepo.count.mockResolvedValue(0);
       const address = makeAddress();
-      addressRepo.save.mockResolvedValue(address);
+      const emMock = {
+        createQueryBuilder: jest.fn().mockReturnValue({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        }),
+        create: jest.fn().mockReturnValue(address),
+        save: jest.fn().mockResolvedValue(address),
+      };
+      dataSource.transaction.mockImplementation((cb: (em: typeof emMock) => Promise<Address>) =>
+        cb(emMock),
+      );
 
       const result = await service.createAddress(1, {
         street: 'Main St',
@@ -454,8 +516,40 @@ describe('CustomersService', () => {
         country: 'NL',
       } as any);
 
-      expect(addressRepo.save).toHaveBeenCalled();
+      expect(emMock.save).toHaveBeenCalled();
       expect(result).toBe(address);
+    });
+
+    it('clears existing primaries in transaction when isPrimary is true', async () => {
+      const customer = makeCustomer();
+      customerRepo.findOne.mockResolvedValue(customer);
+      addressRepo.count.mockResolvedValue(1);
+      const address = makeAddress({ isPrimary: true });
+      const txQb: Record<string, jest.Mock> = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      const emMock = {
+        createQueryBuilder: jest.fn().mockReturnValue(txQb),
+        create: jest.fn().mockReturnValue(address),
+        save: jest.fn().mockResolvedValue(address),
+      };
+      dataSource.transaction.mockImplementation((cb: (em: typeof emMock) => Promise<Address>) =>
+        cb(emMock),
+      );
+
+      await service.createAddress(1, {
+        street: 'Main St',
+        houseNumber: '1',
+        postalCode: '1234AB',
+        city: 'AMS',
+        country: 'NL',
+        isPrimary: true,
+      } as any);
+
+      expect(txQb.set).toHaveBeenCalledWith({ isPrimary: false });
     });
 
     it('throws BadRequestException when customer already has 10 addresses', async () => {
@@ -494,6 +588,19 @@ describe('CustomersService', () => {
       addressRepo.find.mockResolvedValue([address]);
 
       await expect(service.removeAddress(1, 1)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateAddress', () => {
+    it('ignores isPrimary field in payload', async () => {
+      const address = makeAddress({ id: 2, customerId: 1, isPrimary: false });
+      addressRepo.findOne.mockResolvedValue(address);
+      addressRepo.save.mockImplementation((a: Address) => Promise.resolve(a));
+
+      const result = await service.updateAddress(1, 2, { city: 'Rotterdam', isPrimary: true } as any);
+
+      expect(result.isPrimary).toBe(false);
+      expect(result.city).toBe('Rotterdam');
     });
   });
 
