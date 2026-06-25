@@ -37,13 +37,32 @@ export class LineItem {
   @Column({ type: 'int' })
   quantity!: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, name: 'unit_price', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    name: 'unit_price',
+    transformer: decimalTransformer,
+  })
   unitPrice!: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+    transformer: decimalTransformer,
+  })
   discount!: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, name: 'line_total_excl_vat', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    name: 'line_total_excl_vat',
+    transformer: decimalTransformer,
+  })
   lineTotalExclVat!: number | null;
 
   @Column({ type: 'boolean', nullable: true, name: 'is_fulfillable' })

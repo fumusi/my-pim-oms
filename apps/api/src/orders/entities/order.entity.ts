@@ -20,7 +20,12 @@ export class Order {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'varchar', unique: true, name: 'order_number', update: false })
+  @Column({
+    type: 'varchar',
+    unique: true,
+    name: 'order_number',
+    update: false,
+  })
   orderNumber!: string;
 
   @Column({ name: 'customer_id' })
@@ -37,34 +42,84 @@ export class Order {
   @JoinColumn({ name: 'shipping_address_id' })
   shippingAddress!: Address;
 
-  @Column({ type: 'enum', enum: OrderStatus, enumName: 'order_status', default: OrderStatus.Draft })
+  @Column({
+    type: 'enum',
+    enum: OrderStatus,
+    enumName: 'order_status',
+    default: OrderStatus.Draft,
+  })
   status!: OrderStatus;
 
   @Column({ type: 'varchar', nullable: true })
   description!: string | null;
 
-  @Column({ type: 'varchar', name: 'order_source', default: 'manual', update: false })
+  @Column({
+    type: 'varchar',
+    name: 'order_source',
+    default: 'manual',
+    update: false,
+  })
   orderSource!: string;
 
-  @Column({ type: 'enum', enum: DeliveryOption, enumName: 'delivery_option', name: 'delivery_option' })
+  @Column({
+    type: 'enum',
+    enum: DeliveryOption,
+    enumName: 'delivery_option',
+    name: 'delivery_option',
+  })
   deliveryOption!: DeliveryOption;
 
   @Column({ type: 'varchar', nullable: true, name: 'tracking_url' })
   trackingUrl!: string | null;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, name: 'vat_percentage', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+    name: 'vat_percentage',
+    transformer: decimalTransformer,
+  })
   vatPercentage!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, name: 'vat_amount', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    name: 'vat_amount',
+    transformer: decimalTransformer,
+  })
   vatAmount!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, name: 'total_excl_vat', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    name: 'total_excl_vat',
+    transformer: decimalTransformer,
+  })
   totalExclVat!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, name: 'total_incl_vat', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    name: 'total_incl_vat',
+    transformer: decimalTransformer,
+  })
   totalInclVat!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, default: 0, name: 'shipping_cost', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    default: 0,
+    name: 'shipping_cost',
+    transformer: decimalTransformer,
+  })
   shippingCost!: number;
 
   @Column({ type: 'boolean', default: false, name: 'free_shipping_applied' })
