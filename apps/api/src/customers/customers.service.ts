@@ -181,9 +181,9 @@ export class CustomersService {
 
     if (status !== undefined) {
       if (status === CustomerStatus.Active && customer.endDate) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (new Date(customer.endDate) <= today) {
+        const todayUTC = new Date();
+        todayUTC.setUTCHours(0, 0, 0, 0);
+        if (new Date(customer.endDate) < todayUTC) {
           throw new BadRequestException('Cannot activate customer with a past end date');
         }
       }
@@ -199,9 +199,9 @@ export class CustomersService {
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
 
     if (status === CustomerStatus.Active && customer.endDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (new Date(customer.endDate) <= today) {
+      const todayUTC = new Date();
+      todayUTC.setUTCHours(0, 0, 0, 0);
+      if (new Date(customer.endDate) < todayUTC) {
         throw new BadRequestException('Cannot activate customer with a past end date');
       }
     }
@@ -223,11 +223,11 @@ export class CustomersService {
 
   async createContact(customerId: number, dto: CreateContactDto): Promise<Contact> {
     await this.findById(customerId);
-    const count = await this.contactRepo.count({ where: { customerId } });
-    if (count >= 10) {
-      throw new BadRequestException('Cannot add more than 10 contacts');
-    }
     return this.dataSource.transaction(async (em) => {
+      const count = await em.count(Contact, { where: { customerId } });
+      if (count >= 10) {
+        throw new BadRequestException('Cannot add more than 10 contacts');
+      }
       if (dto.isPrimary) {
         await em.createQueryBuilder()
           .update(Contact)
@@ -291,11 +291,11 @@ export class CustomersService {
 
   async createAddress(customerId: number, dto: CreateAddressDto): Promise<Address> {
     await this.findById(customerId);
-    const count = await this.addressRepo.count({ where: { customerId } });
-    if (count >= 10) {
-      throw new BadRequestException('Cannot add more than 10 addresses');
-    }
     return this.dataSource.transaction(async (em) => {
+      const count = await em.count(Address, { where: { customerId } });
+      if (count >= 10) {
+        throw new BadRequestException('Cannot add more than 10 addresses');
+      }
       if (dto.isPrimary) {
         await em.createQueryBuilder()
           .update(Address)
@@ -374,8 +374,8 @@ export class CustomersService {
       .update(Customer)
       .set({ status: CustomerStatus.Inactive })
       .where('status = :status', { status: CustomerStatus.Active })
-      .andWhere('endDate IS NOT NULL')
-      .andWhere('endDate <= CURRENT_DATE')
+      .andWhere('end_date IS NOT NULL')
+      .andWhere('end_date <= CURRENT_DATE')
       .execute();
     return { deactivated: result.affected ?? 0 };
   }

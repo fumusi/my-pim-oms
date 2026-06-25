@@ -218,7 +218,7 @@ describe('CustomersService', () => {
   describe('create', () => {
     it('generates CUST-0001 on empty table', async () => {
       const emMock = {
-        query: jest.fn().mockResolvedValue([{ max: null }]),
+        query: jest.fn().mockResolvedValue([{ next: 1 }]),
         create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
         save: jest.fn().mockImplementation((_entity, data) =>
           Promise.resolve(Array.isArray(data) ? data : { ...data, id: 1 }),
@@ -246,7 +246,7 @@ describe('CustomersService', () => {
 
     it('auto-assigns isPrimary to first address when none specified', async () => {
       const emMock = {
-        query: jest.fn().mockResolvedValue([{ max: 1 }]),
+        query: jest.fn().mockResolvedValue([{ next: 2 }]),
         create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
         save: jest.fn().mockImplementation((_entity, data) =>
           Promise.resolve(Array.isArray(data) ? data : { ...data, id: 1 }),
@@ -367,9 +367,9 @@ describe('CustomersService', () => {
     it('saves a new contact via transaction', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
-      contactRepo.count.mockResolvedValue(0);
       const contact = makeContact();
       const emMock = {
+        count: jest.fn().mockResolvedValue(0),
         createQueryBuilder: jest.fn().mockReturnValue({
           update: jest.fn().mockReturnThis(),
           set: jest.fn().mockReturnThis(),
@@ -395,7 +395,6 @@ describe('CustomersService', () => {
     it('clears existing primaries in transaction when isPrimary is true', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
-      contactRepo.count.mockResolvedValue(1);
       const contact = makeContact({ isPrimary: true });
       const txQb: Record<string, jest.Mock> = {
         update: jest.fn().mockReturnThis(),
@@ -404,6 +403,7 @@ describe('CustomersService', () => {
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       const emMock = {
+        count: jest.fn().mockResolvedValue(1),
         createQueryBuilder: jest.fn().mockReturnValue(txQb),
         create: jest.fn().mockReturnValue(contact),
         save: jest.fn().mockResolvedValue(contact),
@@ -420,7 +420,12 @@ describe('CustomersService', () => {
     it('throws BadRequestException when customer already has 10 contacts', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
-      contactRepo.count.mockResolvedValue(10);
+      const emMock = {
+        count: jest.fn().mockResolvedValue(10),
+      };
+      dataSource.transaction.mockImplementation((cb: (em: typeof emMock) => Promise<Contact>) =>
+        cb(emMock),
+      );
 
       await expect(
         service.createContact(1, { firstName: 'Jane', lastName: 'Doe' } as any),
@@ -492,9 +497,9 @@ describe('CustomersService', () => {
     it('saves a new address via transaction', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
-      addressRepo.count.mockResolvedValue(0);
       const address = makeAddress();
       const emMock = {
+        count: jest.fn().mockResolvedValue(0),
         createQueryBuilder: jest.fn().mockReturnValue({
           update: jest.fn().mockReturnThis(),
           set: jest.fn().mockReturnThis(),
@@ -523,7 +528,6 @@ describe('CustomersService', () => {
     it('clears existing primaries in transaction when isPrimary is true', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
-      addressRepo.count.mockResolvedValue(1);
       const address = makeAddress({ isPrimary: true });
       const txQb: Record<string, jest.Mock> = {
         update: jest.fn().mockReturnThis(),
@@ -532,6 +536,7 @@ describe('CustomersService', () => {
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       const emMock = {
+        count: jest.fn().mockResolvedValue(1),
         createQueryBuilder: jest.fn().mockReturnValue(txQb),
         create: jest.fn().mockReturnValue(address),
         save: jest.fn().mockResolvedValue(address),
@@ -555,7 +560,12 @@ describe('CustomersService', () => {
     it('throws BadRequestException when customer already has 10 addresses', async () => {
       const customer = makeCustomer();
       customerRepo.findOne.mockResolvedValue(customer);
-      addressRepo.count.mockResolvedValue(10);
+      const emMock = {
+        count: jest.fn().mockResolvedValue(10),
+      };
+      dataSource.transaction.mockImplementation((cb: (em: typeof emMock) => Promise<Address>) =>
+        cb(emMock),
+      );
 
       await expect(
         service.createAddress(1, {

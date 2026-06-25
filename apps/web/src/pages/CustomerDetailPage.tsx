@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -506,7 +506,7 @@ export function CustomerDetailPage() {
                 Activate
               </button>
             )}
-            {customer.status !== 'archived' && (
+            {!customer.archivedAt && (
               <button className="exact-btn exact-btn-danger-outline" onClick={() => setArchiveOpen(true)}>Archive</button>
             )}
             <button className="exact-btn exact-btn-danger-outline" onClick={() => setDeleteOpen(true)}>Delete</button>
@@ -559,8 +559,8 @@ export function CustomerDetailPage() {
             {customer.contacts.map((c) => {
               const isEditingThis = editingContact?.id === c.id
               return (
-                <>
-                  <tr key={c.id}>
+                <Fragment key={c.id}>
+                  <tr>
                     <td>{c.firstName} {c.lastName}</td>
                     <td>{c.email ?? <span className="users-td-muted">—</span>}</td>
                     <td>{c.phoneNumber ?? <span className="users-td-muted">—</span>}</td>
@@ -598,7 +598,7 @@ export function CustomerDetailPage() {
                     )}
                   </tr>
                   {isEditingThis && (
-                    <tr key={`edit-${c.id}`}>
+                    <tr>
                       <td colSpan={isAdmin ? 5 : 4}>
                         <ContactForm
                           defaultValues={{
@@ -614,7 +614,7 @@ export function CustomerDetailPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>

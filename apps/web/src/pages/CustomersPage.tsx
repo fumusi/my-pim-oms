@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearch, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
@@ -27,10 +27,16 @@ export function CustomersPage() {
   const limit = 20
 
   const [searchInput, setSearchInput] = useState(search ?? '')
+  const [countryInput, setCountryInput] = useState(country ?? '')
 
   const [createOpen, setCreateOpen] = useState(false)
 
+  const mountedRef = useRef(false)
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      return
+    }
     const t = setTimeout(() => {
       navigate({
         to: '/customers',
@@ -39,6 +45,18 @@ export function CustomersPage() {
     }, 300)
     return () => clearTimeout(t)
   }, [searchInput]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const countryMountedRef = useRef(false)
+  useEffect(() => {
+    if (!countryMountedRef.current) {
+      countryMountedRef.current = true
+      return
+    }
+    const t = setTimeout(() => {
+      setFilter({ country: countryInput || undefined })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [countryInput]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['customers', page, limit, search, status, country],
@@ -104,8 +122,8 @@ export function CustomersPage() {
             className="cust-filter-input"
             type="text"
             placeholder="Country"
-            value={country ?? ''}
-            onChange={(e) => setFilter({ country: e.target.value || undefined })}
+            value={countryInput}
+            onChange={(e) => setCountryInput(e.target.value)}
           />
         </div>
 
