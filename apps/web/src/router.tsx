@@ -26,6 +26,8 @@ import { CategoriesPage } from './pages/CategoriesPage'
 import { CategoryDetailPage } from './pages/CategoryDetailPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
+import { CustomersPage } from './pages/CustomersPage'
+import { CustomerDetailPage } from './pages/CustomerDetailPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -179,6 +181,35 @@ const productDetailRoute = createRoute({
   component: ProductDetailPage,
 })
 
+const customerDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/customers/$id',
+  staticData: { title: 'Customer' },
+  component: CustomerDetailPage,
+})
+
+const customersRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/customers',
+  staticData: { title: 'Customers' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    page: typeof s.page === 'number' && s.page >= 1 ? s.page : 1,
+    search: typeof s.search === 'string' ? s.search : undefined,
+    status:
+      s.status === 'active' || s.status === 'inactive' || s.status === 'archived'
+        ? (s.status as 'active' | 'inactive' | 'archived')
+        : undefined,
+    country: typeof s.country === 'string' ? s.country : undefined,
+  }),
+  beforeLoad: () => {
+    if (store.getState().auth.user?.role !== 'admin') {
+      toast.error('Access denied')
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: CustomersPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -195,6 +226,8 @@ const routeTree = rootRoute.addChildren([
     ordersRoute,
     profileRoute,
     usersRoute,
+    customersRoute,
+    customerDetailRoute,
   ]),
 ])
 

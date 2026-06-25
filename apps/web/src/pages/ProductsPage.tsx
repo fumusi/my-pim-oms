@@ -311,9 +311,9 @@ export function ProductsPage() {
         </div>
 
         {/* Filters */}
-        <div className="products-filters">
+        <div className="cust-filters">
           <input
-            className="products-search"
+            className="cust-filter-input"
             type="text"
             placeholder="Search products…"
             value={searchInput}
@@ -324,7 +324,7 @@ export function ProductsPage() {
           />
 
           <select
-            className="products-filter-select"
+            className="cust-filter-select"
             value={categoryId ?? ''}
             onChange={(e) => setFilter({ categoryId: e.target.value ? Number(e.target.value) : undefined })}
           >
@@ -337,7 +337,7 @@ export function ProductsPage() {
           </select>
 
           <select
-            className="products-filter-select"
+            className="cust-filter-select"
             value={inStock ?? ''}
             onChange={(e) => setFilter({ inStock: (e.target.value || undefined) as StockFilter | undefined })}
           >
@@ -348,7 +348,7 @@ export function ProductsPage() {
           </select>
 
           <select
-            className="products-filter-select"
+            className="cust-filter-select"
             value={limit}
             onChange={(e) =>
               navigate({

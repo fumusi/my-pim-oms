@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { AdminUser } from '../api/admin'
+import { getCustomers } from '../api/customers'
 
 interface Props {
   user: AdminUser
   loading?: boolean
-  onSave: (data: { email: string; role: string; isActive: boolean }) => void
+  onSave: (data: { email: string; role: string; isActive: boolean; customerId: number | null }) => void
   onCancel: () => void
 }
 
@@ -12,10 +14,16 @@ export function EditUserModal({ user, loading = false, onSave, onCancel }: Props
   const [email, setEmail] = useState(user.email)
   const [role, setRole] = useState(user.role)
   const [isActive, setIsActive] = useState(user.isActive)
+  const [customerId, setCustomerId] = useState<number | null>(user.customerId ?? null)
+
+  const { data: customersData } = useQuery({
+    queryKey: ['customers-list'],
+    queryFn: () => getCustomers({ limit: 100 }).then(r => r.data),
+  })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    onSave({ email, role, isActive })
+    onSave({ email, role, isActive, customerId })
   }
 
   return (
@@ -46,6 +54,21 @@ export function EditUserModal({ user, loading = false, onSave, onCancel }: Props
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div className="modal-field">
+            <label className="modal-label" htmlFor="eu-customer">Customer</label>
+            <select
+              id="eu-customer"
+              className="modal-select"
+              value={customerId ?? ''}
+              onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— No customer —</option>
+              {customersData?.data.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.customerNumber})</option>
+              ))}
             </select>
           </div>
 

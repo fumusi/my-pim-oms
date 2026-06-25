@@ -12,6 +12,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { CategoriesModule } from './categories/categories.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CategoriesModule } from './categories/categories.module';
     ExactModule,
     ProductsModule,
     CategoriesModule,
+    CustomersModule,
     HealthModule,
   ],
   providers: [

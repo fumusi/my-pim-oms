@@ -40,13 +40,28 @@ describe('UsersService', () => {
   let service: UsersService;
   let repo: Record<string, jest.Mock>;
   let redis: Record<string, jest.Mock>;
+  let qb: Record<string, jest.Mock>;
 
   beforeEach(async () => {
+    qb = {
+      orderBy: jest.fn(),
+      skip: jest.fn(),
+      take: jest.fn(),
+      andWhere: jest.fn(),
+      getManyAndCount: jest.fn(),
+    };
+    qb.orderBy.mockReturnValue(qb);
+    qb.skip.mockReturnValue(qb);
+    qb.take.mockReturnValue(qb);
+    qb.andWhere.mockReturnValue(qb);
+    qb.getManyAndCount.mockResolvedValue([[], 0]);
+
     repo = {
       findOneBy: jest.fn(),
       findAndCount: jest.fn(),
       save: jest.fn(),
       update: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
     };
 
     redis = {
@@ -162,26 +177,25 @@ describe('UsersService', () => {
   describe('findAll', () => {
     it('returns paginated results', async () => {
       const users = [makeUser(), makeUser({ id: 2, email: 'b@example.com' })];
-      repo.findAndCount.mockResolvedValue([users, 2]);
+      qb.getManyAndCount.mockResolvedValue([users, 2]);
 
-      const result = await service.findAll(1, 20);
+      const result = await service.findAll({ page: 1, limit: 20 } as any);
 
       expect(result.data).toHaveLength(2);
       expect(result.meta).toEqual({ total: 2, page: 1, limit: 20, totalPages: 1 });
     });
 
     it('calculates totalPages correctly', async () => {
-      repo.findAndCount.mockResolvedValue([[], 45]);
-      const result = await service.findAll(1, 20);
+      qb.getManyAndCount.mockResolvedValue([[], 45]);
+      const result = await service.findAll({ page: 1, limit: 20 } as any);
       expect(result.meta.totalPages).toBe(3);
     });
 
     it('applies skip/take for page 2', async () => {
-      repo.findAndCount.mockResolvedValue([[], 0]);
-      await service.findAll(2, 10);
-      expect(repo.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 10, take: 10 }),
-      );
+      qb.getManyAndCount.mockResolvedValue([[], 0]);
+      await service.findAll({ page: 2, limit: 10 } as any);
+      expect(qb.skip).toHaveBeenCalledWith(10);
+      expect(qb.take).toHaveBeenCalledWith(10);
     });
   });
 

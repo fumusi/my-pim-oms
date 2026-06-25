@@ -3,6 +3,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
@@ -50,4 +52,11 @@ export class User {
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt!: Date;
+
+  @Column({ type: 'int', nullable: true, name: 'customer_id' })
+  customerId!: number | null;
+
+  @ManyToOne('Customer', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'customer_id' })
+  customer!: import('../../customers/entities/customer.entity').Customer | null;
 }

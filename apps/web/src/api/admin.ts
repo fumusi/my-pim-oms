@@ -8,6 +8,7 @@ export interface AdminUser {
   lastName: string | null
   isActive: boolean
   createdAt: string
+  customerId: number | null
 }
 
 export interface PaginatedUsers {
@@ -20,12 +21,20 @@ export interface PaginatedUsers {
   }
 }
 
-export const getUsers = (page = 1, limit = 20) =>
-  api.get<PaginatedUsers>('/users', { params: { page, limit } })
+export interface GetUsersParams {
+  page?: number
+  limit?: number
+  search?: string
+  role?: string
+  isActive?: boolean
+}
+
+export const getUsers = (page = 1, limit = 20, params?: Omit<GetUsersParams, 'page' | 'limit'>) =>
+  api.get<PaginatedUsers>('/users', { params: { page, limit, ...params } })
 
 export const adminUpdateUser = (
   id: number,
-  body: { email?: string; role?: string; isActive?: boolean },
+  body: { email?: string; role?: string; isActive?: boolean; customerId?: number | null },
 ) => api.patch<AdminUser>(`/users/${id}`, body)
 
 export const adminDeleteUser = (id: number) => api.delete(`/users/${id}`)
