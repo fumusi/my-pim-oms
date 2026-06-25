@@ -1,18 +1,26 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import ms from 'ms';
+import * as XLSX from 'xlsx';
 import { User } from './entities/user.entity';
+import { Role } from '../common/enums/role.enum';
 import { RedisService } from '../redis/redis.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import type { UpdateMeDto } from './dto/update-me.dto';
 import type { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+
+const FIRST_NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack'];
+const LAST_NAMES = ['Smith', 'Jones', 'Williams', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson'];
 
 export interface UserProfile {
   id: number;
@@ -30,8 +38,15 @@ export interface PaginatedUsers {
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
+export interface ImportUsersResult {
+  imported: number;
+  skipped: number;
+  errors: { row: number; email: string; reason: string }[];
+}
+
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   private readonly accessTokenTtl: number;
 
   constructor(
@@ -129,7 +144,7 @@ export class UsersService {
       await this.redis.del(`bl:user:${targetId}`);
     }
 
-    return this.toProfile({ ...user, ...patch } as User);
+    return this.toProfile({ ...user, ...patch });
   }
 
   async adminDeleteUser(adminId: number, targetId: number): Promise<void> {
@@ -143,6 +158,211 @@ export class UsersService {
     await this.repo.update(targetId, { isActive: false });
     await this.redis.del(`rt:${targetId}`);
     await this.redis.set(`bl:user:${targetId}`, '1', this.accessTokenTtl);
+  }
+
+  getUserImportTemplate(): Buffer {
+    const adminIndices = new Set([0, 5, 10, 15, 20]);
+    const rows = Array.from({ length: 50 }, (_, i) => ({
+      first_name: FIRST_NAMES[i % FIRST_NAMES.length],
+      last_name: LAST_NAMES[Math.floor(i / FIRST_NAMES.length) % LAST_NAMES.length],
+      email: `test${i}@example.com`,
+      role: adminIndices.has(i) ? 'admin' : 'user',
+      status: i % 2 === 0 ? 'active' : 'inactive',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Users Import Template');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'csv' }) as Buffer;
+  }
+
+  async importUsers(
+    buffer: Buffer,
+    adminId: number,
+    adminEmail: string,
+  ): Promise<ImportUsersResult> {
+    const key = `rl:users:import:${adminId}`;
+    const count = await this.redis.incrWithExpireOnCreate(key, 600);
+    if (count > 5) {
+      throw new HttpException(
+        'Rate limit: max 5 imports per 10 minutes',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    let workbook: XLSX.WorkBook;
+    try {
+      workbook = XLSX.read(buffer, { type: 'buffer' });
+    } catch {
+      throw new BadRequestException('Invalid file — upload a valid CSV file');
+    }
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: '',
+    });
+
+    if (rows.length > 2000) {
+      throw new BadRequestException('CSV must not exceed 2000 rows');
+    }
+
+    const str = (v: unknown): string | undefined => {
+      const s = String(v).trim();
+      return s.length > 0 ? s : undefined;
+    };
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    type ValidRow = {
+      first_name: string;
+      last_name: string;
+      email: string;
+      role: string;
+      status: string;
+      rowIndex: number;
+    };
+
+    const validRows: ValidRow[] = [];
+    const errors: ImportUsersResult['errors'] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+
+      const firstName = str(row['first_name']);
+      const lastName = str(row['last_name']);
+      const email = str(row['email']);
+      const role = str(row['role']);
+      const statusRaw = str(row['status']);
+
+      if (!firstName) {
+        errors.push({
+          row: rowNum,
+          email: email ?? '',
+          reason: 'first_name is required',
+        });
+        continue;
+      }
+      if (!lastName) {
+        errors.push({
+          row: rowNum,
+          email: email ?? '',
+          reason: 'last_name is required',
+        });
+        continue;
+      }
+      if (!email) {
+        errors.push({ row: rowNum, email: '', reason: 'email is required' });
+        continue;
+      }
+      if (!emailRegex.test(email)) {
+        errors.push({ row: rowNum, email, reason: 'email is invalid' });
+        continue;
+      }
+      if (!role || !Object.values(Role).includes(role as Role)) {
+        errors.push({
+          row: rowNum,
+          email,
+          reason: 'role must be admin or user',
+        });
+        continue;
+      }
+      if (
+        statusRaw !== undefined &&
+        statusRaw !== 'active' &&
+        statusRaw !== 'inactive'
+      ) {
+        errors.push({
+          row: rowNum,
+          email,
+          reason: 'status must be active or inactive',
+        });
+        continue;
+      }
+
+      validRows.push({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        role,
+        status: statusRaw ?? 'active',
+        rowIndex: rowNum,
+      });
+    }
+
+    const seenInFile = new Set<string>();
+    const dedupedRows: ValidRow[] = [];
+    for (const row of validRows) {
+      if (seenInFile.has(row.email)) {
+        errors.push({ row: row.rowIndex, email: row.email, reason: 'Duplicate email in file' });
+      } else {
+        seenInFile.add(row.email);
+        dedupedRows.push(row);
+      }
+    }
+
+    const validEmails = dedupedRows.map((r) => r.email);
+    const existing =
+      validEmails.length > 0
+        ? await this.repo.find({
+            where: validEmails.map((e) => ({ email: e })),
+          })
+        : [];
+    const takenEmails = new Set(existing.map((u) => u.email));
+
+    const rowsToInsert: ValidRow[] = [];
+    let skipped = 0;
+
+    for (const row of dedupedRows) {
+      if (takenEmails.has(row.email)) {
+        errors.push({
+          row: row.rowIndex,
+          email: row.email,
+          reason: 'Email already exists',
+        });
+        skipped++;
+      } else {
+        rowsToInsert.push(row);
+      }
+    }
+
+    let imported = 0;
+
+    if (rowsToInsert.length > 0) {
+      await this.repo.manager.transaction(async (em) => {
+        for (const row of rowsToInsert) {
+          try {
+            const user = em.create(User, {
+              firstName: row.first_name,
+              lastName: row.last_name,
+              email: row.email,
+              role: row.role as Role,
+              isActive: row.status !== 'inactive',
+              password: null,
+            });
+            await em.save(User, user);
+            imported++;
+          } catch (err: unknown) {
+            const e = err as { code?: string };
+            if (e?.code === '23505') {
+              errors.push({ row: row.rowIndex, email: row.email, reason: 'Email already exists' });
+              skipped++;
+            } else {
+              throw err;
+            }
+          }
+        }
+      });
+    }
+
+    this.logger.log(
+      `User import by ${adminEmail} (id=${adminId}): imported=${imported}, skipped=${skipped}, errors=${errors.length}`,
+    );
+    if (errors.length > 0) {
+      this.logger.warn(
+        `Import errors: ${JSON.stringify(errors.map(({ row, reason }) => ({ row, reason })))}`,
+      );
+    }
+
+    return { imported, skipped, errors };
   }
 
   private toProfile(user: User): UserProfile {

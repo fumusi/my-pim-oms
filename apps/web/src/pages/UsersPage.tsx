@@ -5,6 +5,7 @@ import { getUsers, adminUpdateUser, adminDeleteUser, type AdminUser } from '../a
 import { RoleBadge } from '../components/RoleBadge'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { EditUserModal } from '../components/EditUserModal'
+import { ImportUsersModal } from '../components/ImportUsersModal'
 
 const PAGE_SIZE = 20
 
@@ -21,6 +22,7 @@ export function UsersPage() {
   const [page, setPage] = useState(1)
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
+  const [showImport, setShowImport] = useState(false)
 
   const { data: result, isLoading, isError } = useQuery({
     queryKey: ['users', page],
@@ -78,6 +80,17 @@ export function UsersPage() {
                 {meta ? `${meta.total} user${meta.total === 1 ? '' : 's'} total` : ''}
               </div>
             </div>
+            <button
+              className="exact-btn exact-btn-primary"
+              onClick={() => setShowImport(true)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Import users
+            </button>
           </div>
 
           {users.length === 0 ? (
@@ -184,6 +197,13 @@ export function UsersPage() {
           loading={deleteMutation.isPending}
           onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showImport && (
+        <ImportUsersModal
+          onClose={() => setShowImport(false)}
+          onImported={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
         />
       )}
     </>
