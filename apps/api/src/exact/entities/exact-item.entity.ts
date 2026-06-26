@@ -87,7 +87,7 @@ export class ExactItem {
   @JoinColumn({ name: 'item_group_id' })
   itemGroup!: ExactItemGroup | null;
 
-  @ManyToOne(() => Category, { nullable: true })
+  @ManyToOne(() => Category, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'category_id' })
   category!: Category | null;
 
