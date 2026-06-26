@@ -2440,3 +2440,165 @@ body {
   transition: background 0.15s, border-color 0.15s;
 }
 .exact-btn-danger-outline:hover { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.6); }
+
+/* ── Order status badges ──────────────────────── */
+.order-status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.order-status-draft     { background: rgba(107,114,128,0.18); color: #9ca3af; }
+.order-status-open      { background: rgba(59,130,246,0.18);  color: #60a5fa; }
+.order-status-partial   { background: rgba(245,158,11,0.18);  color: #fbbf24; }
+.order-status-completed { background: rgba(34,197,94,0.15);   color: #4ade80; }
+.order-status-cancelled { background: rgba(239,68,68,0.15);   color: #f87171; }
+
+/* ── Orders page tabs ──────────────────────────── */
+.orders-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  margin-bottom: 1rem;
+}
+.orders-tab {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #6b6e87;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s;
+  margin-bottom: -1px;
+}
+.orders-tab:hover { color: #c5c7d8; }
+.orders-tab--active {
+  color: #e0e2f0;
+  border-bottom-color: #7c3aed;
+}
+
+/* ── Dashboard recent orders list ─────────────── */
+.dash-recent-orders {
+  display: flex;
+  flex-direction: column;
+}
+.dash-recent-order-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  gap: 0.5rem;
+}
+.dash-recent-order-row:last-child { border-bottom: none; }
+.dash-recent-order-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash-recent-order-num {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #e0e2f0;
+}
+.dash-recent-order-cust {
+  font-size: 0.72rem;
+  color: #6b6e87;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-recent-order-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+.dash-recent-order-total {
+  font-size: 0.78rem;
+  color: #c5c7d8;
+  font-weight: 500;
+}
+
+/* ── Order detail ──────────────────────────────── */
+.order-detail-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.order-detail-order-num {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e8eaf0;
+  letter-spacing: 0.01em;
+}
+.order-detail-created {
+  font-size: 0.75rem;
+  color: #6b6e87;
+}
+.order-detail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.order-totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.82rem;
+}
+.order-totals-row:last-child { border-bottom: none; }
+.order-totals-label { color: #9396a5; }
+.order-totals-value { color: #e0e2f0; font-weight: 500; }
+.order-totals-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0 0.1rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e8eaf0;
+}
+.order-free-shipping-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(34,197,94,0.15);
+  color: #4ade80;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.order-archive-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+}
+.order-archive-info-row {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+}
+.order-archive-info-label { color: #9396a5; min-width: 90px; }
+.order-archive-info-value { color: #e0e2f0; }
+.order-li-fulfillable-yes { color: #4ade80; font-weight: 600; }
+.order-li-fulfillable-no  { color: #f87171; font-weight: 600; }
+.order-li-footer-row td {
+  border-top: 1px solid rgba(255,255,255,0.1) !important;
+  font-weight: 600;
+  color: #e0e2f0;
+  font-size: 0.82rem;
+}

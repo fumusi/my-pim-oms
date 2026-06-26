@@ -28,6 +28,7 @@ import { ProductDetailPage } from './pages/ProductDetailPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { CustomerDetailPage } from './pages/CustomerDetailPage'
+import { OrderDetailPage } from './pages/OrderDetailPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -137,7 +138,30 @@ const ordersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/orders',
   staticData: { title: 'Orders' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    page: typeof s.page === 'number' && s.page >= 1 ? s.page : 1,
+    search: typeof s.search === 'string' ? s.search : undefined,
+    status:
+      s.status === 'draft' || s.status === 'open' || s.status === 'partial' ||
+      s.status === 'completed' || s.status === 'cancelled'
+        ? (s.status as 'draft' | 'open' | 'partial' | 'completed' | 'cancelled')
+        : undefined,
+    deliveryOption:
+      s.deliveryOption === 'dhl' || s.deliveryOption === 'ups' || s.deliveryOption === 'pickup'
+        ? (s.deliveryOption as 'dhl' | 'ups' | 'pickup')
+        : undefined,
+    dateFrom: typeof s.dateFrom === 'string' ? s.dateFrom : undefined,
+    dateTo: typeof s.dateTo === 'string' ? s.dateTo : undefined,
+    archived: s.archived === true,
+  }),
   component: OrdersPage,
+})
+
+const orderDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders/$id',
+  staticData: { title: 'Order' },
+  component: OrderDetailPage,
 })
 
 const profileRoute = createRoute({
@@ -224,6 +248,7 @@ const routeTree = rootRoute.addChildren([
     categoriesRoute,
     categoryDetailRoute,
     ordersRoute,
+    orderDetailRoute,
     profileRoute,
     usersRoute,
     customersRoute,

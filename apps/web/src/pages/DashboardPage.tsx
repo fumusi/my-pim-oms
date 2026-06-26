@@ -7,6 +7,7 @@ import type { RootState } from '../store'
 import { getExactStatus, getExactAuthorizeUrl, startExactSync, getExactSyncStatus } from '../api/exact'
 import { getPimProducts } from '../api/pim-products'
 import { getUsers } from '../api/admin'
+import { getOrders } from '../api/orders'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -305,9 +306,23 @@ export function DashboardPage() {
     queryFn: () => getPimProducts({ page: 1, limit: 1, inStock: 'low_stock' }).then((r) => r.data),
   })
 
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders-count'],
+    queryFn: () => getOrders({ page: 1, limit: 1, archived: false }).then((r) => r.data),
+    enabled: isAdmin,
+  })
+
+  const { data: recentOrders, isLoading: recentOrdersLoading } = useQuery({
+    queryKey: ['recent-orders'],
+    queryFn: () => getOrders({ page: 1, limit: 5, archived: false }).then((r) => r.data),
+    enabled: isAdmin,
+    staleTime: 30_000,
+  })
+
   const productCount = productsPage != null ? String(productsPage.total) : null
   const userCount = usersData != null ? String(usersData.meta.total) : null
   const lowStockCount = lowStockData != null ? String(lowStockData.total) : null
+  const orderCount = ordersData != null ? String(ordersData.total) : null
 
   if (!isAdmin) {
     return (
@@ -348,11 +363,13 @@ export function DashboardPage() {
         <div className="col-6 col-xl-3">
           <StatCard
             label="Total Orders"
-            value={null}
-            note="coming soon"
+            value={orderCount}
+            note="active orders"
             accentColor="#3b82f6"
             accentBg="rgba(59, 130, 246, 0.14)"
             icon={<ClipboardIcon />}
+            loading={ordersLoading}
+            href="/orders"
           />
         </div>
         <div className="col-6 col-xl-3">
@@ -404,7 +421,39 @@ export function DashboardPage() {
                 <div className="dash-card-sub">Latest activity</div>
               </div>
             </div>
-            <NoData message="No orders yet" />
+            {recentOrdersLoading && !recentOrders && (
+              <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                <div className="spinner-border spinner-border-sm" style={{ color: '#7c3aed' }} role="status" />
+              </div>
+            )}
+            {!recentOrdersLoading && (!recentOrders || recentOrders.data.length === 0) && (
+              <NoData message="No orders yet" />
+            )}
+            {recentOrders && recentOrders.data.length > 0 && (
+              <div className="dash-recent-orders">
+                {recentOrders.data.map((o) => (
+                  <div key={o.id} className="dash-recent-order-row">
+                    <div className="dash-recent-order-left">
+                      <span className="dash-recent-order-num">{o.orderNumber}</span>
+                      <span className="dash-recent-order-cust">{o.customer?.name ?? '—'}</span>
+                    </div>
+                    <div className="dash-recent-order-right">
+                      <span className={`order-status-badge order-status-${o.status}`}>
+                        {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
+                      </span>
+                      <span className="dash-recent-order-total">
+                        {o.totalInclVat != null ? '€' + o.totalInclVat.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Link to="/orders" style={{ fontSize: '0.78rem', color: '#7c3aed', textDecoration: 'none' }}>
+                    View all orders →
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
