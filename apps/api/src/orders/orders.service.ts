@@ -57,6 +57,7 @@ export class OrdersService {
       .createQueryBuilder('o')
       .leftJoinAndSelect('o.customer', 'customer')
       .leftJoinAndSelect('o.shippingAddress', 'shippingAddress')
+      .leftJoinAndSelect('o.lineItems', 'lineItems')
       .orderBy('o.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -195,44 +196,40 @@ export class OrdersService {
     dto: UpdateOrderDto,
     updatedBy: string,
   ): Promise<Order> {
-    const order = await this.findById(id);
+    return this.dataSource.transaction(async (em) => {
+      const order = await em.findOne(Order, {
+        where: { id },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      });
+      if (!order) throw new NotFoundException(`Order ${id} not found`);
 
-    if (TERMINAL_STATUSES.includes(order.status)) {
-      throw new BadRequestException(
-        'Order cannot be modified in its current status',
-      );
-    }
+      if (TERMINAL_STATUSES.includes(order.status)) {
+        throw new BadRequestException(
+          'Order cannot be modified in its current status',
+        );
+      }
 
-    if (dto.description !== undefined)
-      order.description = dto.description ?? null;
-    if (dto.deliveryOption !== undefined)
-      order.deliveryOption = dto.deliveryOption;
-    if (dto.trackingUrl !== undefined)
-      order.trackingUrl = dto.trackingUrl ?? null;
-    if (dto.shippingAddressId !== undefined)
-      order.shippingAddressId = dto.shippingAddressId;
-    if (dto.shippingCost !== undefined)
-      order.nominalShippingCost = dto.shippingCost;
+      if (dto.description !== undefined)
+        order.description = dto.description ?? null;
+      if (dto.deliveryOption !== undefined)
+        order.deliveryOption = dto.deliveryOption;
+      if (dto.trackingUrl !== undefined)
+        order.trackingUrl = dto.trackingUrl ?? null;
+      if (dto.shippingAddressId !== undefined)
+        order.shippingAddressId = dto.shippingAddressId;
+      if (dto.shippingCost !== undefined)
+        order.nominalShippingCost = dto.shippingCost;
 
-    order.updatedBy = updatedBy;
+      order.updatedBy = updatedBy;
 
-    const lineItems = await this.lineItemRepo.find({ where: { orderId: id } });
-    const totals = this.calc.calcTotals(
-      lineItems.map((li) => ({
-        unitPrice: li.unitPrice,
-        quantity: li.quantity,
-        discount: li.discount,
-      })),
-      order.vatPercentage,
-      order.nominalShippingCost,
-    );
-    order.totalExclVat = totals.totalExclVat;
-    order.vatAmount = totals.vatAmount;
-    order.totalInclVat = totals.totalInclVat;
-    order.shippingCost = totals.shippingCost;
-    order.freeShippingApplied = totals.freeShippingApplied;
+      order.lineItems = await em.find(LineItem, { where: { orderId: id } });
+      await this.recalculateAndSaveOrder(order, em);
 
-    return this.orderRepo.save(order);
+      return em.findOne(Order, {
+        where: { id },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      }) as Promise<Order>;
+    });
   }
 
   async updateStatus(
@@ -424,7 +421,7 @@ export class OrdersService {
     return this.orderRepo.save(order);
   }
 
-  private async recalculateAndSaveOrder(order: Order, em?: EntityManager): Promise<void> {
+  private async recalculateAndSaveOrder(order: Order, em: EntityManager): Promise<void> {
     const totals = this.calc.calcTotals(
       order.lineItems.map((li) => ({
         unitPrice: li.unitPrice,
@@ -439,11 +436,7 @@ export class OrdersService {
     order.totalInclVat = totals.totalInclVat;
     order.shippingCost = totals.shippingCost;
     order.freeShippingApplied = totals.freeShippingApplied;
-    if (em) {
-      await em.save(Order, order);
-    } else {
-      await this.orderRepo.save(order);
-    }
+    await em.save(Order, order);
   }
 
   private async generateOrderNumber(em: EntityManager): Promise<string> {

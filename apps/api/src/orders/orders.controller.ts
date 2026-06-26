@@ -45,6 +45,7 @@ export class OrdersController {
   }
 
   @Get(':id/invoice')
+  @Roles(Role.Admin)
   async getInvoice(
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
