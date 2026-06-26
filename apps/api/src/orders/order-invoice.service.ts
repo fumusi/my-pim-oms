@@ -76,7 +76,7 @@ export class OrderInvoiceService {
     const content: Content[] = [
       { text: 'INVOICE', style: 'header' },
       { text: 'MyPIM OMS', style: 'subheader' },
-{
+      {
         columns: [metaLeft, metaRight],
       },
       ...customerLines,
