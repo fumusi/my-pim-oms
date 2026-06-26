@@ -22,14 +22,14 @@ export interface LineItem {
   quantity: number
   unitPrice: number
   discount: number
-  lineTotalExclVat: number
-  isFulfillable: boolean
+  lineTotalExclVat: number | null
+  isFulfillable: boolean | null
 }
 
 export interface Order {
   id: number
   orderNumber: string
-  customerId: number
+  customerId: number | null
   customer: Customer
   shippingAddress: ShippingAddress
   status: OrderStatus

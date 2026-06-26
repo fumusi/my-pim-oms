@@ -82,19 +82,24 @@ export class OrdersController {
   @Post()
   @Roles(Role.Admin, Role.User)
   create(@Body() dto: CreateOrderDto, @Req() req: AuthRequest) {
+    const createdBy = req.user.role === Role.Admin && dto.onBehalfOf
+      ? dto.onBehalfOf
+      : req.user.email;
+
     if (req.user.role === Role.User) {
       if (req.user.customerId != null && dto.customerId != null && dto.customerId !== req.user.customerId) {
         throw new ForbiddenException('Cannot create order for another customer');
       }
-      dto.vatPercentage = undefined;
-      dto.shippingCost = 0;
-      for (const li of dto.lineItems) {
-        li.discount = 0;
-      }
+      return this.service.create(
+        {
+          ...dto,
+          vatPercentage: undefined,
+          shippingCost: 0,
+          lineItems: dto.lineItems.map((li) => ({ ...li, discount: 0 })),
+        } as CreateOrderDto,
+        createdBy,
+      );
     }
-    const createdBy = req.user.role === Role.Admin && dto.onBehalfOf
-      ? dto.onBehalfOf
-      : req.user.email;
     return this.service.create(dto, createdBy);
   }
 

@@ -33,7 +33,7 @@ export function OrdersPage() {
       })
     }, 300)
     return () => clearTimeout(t)
-  }, [searchInput]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchInput, navigate])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['orders', page, limit, search, status, deliveryOption, dateFrom, dateTo, archived],
@@ -48,7 +48,10 @@ export function OrdersPage() {
         dateTo,
         archived: archived || undefined,
       }).then((r) => r.data),
+    enabled: isAdmin,
   })
+
+  if (!isAdmin) return null
 
   function setFilter(
     updates: Partial<{

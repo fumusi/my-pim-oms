@@ -21,6 +21,7 @@ import { getPimProducts, getPimProductById, type PimProduct } from '../api/pim-p
 import { getApiError } from '../utils/format'
 import type { RootState } from '../store'
 
+// Must match the backend FREE_SHIPPING_THRESHOLD env var (default: 150)
 const FREE_SHIPPING_THRESHOLD = 150
 
 const step1Schema = z.object({
@@ -176,7 +177,7 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
       const primary = res.data.addresses?.find((a) => a.isPrimary) ?? res.data.addresses?.[0]
       if (primary) setValue('shippingAddressId', primary.id)
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAdmin, buyerCustomerId, isEdit, setValue])
 
   useEffect(() => {
     if (!prefillProductId) return
@@ -196,7 +197,7 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
         discount: 0,
       })
     })
-  }, [prefillProductId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefillProductId, append, getValues])
 
   const [prefilled, setPrefilled] = useState(false)
 
@@ -207,7 +208,7 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
     setValue('vatPercentage', existingOrder.vatPercentage)
     setValue('description', existingOrder.description)
     setValue('trackingUrl', existingOrder.trackingUrl)
-    setValue('customerId', existingOrder.customerId)
+    setValue('customerId', existingOrder.customerId ?? undefined)
     setValue('shippingAddressId', existingOrder.shippingAddress?.id)
     setCustomerSearch(existingOrder.customer?.name ?? '')
     setValue(
@@ -222,9 +223,11 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
         discount: li.discount,
       })),
     )
-    getCustomer(existingOrder.customerId).then((res) => {
-      setSelectedCustomerAddresses(res.data.addresses ?? [])
-    })
+    if (existingOrder.customerId != null) {
+      getCustomer(existingOrder.customerId).then((res) => {
+        setSelectedCustomerAddresses(res.data.addresses ?? [])
+      })
+    }
     setPrefilled(true)
   }, [existingOrder, prefilled, setValue])
 

@@ -28,6 +28,7 @@ export function OrderDetailPage() {
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => getOrder(orderId).then((r) => r.data),
+    enabled: !isNaN(orderId),
   })
 
   const statusMutation = useMutation({
@@ -42,6 +43,14 @@ export function OrderDetailPage() {
     },
     onError: (err) => toast.error(getApiError(err)),
   })
+
+  if (isNaN(orderId)) {
+    return (
+      <div className="profile-loading">
+        <p style={{ color: '#f87171' }}>Invalid order.</p>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -66,7 +75,7 @@ export function OrderDetailPage() {
   const activeSelectedStatus: OrderStatus =
     selectedStatus !== '' ? selectedStatus : nextStatuses[0]
 
-  const subtotal = order.lineItems.reduce((sum, li) => sum + li.lineTotalExclVat, 0)
+  const subtotal = order.lineItems.reduce((sum, li) => sum + (li.lineTotalExclVat ?? 0), 0)
 
   return (
     <div className="cust-detail-page">
@@ -318,7 +327,7 @@ export function OrderDetailPage() {
                   <td className="users-td-muted">{li.quantity}</td>
                   <td className="users-td-muted">€{li.unitPrice.toFixed(2)}</td>
                   <td className="users-td-muted">{li.discount}%</td>
-                  <td className="users-td-muted">€{li.lineTotalExclVat.toFixed(2)}</td>
+                  <td className="users-td-muted">{li.lineTotalExclVat != null ? `€${li.lineTotalExclVat.toFixed(2)}` : '—'}</td>
                   <td>
                     {li.isFulfillable ? (
                       <span className="order-li-fulfillable-yes">✓</span>

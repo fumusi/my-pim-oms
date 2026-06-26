@@ -293,7 +293,7 @@ function BuyerOrdersDashboard() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['orders', 'buyer'],
-    queryFn: () => getOrders({}).then((r) => r.data),
+    queryFn: () => getOrders({ archived: false }).then((r) => r.data),
   })
 
   const orders = data?.data ?? []
@@ -402,12 +402,6 @@ export function DashboardPage() {
     queryFn: () => getPimProducts({ page: 1, limit: 1, inStock: 'low_stock' }).then((r) => r.data),
   })
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders-count'],
-    queryFn: () => getOrders({ page: 1, limit: 1 }).then((r) => r.data),
-    enabled: isAdmin,
-  })
-
   const { data: recentOrders, isLoading: recentOrdersLoading } = useQuery({
     queryKey: ['recent-orders'],
     queryFn: () => getOrders({ page: 1, limit: 5 }).then((r) => r.data),
@@ -425,7 +419,8 @@ export function DashboardPage() {
   const productCount = productsPage != null ? String(productsPage.total) : null
   const userCount = usersData != null ? String(usersData.meta.total) : null
   const lowStockCount = lowStockData != null ? String(lowStockData.total) : null
-  const orderCount = ordersData != null ? String(ordersData.total) : null
+  const orderCount = recentOrders != null ? String(recentOrders.total) : null
+  const revenueMax = revenueData ? Math.max(...revenueData.monthlyRevenue.map((m) => m.revenue), 1) : 1
 
   if (!isAdmin) {
     return <BuyerOrdersDashboard />
@@ -455,7 +450,7 @@ export function DashboardPage() {
             accentColor="#3b82f6"
             accentBg="rgba(59, 130, 246, 0.14)"
             icon={<ClipboardIcon />}
-            loading={ordersLoading}
+            loading={recentOrdersLoading}
             href="/orders"
           />
         </div>
@@ -516,12 +511,10 @@ export function DashboardPage() {
               <NoData message="No completed orders yet" />
             )}
 
-            {revenueData && revenueData.monthlyRevenue.length > 0 && (() => {
-              const max = Math.max(...revenueData.monthlyRevenue.map((m) => m.revenue), 1)
-              return (
+            {revenueData && revenueData.monthlyRevenue.length > 0 && (
                 <div style={{ padding: '0.5rem 1rem 1rem' }}>
                   {revenueData.monthlyRevenue.map((m) => {
-                    const pct = (m.revenue / max) * 100
+                    const pct = (m.revenue / revenueMax) * 100
                     const [year, month] = m.month.split('-')
                     const label = new Date(Number(year), Number(month) - 1).toLocaleString('default', { month: 'short', year: '2-digit' })
                     return (
@@ -537,8 +530,7 @@ export function DashboardPage() {
                     )
                   })}
                 </div>
-              )
-            })()}
+            )}
           </div>
         </div>
 

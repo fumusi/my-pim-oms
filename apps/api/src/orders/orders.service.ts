@@ -148,6 +148,9 @@ export class OrdersService {
       const orderNumber = await this.generateOrderNumber(em);
 
       const createdByUser = await em.findOne(User, { where: { email: createdBy } });
+      if (!createdByUser && dto.onBehalfOf) {
+        throw new BadRequestException(`User ${dto.onBehalfOf} not found`);
+      }
       const createdByName = createdByUser
         ? [createdByUser.firstName, createdByUser.lastName].filter(Boolean).join(' ') || createdBy
         : createdBy;
@@ -302,6 +305,16 @@ export class OrdersService {
 
       if (newStatus === OrderStatus.Completed) {
         for (const li of order.lineItems) {
+          const rows = await em.query<Array<{ stock: number | null }>>(
+            `SELECT stock FROM products WHERE id = $1 FOR UPDATE`,
+            [li.productId],
+          );
+          const current = rows[0]?.stock;
+          if (current != null && current < li.quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for product ${li.productId}: available ${current}, required ${li.quantity}`,
+            );
+          }
           await em.query(
             `UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2 AND stock IS NOT NULL`,
             [li.quantity, li.productId],
