@@ -8,6 +8,7 @@ import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { LineItem } from './entities/line-item.entity';
 import { Product } from '../products/entities/product.entity';
+import { Address } from '../customers/entities/address.entity';
 import { OrderStatus } from '../common/enums/order-status.enum';
 import { OrderCalculationService } from './order-calculation.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
@@ -112,6 +113,15 @@ export class OrdersService {
 
   async create(dto: CreateOrderDto, createdBy: string): Promise<Order> {
     return this.dataSource.transaction(async (em) => {
+      const address = await em.findOne(Address, {
+        where: { id: dto.shippingAddressId },
+      });
+      if (!address || address.customerId !== dto.customerId) {
+        throw new BadRequestException(
+          'Shipping address does not belong to this customer',
+        );
+      }
+
       const orderNumber = await this.generateOrderNumber(em);
 
       const nominalShippingCost = dto.shippingCost ?? 0;
@@ -215,14 +225,22 @@ export class OrdersService {
         order.deliveryOption = dto.deliveryOption;
       if (dto.trackingUrl !== undefined)
         order.trackingUrl = dto.trackingUrl ?? null;
-      if (dto.shippingAddressId !== undefined)
+      if (dto.shippingAddressId !== undefined) {
+        const address = await em.findOne(Address, {
+          where: { id: dto.shippingAddressId },
+        });
+        if (!address || address.customerId !== order.customerId) {
+          throw new BadRequestException(
+            'Shipping address does not belong to this customer',
+          );
+        }
         order.shippingAddressId = dto.shippingAddressId;
+      }
       if (dto.shippingCost !== undefined)
         order.nominalShippingCost = dto.shippingCost;
 
       order.updatedBy = updatedBy;
 
-      order.lineItems = await em.find(LineItem, { where: { orderId: id } });
       await this.recalculateAndSaveOrder(order, em);
 
       return em.findOne(Order, {
@@ -379,14 +397,13 @@ export class OrdersService {
         );
       }
 
-      const lineItems = await em.find(LineItem, { where: { orderId } });
-      if (lineItems.length <= 1) {
+      if (order.lineItems.length <= 1) {
         throw new BadRequestException(
           'Cannot remove the only line item from an order',
         );
       }
 
-      const target = lineItems.find((li) => li.id === itemId);
+      const target = order.lineItems.find((li) => li.id === itemId);
       if (!target) {
         throw new NotFoundException(
           `Line item ${itemId} not found for order ${orderId}`,
@@ -395,7 +412,7 @@ export class OrdersService {
 
       await em.remove(LineItem, target);
 
-      order.lineItems = lineItems.filter((li) => li.id !== itemId);
+      order.lineItems = order.lineItems.filter((li) => li.id !== itemId);
       order.updatedBy = updatedBy;
 
       await this.recalculateAndSaveOrder(order, em);

@@ -122,7 +122,14 @@ export class Order {
   })
   shippingCost!: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, default: 0, name: 'nominal_shipping_cost', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    default: 0,
+    name: 'nominal_shipping_cost',
+    transformer: decimalTransformer,
+  })
   nominalShippingCost!: number;
 
   @Column({ type: 'boolean', default: false, name: 'free_shipping_applied' })

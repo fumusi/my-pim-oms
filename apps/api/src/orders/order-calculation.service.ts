@@ -20,9 +20,8 @@ export class OrderCalculationService {
   private readonly threshold: number;
 
   constructor(private readonly config: ConfigService) {
-    this.threshold = parseFloat(
-      config.get<string>('FREE_SHIPPING_THRESHOLD') ?? '150',
-    );
+    const raw = parseFloat(config.get<string>('FREE_SHIPPING_THRESHOLD') ?? '150');
+    this.threshold = isFinite(raw) ? raw : 150;
   }
 
   calcLineTotal(item: LineItemInput): number {
