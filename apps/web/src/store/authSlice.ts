@@ -5,6 +5,7 @@ interface JwtPayload {
   sub: string
   email: string
   role: string
+  customerId: number | null
   exp: number
 }
 
@@ -12,6 +13,7 @@ export interface AuthUser {
   sub: string
   email: string
   role: string
+  customerId: number | null
 }
 
 interface AuthState {
@@ -21,8 +23,8 @@ interface AuthState {
 
 function tryDecode(token: string): AuthUser | null {
   try {
-    const { sub, email, role } = jwtDecode<JwtPayload>(token)
-    return { sub, email, role }
+    const { sub, email, role, customerId } = jwtDecode<JwtPayload>(token)
+    return { sub, email, role, customerId: customerId ?? null }
   } catch {
     return null
   }

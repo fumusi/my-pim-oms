@@ -9,18 +9,11 @@ import {
   updateOrderStatus,
   archiveOrder,
   downloadInvoice,
+  NEXT_STATUSES,
   type Order,
   type OrderStatus,
 } from '../api/orders'
 import { formatDate, getApiError } from '../utils/format'
-
-const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
-  draft: ['open'],
-  open: ['partial', 'completed', 'cancelled'],
-  partial: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-}
 
 function ArchiveOrderModal({
   order,
@@ -39,6 +32,8 @@ function ArchiveOrderModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', order.id] })
       queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['recent-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['orders-count'] })
       onSaved()
     },
     onError: (err) => {
@@ -101,6 +96,8 @@ export function OrderDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', orderId] })
       queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['recent-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['orders-count'] })
       setSelectedStatus('')
       toast.success('Status updated')
     },
@@ -124,8 +121,8 @@ export function OrderDetailPage() {
   }
 
   const nextStatuses = NEXT_STATUSES[order.status]
-  const canArchive =
-    (order.status === 'completed' || order.status === 'cancelled') && order.archivedAt === null
+  const isTerminal = order.status === 'completed' || order.status === 'cancelled'
+  const canArchive = isTerminal && order.archivedAt === null
 
   const activeSelectedStatus: OrderStatus =
     selectedStatus !== '' ? selectedStatus : nextStatuses[0]
@@ -151,50 +148,62 @@ export function OrderDetailPage() {
           </div>
         </div>
 
-        {isAdmin && (
-          <div className="order-detail-header-right">
-            {nextStatuses.length > 0 && (
-              <>
-                <select
-                  className="cust-filter-select"
-                  value={activeSelectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value as OrderStatus)}
-                >
-                  {nextStatuses.map((s) => (
-                    <option key={s} value={s}>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </option>
-                  ))}
-                </select>
+        <div className="order-detail-header-right">
+          {isAdmin && (
+            <>
+              {!isTerminal && (
                 <button
-                  className="exact-btn exact-btn-primary"
-                  disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate(activeSelectedStatus)}
+                  className="exact-btn exact-btn-outline"
+                  onClick={() =>
+                    navigate({ to: '/orders/$id/edit', params: { id: String(orderId) } })
+                  }
                 >
-                  {statusMutation.isPending ? 'Saving…' : 'Update'}
+                  Edit
                 </button>
-              </>
-            )}
+              )}
+              {nextStatuses.length > 0 && (
+                <>
+                  <select
+                    className="cust-filter-select"
+                    value={activeSelectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value as OrderStatus)}
+                  >
+                    {nextStatuses.map((s) => (
+                      <option key={s} value={s}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="exact-btn exact-btn-primary"
+                    disabled={statusMutation.isPending}
+                    onClick={() => statusMutation.mutate(activeSelectedStatus)}
+                  >
+                    {statusMutation.isPending ? 'Saving…' : 'Update'}
+                  </button>
+                </>
+              )}
+            </>
+          )}
+          <button
+            className="exact-btn exact-btn-outline"
+            onClick={() =>
+              downloadInvoice(orderId, order.orderNumber).catch((e) =>
+                toast.error(getApiError(e)),
+              )
+            }
+          >
+            Export PDF
+          </button>
+          {isAdmin && canArchive && (
             <button
-              className="exact-btn exact-btn-outline"
-              onClick={() =>
-                downloadInvoice(orderId, order.orderNumber).catch((e) =>
-                  toast.error(getApiError(e)),
-                )
-              }
+              className="exact-btn exact-btn-danger-outline"
+              onClick={() => setArchiveOpen(true)}
             >
-              Export PDF
+              Archive
             </button>
-            {canArchive && (
-              <button
-                className="exact-btn exact-btn-danger-outline"
-                onClick={() => setArchiveOpen(true)}
-              >
-                Archive
-              </button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="cust-detail-grid">
@@ -204,13 +213,21 @@ export function OrderDetailPage() {
               <div className="dash-card-title">Customer</div>
             </div>
             <div className="cust-detail-field">
-              <span className="modal-label">Name</span>
-              <span className="cust-detail-value">{order.customer?.name ?? '—'}</span>
+              <span className="modal-label">User</span>
+              <span className="cust-detail-value">{order.createdByName ?? order.createdBy ?? '—'}</span>
             </div>
-            <div className="cust-detail-field">
-              <span className="modal-label">Email</span>
-              <span className="cust-detail-value">{order.customer?.email ?? '—'}</span>
-            </div>
+            {order.customer && (
+              <>
+                <div className="cust-detail-field">
+                  <span className="modal-label">Customer</span>
+                  <span className="cust-detail-value">{order.customer.name}</span>
+                </div>
+                <div className="cust-detail-field">
+                  <span className="modal-label">Email</span>
+                  <span className="cust-detail-value">{order.customer.email ?? '—'}</span>
+                </div>
+              </>
+            )}
             {order.shippingAddress && (
               <div className="cust-detail-field">
                 <span className="modal-label">Shipping address</span>

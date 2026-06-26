@@ -9,7 +9,9 @@ import { Order } from './entities/order.entity';
 import { LineItem } from './entities/line-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { Address } from '../customers/entities/address.entity';
+import { User } from '../users/entities/user.entity';
 import { OrderStatus } from '../common/enums/order-status.enum';
+import { ProductStatus } from '../common/enums/product-status.enum';
 import { OrderCalculationService } from './order-calculation.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { UpdateOrderDto } from './dto/update-order.dto';
@@ -79,6 +81,10 @@ export class OrdersService {
       });
     }
 
+    if (query.createdBy) {
+      qb.andWhere('o.createdBy = :createdBy', { createdBy: query.createdBy });
+    }
+
     if (query.deliveryOption) {
       qb.andWhere('o.deliveryOption = :deliveryOption', {
         deliveryOption: query.deliveryOption,
@@ -113,23 +119,45 @@ export class OrdersService {
 
   async create(dto: CreateOrderDto, createdBy: string): Promise<Order> {
     return this.dataSource.transaction(async (em) => {
-      const address = await em.findOne(Address, {
-        where: { id: dto.shippingAddressId },
-      });
-      if (!address || address.customerId !== dto.customerId) {
-        throw new BadRequestException(
-          'Shipping address does not belong to this customer',
-        );
+      if (dto.shippingAddressId != null && dto.customerId != null) {
+        const address = await em.findOne(Address, {
+          where: { id: dto.shippingAddressId },
+        });
+        if (!address || address.customerId !== dto.customerId) {
+          throw new BadRequestException(
+            'Shipping address does not belong to this customer',
+          );
+        }
+      }
+
+      if (dto.newAddress && dto.shippingAddressId == null) {
+        const addr = em.create(Address, {
+          customerId: null,
+          street: dto.newAddress.street,
+          houseNumber: dto.newAddress.houseNumber,
+          postalCode: dto.newAddress.postalCode,
+          city: dto.newAddress.city,
+          province: dto.newAddress.province ?? null,
+          country: dto.newAddress.country,
+          isPrimary: false,
+        });
+        const savedAddr = await em.save(Address, addr);
+        dto.shippingAddressId = savedAddr.id;
       }
 
       const orderNumber = await this.generateOrderNumber(em);
+
+      const createdByUser = await em.findOne(User, { where: { email: createdBy } });
+      const createdByName = createdByUser
+        ? [createdByUser.firstName, createdByUser.lastName].filter(Boolean).join(' ') || createdBy
+        : createdBy;
 
       const nominalShippingCost = dto.shippingCost ?? 0;
 
       const order = em.create(Order, {
         orderNumber,
-        customerId: dto.customerId,
-        shippingAddressId: dto.shippingAddressId,
+        customerId: dto.customerId ?? null,
+        shippingAddressId: dto.shippingAddressId ?? null,
         deliveryOption: dto.deliveryOption,
         description: dto.description ?? null,
         vatPercentage: dto.vatPercentage ?? null,
@@ -144,6 +172,7 @@ export class OrdersService {
         archiveReason: null,
         archivedAt: null,
         createdBy,
+        createdByName,
         updatedBy: createdBy,
       });
       const savedOrder = await em.save(Order, order);
@@ -157,9 +186,13 @@ export class OrdersService {
         const product = productMap.get(liDto.productId);
         if (!product)
           throw new NotFoundException(`Product ${liDto.productId} not found`);
+        if (product.status !== ProductStatus.Active)
+          throw new BadRequestException(
+            `Product ${liDto.productId} is not active`,
+          );
 
         const lineTotal = this.calc.calcLineTotal({
-          unitPrice: liDto.unitPrice,
+          unitPrice: product.basePrice ?? 0,
           quantity: liDto.quantity,
           discount: liDto.discount ?? 0,
         });
@@ -171,7 +204,7 @@ export class OrdersService {
             product.name?.en ?? product.name?.nl ?? String(liDto.productId),
           sku: product.barcode ?? null,
           quantity: liDto.quantity,
-          unitPrice: liDto.unitPrice,
+          unitPrice: product.basePrice ?? 0,
           discount: liDto.discount ?? 0,
           lineTotalExclVat: lineTotal,
           isFulfillable: this.calc.isFulfillable(product.stock, liDto.quantity),
@@ -255,16 +288,31 @@ export class OrdersService {
     newStatus: OrderStatus,
     updatedBy: string,
   ): Promise<Order> {
-    const order = await this.findById(id);
+    return this.dataSource.transaction(async (em) => {
+      const order = await em.findOne(Order, {
+        where: { id },
+        relations: { lineItems: true },
+      });
+      if (!order) throw new NotFoundException(`Order ${id} not found`);
 
-    const allowed = VALID_TRANSITIONS[order.status] ?? [];
-    if (!allowed.includes(newStatus)) {
-      throw new BadRequestException('Invalid status transition');
-    }
+      const allowed = VALID_TRANSITIONS[order.status] ?? [];
+      if (!allowed.includes(newStatus)) {
+        throw new BadRequestException('Invalid status transition');
+      }
 
-    order.status = newStatus;
-    order.updatedBy = updatedBy;
-    return this.orderRepo.save(order);
+      if (newStatus === OrderStatus.Completed) {
+        for (const li of order.lineItems) {
+          await em.query(
+            `UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2 AND stock IS NOT NULL`,
+            [li.quantity, li.productId],
+          );
+        }
+      }
+
+      order.status = newStatus;
+      order.updatedBy = updatedBy;
+      return em.save(Order, order);
+    });
   }
 
   async addLineItem(
@@ -290,9 +338,13 @@ export class OrdersService {
       });
       if (!product)
         throw new NotFoundException(`Product ${dto.productId} not found`);
+      if (product.status !== ProductStatus.Active)
+        throw new BadRequestException(
+          `Product ${dto.productId} is not active`,
+        );
 
       const lineTotal = this.calc.calcLineTotal({
-        unitPrice: dto.unitPrice,
+        unitPrice: product.basePrice ?? 0,
         quantity: dto.quantity,
         discount: dto.discount ?? 0,
       });
@@ -304,7 +356,7 @@ export class OrdersService {
           product.name?.en ?? product.name?.nl ?? String(dto.productId),
         sku: product.barcode ?? null,
         quantity: dto.quantity,
-        unitPrice: dto.unitPrice,
+        unitPrice: product.basePrice ?? 0,
         discount: dto.discount ?? 0,
         lineTotalExclVat: lineTotal,
         isFulfillable: this.calc.isFulfillable(product.stock, dto.quantity),
@@ -349,7 +401,6 @@ export class OrdersService {
       }
 
       if (dto.quantity !== undefined) lineItem.quantity = dto.quantity;
-      if (dto.unitPrice !== undefined) lineItem.unitPrice = dto.unitPrice;
       if (dto.discount !== undefined) lineItem.discount = dto.discount;
 
       lineItem.lineTotalExclVat = this.calc.calcLineTotal({
@@ -417,6 +468,37 @@ export class OrdersService {
 
       await this.recalculateAndSaveOrder(order, em);
     });
+  }
+
+  async getRevenueSummary(): Promise<{
+    totalRevenue: number;
+    monthlyRevenue: Array<{ month: string; revenue: number }>;
+  }> {
+    const totalResult = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('COALESCE(SUM(o.totalInclVat), 0)', 'total')
+      .where('o.status = :status', { status: 'completed' })
+      .andWhere('o.archivedAt IS NULL')
+      .getRawOne<{ total: string }>();
+
+    const monthlyResult = await this.orderRepo
+      .createQueryBuilder('o')
+      .select("TO_CHAR(DATE_TRUNC('month', o.createdAt), 'YYYY-MM')", 'month')
+      .addSelect('COALESCE(SUM(o.totalInclVat), 0)', 'revenue')
+      .where('o.status = :status', { status: 'completed' })
+      .andWhere('o.archivedAt IS NULL')
+      .andWhere("o.createdAt >= NOW() - INTERVAL '12 months'")
+      .groupBy("DATE_TRUNC('month', o.createdAt)")
+      .orderBy("DATE_TRUNC('month', o.createdAt)", 'ASC')
+      .getRawMany<{ month: string; revenue: string }>();
+
+    return {
+      totalRevenue: parseFloat(totalResult?.total ?? '0'),
+      monthlyRevenue: monthlyResult.map((r) => ({
+        month: r.month,
+        revenue: parseFloat(r.revenue),
+      })),
+    };
   }
 
   async archive(id: number, reason: string, updatedBy: string): Promise<Order> {

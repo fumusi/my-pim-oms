@@ -9,6 +9,7 @@ const FindOrdersQuerySchema = z.object({
   search: z.string().max(200).optional(),
   status: z.nativeEnum(OrderStatus).optional(),
   customerId: z.coerce.number().int().positive().optional(),
+  createdBy: z.string().email().optional(),
   deliveryOption: z.nativeEnum(DeliveryOption).optional(),
   dateFrom: z.string().datetime({ offset: true }).optional(),
   dateTo: z.string().datetime({ offset: true }).optional(),

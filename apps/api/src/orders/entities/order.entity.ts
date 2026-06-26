@@ -28,19 +28,19 @@ export class Order {
   })
   orderNumber!: string;
 
-  @Column({ name: 'customer_id' })
-  customerId!: number;
+  @Column({ name: 'customer_id', nullable: true })
+  customerId!: number | null;
 
-  @ManyToOne(() => Customer, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Customer, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'customer_id' })
-  customer!: Customer;
+  customer!: Customer | null;
 
-  @Column({ name: 'shipping_address_id' })
-  shippingAddressId!: number;
+  @Column({ name: 'shipping_address_id', nullable: true })
+  shippingAddressId!: number | null;
 
-  @ManyToOne(() => Address, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Address, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'shipping_address_id' })
-  shippingAddress!: Address;
+  shippingAddress!: Address | null;
 
   @Column({
     type: 'enum',
@@ -149,6 +149,9 @@ export class Order {
 
   @Column({ type: 'varchar', nullable: true, name: 'created_by' })
   createdBy!: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'created_by_name' })
+  createdByName!: string | null;
 
   @Column({ type: 'varchar', nullable: true, name: 'updated_by' })
   updatedBy!: string | null;

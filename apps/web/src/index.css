@@ -2496,6 +2496,7 @@ body {
   gap: 0.5rem;
 }
 .dash-recent-order-row:last-child { border-bottom: none; }
+.dash-recent-order-row:hover { background: rgba(255,255,255,0.04); }
 .dash-recent-order-left {
   display: flex;
   flex-direction: column;
@@ -2601,4 +2602,103 @@ body {
   font-weight: 600;
   color: #e0e2f0;
   font-size: 0.82rem;
+}
+
+/* ── Order Form Page ─────────────────────────────────────────────────────────── */
+.order-form-steps {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 1rem;
+}
+.order-form-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem 0.4rem 0;
+  font-size: 0.82rem;
+  color: #6b6e87;
+  flex: 1;
+}
+.order-form-step--active .order-form-step-num {
+  background: #7c3aed;
+  color: #fff;
+}
+.order-form-step--active .order-form-step-label {
+  color: #e0e2f0;
+  font-weight: 500;
+}
+.order-form-step--done .order-form-step-num {
+  background: rgba(34,197,94,0.2);
+  color: #4ade80;
+}
+.order-form-step--done .order-form-step-label {
+  color: #9396a5;
+}
+.order-form-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  font-size: 0.72rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.order-form-step-label {
+  white-space: nowrap;
+}
+.order-form-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 1.5rem;
+}
+.order-form-product-search {
+  margin-bottom: 0.5rem;
+}
+.order-form-product-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #1a1b2e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.order-form-product-item {
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  font-size: 0.83rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.order-form-product-item:last-child { border-bottom: none; }
+.order-form-product-item:hover { background: rgba(124,58,237,0.12); }
+.order-form-product-item--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.order-form-error {
+  color: #f87171;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+.order-form-nav {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin-top: 0.5rem;
 }

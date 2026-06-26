@@ -2,16 +2,22 @@ import { Injectable } from '@nestjs/common';
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import type { Order } from './entities/order.entity';
 
+type PdfDoc = NodeJS.EventEmitter & { end(): void };
+
 type PrinterInstance = {
   createPdfKitDocument(
     docDefinition: TDocumentDefinitions,
     options?: Record<string, unknown>,
-  ): NodeJS.EventEmitter & { end(): void };
+  ): Promise<PdfDoc>;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const PdfPrinter = require('pdfmake/js/Printer') as {
-  default: new (fonts: Record<string, unknown>) => PrinterInstance;
+  default: new (
+    fonts: Record<string, unknown>,
+    virtualfs: undefined,
+    urlResolver: { resolve: (url: string, headers: Record<string, string>) => void; resolved: () => Promise<void> },
+  ) => PrinterInstance;
 };
 
 function formatMoney(amount: number): string {
@@ -23,14 +29,22 @@ export class OrderInvoiceService {
   private readonly printer: PrinterInstance;
 
   constructor() {
-    this.printer = new PdfPrinter.default({
-      Courier: {
-        normal: 'Courier',
-        bold: 'Courier-Bold',
-        italics: 'Courier-Oblique',
-        bolditalics: 'Courier-BoldOblique',
+    const noopUrlResolver = {
+      resolve: (_url: string, _headers: Record<string, string>) => {},
+      resolved: () => Promise.resolve(),
+    };
+    this.printer = new PdfPrinter.default(
+      {
+        Courier: {
+          normal: 'Courier',
+          bold: 'Courier-Bold',
+          italics: 'Courier-Oblique',
+          bolditalics: 'Courier-BoldOblique',
+        },
       },
-    });
+      undefined,
+      noopUrlResolver,
+    );
   }
 
   buildDocDefinition(order: Order): TDocumentDefinitions {
@@ -47,22 +61,30 @@ export class OrderInvoiceService {
       ...(order.freeShippingApplied ? [{ text: 'Free shipping applied', color: 'green' } as Content] : []),
     ];
 
-    const customerLines: Content[] = [
-      { text: 'Bill To', style: 'sectionHeader' },
-      { text: order.customer.name },
-      ...(order.customer.companyName ? [{ text: order.customer.companyName } as Content] : []),
-      { text: order.customer.email },
-    ];
+    const customerLines: Content[] = order.customer
+      ? [
+          { text: 'Bill To', style: 'sectionHeader' },
+          { text: order.customer.name ?? 'N/A' },
+          ...(order.customer.companyName ? [{ text: order.customer.companyName } as Content] : []),
+          { text: order.customer.email ?? 'N/A' },
+        ]
+      : [];
 
-    const addr = order.shippingAddress;
-    const addressParts = [
-      `${addr.street} ${addr.houseNumber}`,
-      ', ',
-      `${addr.postalCode} ${addr.city}`,
-      addr.province ? `, ${addr.province}` : '',
-      ', ',
-      addr.country,
-    ];
+    const addressSection: Content[] = order.shippingAddress
+      ? [
+          { text: 'Ship To', style: 'sectionHeader' },
+          {
+            text: [
+              `${order.shippingAddress.street} ${order.shippingAddress.houseNumber}`,
+              ', ',
+              `${order.shippingAddress.postalCode} ${order.shippingAddress.city}`,
+              order.shippingAddress.province ? `, ${order.shippingAddress.province}` : '',
+              ', ',
+              order.shippingAddress.country,
+            ].join(''),
+          },
+        ]
+      : [];
 
     const lineItemRows = order.lineItems.map((li) => [
       li.productName,
@@ -80,8 +102,7 @@ export class OrderInvoiceService {
         columns: [metaLeft, metaRight],
       },
       ...customerLines,
-      { text: 'Ship To', style: 'sectionHeader' },
-      { text: addressParts.join('') },
+      ...addressSection,
       { text: 'Line Items', style: 'sectionHeader' },
       {
         table: {
@@ -131,11 +152,11 @@ export class OrderInvoiceService {
     };
   }
 
-  generateInvoice(order: Order): Promise<Buffer> {
+  async generateInvoice(order: Order): Promise<Buffer> {
     const docDef = this.buildDocDefinition(order);
+    const doc = await this.printer.createPdfKitDocument(docDef);
     return new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = [];
-      const doc = this.printer.createPdfKitDocument(docDef);
       doc.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);

@@ -97,6 +97,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     createdAt: new Date('2024-06-01'),
     updatedAt: new Date('2024-06-01'),
     createdBy: 'admin@test.com',
+    createdByName: null,
     updatedBy: 'admin@test.com',
     lineItems,
     ...overrides,

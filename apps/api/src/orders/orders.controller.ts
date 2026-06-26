@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -34,24 +35,41 @@ export class OrdersController {
   ) {}
 
   @Get()
-  @Roles(Role.Admin)
-  findAll(@Query() query: FindOrdersQueryDto) {
+  @Roles(Role.Admin, Role.User)
+  findAll(@Query() query: FindOrdersQueryDto, @Req() req: AuthRequest) {
+    if (req.user.role === Role.User) {
+      query.createdBy = req.user.email;
+    }
     return this.service.findAll(query);
   }
 
-  @Get(':id')
+  @Get('revenue')
   @Roles(Role.Admin)
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findById(id);
+  getRevenueSummary() {
+    return this.service.getRevenueSummary();
+  }
+
+  @Get(':id')
+  @Roles(Role.Admin, Role.User)
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    const order = await this.service.findById(id);
+    if (req.user.role === Role.User && order.createdBy !== req.user.email) {
+      throw new ForbiddenException();
+    }
+    return order;
   }
 
   @Get(':id/invoice')
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.User)
   async getInvoice(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthRequest,
     @Res() res: Response,
   ) {
     const order = await this.service.findById(id);
+    if (req.user.role === Role.User && order.createdBy !== req.user.email) {
+      throw new ForbiddenException();
+    }
     const pdf = await this.invoiceService.generateInvoice(order);
     res.set({
       'Content-Type': 'application/pdf',
@@ -62,9 +80,22 @@ export class OrdersController {
   }
 
   @Post()
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.User)
   create(@Body() dto: CreateOrderDto, @Req() req: AuthRequest) {
-    return this.service.create(dto, req.user.email);
+    if (req.user.role === Role.User) {
+      if (req.user.customerId != null && dto.customerId != null && dto.customerId !== req.user.customerId) {
+        throw new ForbiddenException('Cannot create order for another customer');
+      }
+      dto.vatPercentage = undefined;
+      dto.shippingCost = 0;
+      for (const li of dto.lineItems) {
+        li.discount = 0;
+      }
+    }
+    const createdBy = req.user.role === Role.Admin && dto.onBehalfOf
+      ? dto.onBehalfOf
+      : req.user.email;
+    return this.service.create(dto, createdBy);
   }
 
   @Patch(':id')

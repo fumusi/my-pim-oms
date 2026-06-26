@@ -48,6 +48,7 @@ export interface Order {
   createdAt: string
   updatedAt: string
   createdBy: string | null
+  createdByName: string | null
   updatedBy: string | null
   lineItems: LineItem[]
 }
@@ -70,6 +71,64 @@ export interface OrdersQuery {
   archived?: boolean
 }
 
+export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
+  draft: ['open'],
+  open: ['partial', 'completed', 'cancelled'],
+  partial: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+}
+
+export interface CreateOrderBody {
+  customerId?: number
+  shippingAddressId?: number
+  deliveryOption: DeliveryOption
+  description?: string | null
+  vatPercentage?: number | null
+  shippingCost?: number
+  lineItems: Array<{
+    productId: number
+    quantity: number
+    discount: number
+  }>
+  onBehalfOf?: string
+  newAddress?: {
+    street: string
+    houseNumber: string
+    postalCode: string
+    city: string
+    province?: string
+    country: string
+  }
+}
+
+export interface UpdateOrderBody {
+  description?: string | null
+  deliveryOption?: DeliveryOption
+  trackingUrl?: string | null
+  shippingAddressId?: number
+  shippingCost?: number
+}
+
+export interface AddLineItemBody {
+  productId: number
+  quantity: number
+  discount: number
+}
+
+export interface UpdateLineItemBody {
+  quantity?: number
+  discount?: number
+}
+
+export interface RevenueSummary {
+  totalRevenue: number
+  monthlyRevenue: Array<{ month: string; revenue: number }>
+}
+
+export const getOrdersRevenue = () =>
+  api.get<RevenueSummary>('/orders/revenue')
+
 export const getOrders = (q: OrdersQuery) =>
   api.get<PaginatedOrders>('/orders', { params: q })
 
@@ -82,6 +141,21 @@ export const archiveOrder = (id: number, archiveReason: string) =>
 export const getOrder = (id: number) =>
   api.get<Order>(`/orders/${id}`)
 
+export const createOrder = (body: CreateOrderBody) =>
+  api.post<Order>('/orders', body)
+
+export const updateOrder = (id: number, body: UpdateOrderBody) =>
+  api.patch<Order>(`/orders/${id}`, body)
+
+export const addLineItem = (orderId: number, body: AddLineItemBody) =>
+  api.post<LineItem>(`/orders/${orderId}/items`, body)
+
+export const updateLineItem = (orderId: number, itemId: number, body: UpdateLineItemBody) =>
+  api.patch<LineItem>(`/orders/${orderId}/items/${itemId}`, body)
+
+export const removeLineItem = (orderId: number, itemId: number) =>
+  api.delete(`/orders/${orderId}/items/${itemId}`)
+
 export const downloadInvoice = (id: number, orderNumber: string) =>
   api.get(`/orders/${id}/invoice`, { responseType: 'blob' }).then((res) => {
     const url = URL.createObjectURL(new Blob([res.data as BlobPart], { type: 'application/pdf' }))
@@ -89,5 +163,5 @@ export const downloadInvoice = (id: number, orderNumber: string) =>
     a.href = url
     a.download = `invoice-${orderNumber}.pdf`
     a.click()
-    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
   })

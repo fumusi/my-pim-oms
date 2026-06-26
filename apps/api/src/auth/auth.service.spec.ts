@@ -240,7 +240,7 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('blacklists the access token jti in Redis', async () => {
-      const user = { sub: 1, email: 'test@example.com', role: Role.User, jti: 'abc-123', exp: Math.floor(Date.now() / 1000) + 3600 };
+      const user = { sub: 1, email: 'test@example.com', role: Role.User, customerId: null, jti: 'abc-123', exp: Math.floor(Date.now() / 1000) + 3600 };
       redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 
@@ -250,7 +250,7 @@ describe('AuthService', () => {
     });
 
     it('deletes refresh token from Redis on logout', async () => {
-      const user = { sub: 1, email: 'test@example.com', role: Role.User, jti: 'abc-123', exp: Math.floor(Date.now() / 1000) + 3600 };
+      const user = { sub: 1, email: 'test@example.com', role: Role.User, customerId: null, jti: 'abc-123', exp: Math.floor(Date.now() / 1000) + 3600 };
       redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 

@@ -1,145 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearch, useNavigate } from '@tanstack/react-router'
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
-import { toast } from 'sonner'
 import type { RootState } from '../store'
-import {
-  getOrders,
-  updateOrderStatus,
-  archiveOrder,
-  type Order,
-  type OrderStatus,
-} from '../api/orders'
-import { formatDate, getApiError } from '../utils/format'
-
-const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
-  draft: ['open'],
-  open: ['partial', 'completed', 'cancelled'],
-  partial: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-}
-
-function UpdateStatusModal({
-  order,
-  onClose,
-  onSaved,
-}: {
-  order: Order
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const queryClient = useQueryClient()
-  const options = NEXT_STATUSES[order.status]
-  const [selected, setSelected] = useState<OrderStatus>(options[0])
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: () => updateOrderStatus(order.id, selected),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] })
-      onSaved()
-    },
-    onError: (err) => {
-      toast.error(getApiError(err))
-    },
-  })
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">Update Status</div>
-        <p className="modal-msg">
-          Order <strong>{order.orderNumber}</strong> — current status:{' '}
-          <strong>{order.status}</strong>
-        </p>
-        <div className="modal-field">
-          <label className="modal-label">New status</label>
-          <select
-            className="modal-select"
-            value={selected}
-            onChange={(e) => setSelected(e.target.value as OrderStatus)}
-          >
-            {options.map((s) => (
-              <option key={s} value={s}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="modal-actions">
-          <button className="modal-btn-cancel" onClick={onClose} disabled={isPending}>
-            Cancel
-          </button>
-          <button
-            className="modal-btn-confirm"
-            onClick={() => mutate()}
-            disabled={isPending}
-          >
-            {isPending ? 'Saving…' : 'Confirm'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ArchiveModal({
-  order,
-  onClose,
-  onSaved,
-}: {
-  order: Order
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const queryClient = useQueryClient()
-  const [reason, setReason] = useState('')
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: () => archiveOrder(order.id, reason),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] })
-      onSaved()
-    },
-    onError: (err) => {
-      toast.error(getApiError(err))
-    },
-  })
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">Archive Order</div>
-        <p className="modal-msg">
-          Archive order <strong>{order.orderNumber}</strong>? Provide a reason below.
-        </p>
-        <div className="modal-field">
-          <label className="modal-label">Reason</label>
-          <input
-            className="modal-input"
-            type="text"
-            placeholder="Archive reason…"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </div>
-        <div className="modal-actions">
-          <button className="modal-btn-cancel" onClick={onClose} disabled={isPending}>
-            Cancel
-          </button>
-          <button
-            className="modal-btn-confirm"
-            onClick={() => mutate()}
-            disabled={!reason.trim() || isPending}
-          >
-            {isPending ? 'Archiving…' : 'Archive'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { getOrders, type OrderStatus, type DeliveryOption } from '../api/orders'
+import { formatDate } from '../utils/format'
 
 export function OrdersPage() {
   const navigate = useNavigate()
@@ -152,9 +17,6 @@ export function OrdersPage() {
   const limit = 20
 
   const [searchInput, setSearchInput] = useState(search ?? '')
-
-  const [updateStatusOrder, setUpdateStatusOrder] = useState<Order | null>(null)
-  const [archiveOrder_, setArchiveOrder] = useState<Order | null>(null)
 
   const mountedRef = useRef(false)
   useEffect(() => {
@@ -182,7 +44,7 @@ export function OrdersPage() {
         deliveryOption,
         dateFrom,
         dateTo,
-        archived,
+        archived: archived || undefined,
       }).then((r) => r.data),
   })
 
@@ -205,7 +67,7 @@ export function OrdersPage() {
   }
 
   function setArchived(value: boolean) {
-    navigate({ to: '/orders', search: () => ({ page: 1, archived: value }) })
+    navigate({ to: '/orders', search: (prev) => ({ ...prev, page: 1, archived: value }) })
   }
 
   const orders = data?.data ?? []
@@ -221,6 +83,12 @@ export function OrdersPage() {
               {data ? `${data.total} order${data.total === 1 ? '' : 's'}` : 'Loading…'}
             </div>
           </div>
+          <button
+            className="exact-btn exact-btn-primary"
+            onClick={() => navigate({ to: '/orders/new' })}
+          >
+            + New Order
+          </button>
         </div>
 
         <div className="orders-tabs">
@@ -274,20 +142,6 @@ export function OrdersPage() {
             <option value="ups">UPS</option>
             <option value="pickup">Pickup</option>
           </select>
-          <input
-            className="cust-filter-input"
-            type="date"
-            placeholder="From"
-            value={dateFrom ?? ''}
-            onChange={(e) => setFilter({ dateFrom: e.target.value || undefined })}
-          />
-          <input
-            className="cust-filter-input"
-            type="date"
-            placeholder="To"
-            value={dateTo ?? ''}
-            onChange={(e) => setFilter({ dateTo: e.target.value || undefined })}
-          />
         </div>
 
         {isLoading && !data && (
@@ -314,25 +168,26 @@ export function OrdersPage() {
               <thead>
                 <tr>
                   <th>Order #</th>
-                  <th>Customer</th>
+                  <th>User</th>
                   <th>Status</th>
                   <th>Delivery</th>
                   <th>Total incl. VAT</th>
                   <th>Created</th>
-                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {orders.map((o) => {
-                  const isTerminal = o.status === 'completed' || o.status === 'cancelled'
-                  const canArchive = isTerminal && o.archivedAt === null
                   return (
-                    <tr key={o.id}>
+                    <tr
+                      key={o.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => navigate({ to: '/orders/$id', params: { id: String(o.id) } })}
+                    >
                       <td className="users-td-muted" style={{ fontSize: '0.78rem' }}>
                         {o.orderNumber}
                       </td>
                       <td style={{ fontWeight: 500, color: '#e0e2f0' }}>
-                        {o.customer?.name ?? '—'}
+                        {o.createdByName ?? o.createdBy ?? '—'}
                       </td>
                       <td>
                         <span
@@ -348,39 +203,6 @@ export function OrdersPage() {
                         {o.totalInclVat != null ? '€' + o.totalInclVat.toFixed(2) : '—'}
                       </td>
                       <td className="users-td-muted">{formatDate(o.createdAt)}</td>
-                      {isAdmin && (
-                        <td>
-                          <div className="users-actions">
-                            <button
-                              className="users-action-btn"
-                              onClick={() =>
-                                navigate({
-                                  to: '/orders/$id',
-                                  params: { id: String(o.id) },
-                                })
-                              }
-                            >
-                              View
-                            </button>
-                            {!archived && !isTerminal && (
-                              <button
-                                className="users-action-btn"
-                                onClick={() => setUpdateStatusOrder(o)}
-                              >
-                                Update Status
-                              </button>
-                            )}
-                            {!archived && canArchive && (
-                              <button
-                                className="users-action-btn"
-                                onClick={() => setArchiveOrder(o)}
-                              >
-                                Archive
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
                     </tr>
                   )
                 })}
@@ -414,21 +236,6 @@ export function OrdersPage() {
         )}
       </div>
 
-      {updateStatusOrder && (
-        <UpdateStatusModal
-          order={updateStatusOrder}
-          onClose={() => setUpdateStatusOrder(null)}
-          onSaved={() => setUpdateStatusOrder(null)}
-        />
-      )}
-
-      {archiveOrder_ && (
-        <ArchiveModal
-          order={archiveOrder_}
-          onClose={() => setArchiveOrder(null)}
-          onSaved={() => setArchiveOrder(null)}
-        />
-      )}
     </>
   )
 }

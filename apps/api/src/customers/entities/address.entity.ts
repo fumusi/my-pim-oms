@@ -14,12 +14,12 @@ export class Address {
   id!: number;
 
   @Index()
-  @Column({ name: 'customer_id' })
-  customerId!: number;
+  @Column({ name: 'customer_id', nullable: true })
+  customerId!: number | null;
 
-  @ManyToOne(() => Customer, (c) => c.addresses, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Customer, (c) => c.addresses, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'customer_id' })
-  customer!: Customer;
+  customer!: Customer | null;
 
   @Column({ type: 'varchar' })
   street!: string;

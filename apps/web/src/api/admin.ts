@@ -27,6 +27,7 @@ export interface GetUsersParams {
   search?: string
   role?: string
   isActive?: boolean
+  customerId?: number
 }
 
 export const getUsers = (page = 1, limit = 20, params?: Omit<GetUsersParams, 'page' | 'limit'>) =>

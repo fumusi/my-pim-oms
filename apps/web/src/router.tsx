@@ -6,6 +6,8 @@ import {
   redirect,
   Outlet,
   useNavigate,
+  useParams,
+  useSearch,
 } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
@@ -29,6 +31,7 @@ import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { CustomerDetailPage } from './pages/CustomerDetailPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
+import { OrderFormPage } from './pages/OrderFormPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -152,7 +155,7 @@ const ordersRoute = createRoute({
         : undefined,
     dateFrom: typeof s.dateFrom === 'string' ? s.dateFrom : undefined,
     dateTo: typeof s.dateTo === 'string' ? s.dateTo : undefined,
-    archived: s.archived === true,
+    archived: s.archived === true || s.archived === 'true',
   }),
   component: OrdersPage,
 })
@@ -162,6 +165,39 @@ const orderDetailRoute = createRoute({
   path: '/orders/$id',
   staticData: { title: 'Order' },
   component: OrderDetailPage,
+})
+
+function OrderNewPage() {
+  const { productId } = useSearch({ from: '/app/orders/new' })
+  return <OrderFormPage prefillProductId={productId} />
+}
+
+function OrderEditPage() {
+  const { id } = useParams({ strict: false }) as { id: string }
+  return <OrderFormPage orderId={parseInt(id, 10)} />
+}
+
+const orderNewRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders/new',
+  staticData: { title: 'New Order' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    productId: typeof s.productId === 'number' ? s.productId : undefined,
+  }),
+  component: OrderNewPage,
+})
+
+const orderEditRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders/$id/edit',
+  staticData: { title: 'Edit Order' },
+  beforeLoad: () => {
+    if (store.getState().auth.user?.role !== 'admin') {
+      toast.error('Access denied')
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: OrderEditPage,
 })
 
 const profileRoute = createRoute({
@@ -248,7 +284,9 @@ const routeTree = rootRoute.addChildren([
     categoriesRoute,
     categoryDetailRoute,
     ordersRoute,
+    orderNewRoute,
     orderDetailRoute,
+    orderEditRoute,
     profileRoute,
     usersRoute,
     customersRoute,

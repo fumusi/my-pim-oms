@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -42,8 +43,14 @@ export class CustomersController {
   }
 
   @Get(':id')
-  @Roles(Role.Admin)
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  @Roles(Role.Admin, Role.User)
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: AuthRequest,
+  ) {
+    if (req.user.role === Role.User && req.user.customerId !== id) {
+      throw new ForbiddenException();
+    }
     return this.service.findById(id);
   }
 
