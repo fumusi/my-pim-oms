@@ -478,7 +478,6 @@ export class OrdersService {
       .createQueryBuilder('o')
       .select('COALESCE(SUM(o.totalInclVat), 0)', 'total')
       .where('o.status = :status', { status: 'completed' })
-      .andWhere('o.archivedAt IS NULL')
       .getRawOne<{ total: string }>();
 
     const monthlyResult = await this.orderRepo
@@ -486,7 +485,6 @@ export class OrdersService {
       .select("TO_CHAR(DATE_TRUNC('month', o.createdAt), 'YYYY-MM')", 'month')
       .addSelect('COALESCE(SUM(o.totalInclVat), 0)', 'revenue')
       .where('o.status = :status', { status: 'completed' })
-      .andWhere('o.archivedAt IS NULL')
       .andWhere("o.createdAt >= NOW() - INTERVAL '12 months'")
       .groupBy("DATE_TRUNC('month', o.createdAt)")
       .orderBy("DATE_TRUNC('month', o.createdAt)", 'ASC')

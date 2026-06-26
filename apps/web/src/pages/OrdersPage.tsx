@@ -3,8 +3,9 @@ import { useSearch, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import type { RootState } from '../store'
-import { getOrders, type OrderStatus, type DeliveryOption } from '../api/orders'
+import { getOrders, type Order, type OrderStatus, type DeliveryOption } from '../api/orders'
 import { formatDate } from '../utils/format'
+import { ArchiveOrderModal } from '../components/ArchiveOrderModal'
 
 export function OrdersPage() {
   const navigate = useNavigate()
@@ -17,6 +18,7 @@ export function OrdersPage() {
   const limit = 20
 
   const [searchInput, setSearchInput] = useState(search ?? '')
+  const [archiveTarget, setArchiveTarget] = useState<Order | null>(null)
 
   const mountedRef = useRef(false)
   useEffect(() => {
@@ -173,6 +175,7 @@ export function OrdersPage() {
                   <th>Delivery</th>
                   <th>Total incl. VAT</th>
                   <th>Created</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,6 +206,17 @@ export function OrdersPage() {
                         {o.totalInclVat != null ? '€' + o.totalInclVat.toFixed(2) : '—'}
                       </td>
                       <td className="users-td-muted">{formatDate(o.createdAt)}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {isAdmin && (o.status === 'completed' || o.status === 'cancelled') && o.archivedAt === null && (
+                          <button
+                            className="exact-btn exact-btn-danger-outline"
+                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                            onClick={() => setArchiveTarget(o)}
+                          >
+                            Archive
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -236,6 +250,13 @@ export function OrdersPage() {
         )}
       </div>
 
+      {archiveTarget && (
+        <ArchiveOrderModal
+          order={archiveTarget}
+          onClose={() => setArchiveTarget(null)}
+          onSaved={() => setArchiveTarget(null)}
+        />
+      )}
     </>
   )
 }

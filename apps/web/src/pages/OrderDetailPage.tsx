@@ -7,73 +7,12 @@ import type { RootState } from '../store'
 import {
   getOrder,
   updateOrderStatus,
-  archiveOrder,
   downloadInvoice,
   NEXT_STATUSES,
-  type Order,
   type OrderStatus,
 } from '../api/orders'
 import { formatDate, getApiError } from '../utils/format'
-
-function ArchiveOrderModal({
-  order,
-  onClose,
-  onSaved,
-}: {
-  order: Order
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const queryClient = useQueryClient()
-  const [reason, setReason] = useState('')
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: () => archiveOrder(order.id, reason),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order', order.id] })
-      queryClient.invalidateQueries({ queryKey: ['orders'] })
-      queryClient.invalidateQueries({ queryKey: ['recent-orders'] })
-      queryClient.invalidateQueries({ queryKey: ['orders-count'] })
-      onSaved()
-    },
-    onError: (err) => {
-      toast.error(getApiError(err))
-    },
-  })
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">Archive Order</div>
-        <p className="modal-msg">
-          Archive order <strong>{order.orderNumber}</strong>? Provide a reason below.
-        </p>
-        <div className="modal-field">
-          <label className="modal-label">Reason</label>
-          <input
-            className="modal-input"
-            type="text"
-            placeholder="Archive reason…"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </div>
-        <div className="modal-actions">
-          <button className="modal-btn-cancel" onClick={onClose} disabled={isPending}>
-            Cancel
-          </button>
-          <button
-            className="modal-btn-confirm"
-            onClick={() => mutate()}
-            disabled={!reason.trim() || isPending}
-          >
-            {isPending ? 'Archiving…' : 'Archive'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { ArchiveOrderModal } from '../components/ArchiveOrderModal'
 
 export function OrderDetailPage() {
   const { id } = useParams({ from: '/app/orders/$id' })
@@ -407,7 +346,7 @@ export function OrderDetailPage() {
         <ArchiveOrderModal
           order={order}
           onClose={() => setArchiveOpen(false)}
-          onSaved={() => setArchiveOpen(false)}
+          onSaved={() => { setArchiveOpen(false); navigate({ to: '/orders' }) }}
         />
       )}
     </div>
