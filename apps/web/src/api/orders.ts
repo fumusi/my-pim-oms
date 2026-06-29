@@ -30,8 +30,16 @@ export interface Order {
   id: number
   orderNumber: string
   customerId: number | null
-  customer: Customer
-  shippingAddress: ShippingAddress
+  customer: Customer | null
+  shippingAddress: ShippingAddress | null
+  shippingSnapshot: {
+    street: string
+    houseNumber: string
+    postalCode: string
+    city: string
+    province: string | null
+    country: string
+  } | null
   status: OrderStatus
   deliveryOption: DeliveryOption
   orderSource: string
@@ -110,6 +118,17 @@ export interface UpdateOrderBody {
   shippingCost?: number
 }
 
+export interface BulkEditOrderBody {
+  description?: string | null
+  deliveryOption?: DeliveryOption
+  trackingUrl?: string | null
+  shippingAddressId?: number
+  shippingCost?: number
+  removeItemIds?: number[]
+  updateItems?: Array<{ id: number; quantity?: number; discount?: number }>
+  addItems?: Array<{ productId: number; quantity: number; discount: number }>
+}
+
 export interface AddLineItemBody {
   productId: number
   quantity: number
@@ -126,8 +145,15 @@ export interface RevenueSummary {
   monthlyRevenue: Array<{ month: string; revenue: number }>
 }
 
+export interface OrdersConfig {
+  freeShippingThreshold: number
+}
+
 export const getOrdersRevenue = () =>
   api.get<RevenueSummary>('/orders/revenue')
+
+export const getOrdersConfig = () =>
+  api.get<OrdersConfig>('/orders/config')
 
 export const getOrders = (q: OrdersQuery) =>
   api.get<PaginatedOrders>('/orders', { params: q })
@@ -146,6 +172,9 @@ export const createOrder = (body: CreateOrderBody) =>
 
 export const updateOrder = (id: number, body: UpdateOrderBody) =>
   api.patch<Order>(`/orders/${id}`, body)
+
+export const bulkEditOrder = (id: number, body: BulkEditOrderBody) =>
+  api.patch<Order>(`/orders/${id}/bulk-edit`, body)
 
 export const addLineItem = (orderId: number, body: AddLineItemBody) =>
   api.post<LineItem>(`/orders/${orderId}/items`, body)

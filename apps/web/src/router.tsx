@@ -173,7 +173,7 @@ function OrderNewPage() {
 }
 
 function OrderEditPage() {
-  const { id } = useParams({ strict: false }) as { id: string }
+  const { id } = useParams({ from: '/app/orders/$id/edit' })
   return <OrderFormPage orderId={parseInt(id, 10)} />
 }
 

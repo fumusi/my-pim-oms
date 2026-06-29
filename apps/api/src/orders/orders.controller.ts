@@ -20,18 +20,21 @@ import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
 import { OrdersService } from './orders.service';
 import { OrderInvoiceService } from './order-invoice.service';
+import { OrderCalculationService } from './order-calculation.service';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { CreateOrderDto, CreateLineItemDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateLineItemDto } from './dto/update-line-item.dto';
 import { ArchiveOrderDto } from './dto/archive-order.dto';
+import { BulkEditOrderDto } from './dto/bulk-edit-order.dto';
 
 @Controller('orders')
 export class OrdersController {
   constructor(
     private readonly service: OrdersService,
     private readonly invoiceService: OrderInvoiceService,
+    private readonly calc: OrderCalculationService,
   ) {}
 
   @Get()
@@ -47,6 +50,12 @@ export class OrdersController {
   @Roles(Role.Admin)
   getRevenueSummary() {
     return this.service.getRevenueSummary();
+  }
+
+  @Get('config')
+  @Roles(Role.Admin, Role.User)
+  getConfig() {
+    return { freeShippingThreshold: this.calc.getThreshold() };
   }
 
   @Get(':id')
@@ -82,25 +91,21 @@ export class OrdersController {
   @Post()
   @Roles(Role.Admin, Role.User)
   create(@Body() dto: CreateOrderDto, @Req() req: AuthRequest) {
-    const createdBy = req.user.role === Role.Admin && dto.onBehalfOf
-      ? dto.onBehalfOf
-      : req.user.email;
+    const createdBy =
+      req.user.role === Role.Admin && dto.onBehalfOf
+        ? dto.onBehalfOf
+        : req.user.email;
 
-    if (req.user.role === Role.User) {
-      if (req.user.customerId != null && dto.customerId != null && dto.customerId !== req.user.customerId) {
-        throw new ForbiddenException('Cannot create order for another customer');
-      }
-      return this.service.create(
-        {
-          ...dto,
-          vatPercentage: undefined,
-          shippingCost: 0,
-          lineItems: dto.lineItems.map((li) => ({ ...li, discount: 0 })),
-        } as CreateOrderDto,
-        createdBy,
-      );
+    if (
+      req.user.role === Role.User &&
+      req.user.customerId != null &&
+      dto.customerId != null &&
+      dto.customerId !== req.user.customerId
+    ) {
+      throw new ForbiddenException('Cannot create order for another customer');
     }
-    return this.service.create(dto, createdBy);
+
+    return this.service.create(dto, createdBy, req.user.role);
   }
 
   @Patch(':id')
@@ -111,6 +116,16 @@ export class OrdersController {
     @Req() req: AuthRequest,
   ) {
     return this.service.update(id, dto, req.user.email);
+  }
+
+  @Patch(':id/bulk-edit')
+  @Roles(Role.Admin)
+  bulkEdit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: BulkEditOrderDto,
+    @Req() req: AuthRequest,
+  ) {
+    return this.service.bulkEdit(id, dto, req.user.email);
   }
 
   @Patch(':id/status')

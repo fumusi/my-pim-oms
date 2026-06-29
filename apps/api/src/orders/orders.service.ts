@@ -12,12 +12,14 @@ import { Address } from '../customers/entities/address.entity';
 import { User } from '../users/entities/user.entity';
 import { OrderStatus } from '../common/enums/order-status.enum';
 import { ProductStatus } from '../common/enums/product-status.enum';
+import { Role } from '../common/enums/role.enum';
 import { OrderCalculationService } from './order-calculation.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { UpdateOrderDto } from './dto/update-order.dto';
 import type { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import type { UpdateLineItemDto } from './dto/update-line-item.dto';
 import type { CreateLineItemDto } from './dto/create-order.dto';
+import type { BulkEditOrderDto } from './dto/bulk-edit-order.dto';
 
 export interface PaginatedOrders {
   data: Order[];
@@ -117,53 +119,49 @@ export class OrdersService {
     return order;
   }
 
-  async create(dto: CreateOrderDto, createdBy: string): Promise<Order> {
+  async create(dto: CreateOrderDto, createdBy: string, callerRole: Role = Role.Admin): Promise<Order> {
     return this.dataSource.transaction(async (em) => {
-      if (dto.shippingAddressId != null && dto.customerId != null) {
+      const effectiveDto =
+        callerRole === Role.User
+          ? {
+              ...dto,
+              vatPercentage: undefined,
+              shippingCost: 0,
+              onBehalfOf: undefined,
+              lineItems: dto.lineItems.map((li) => ({ ...li, discount: 0 })),
+            }
+          : dto;
+
+      if (effectiveDto.shippingAddressId != null && effectiveDto.customerId != null) {
         const address = await em.findOne(Address, {
-          where: { id: dto.shippingAddressId },
+          where: { id: effectiveDto.shippingAddressId },
         });
-        if (!address || address.customerId !== dto.customerId) {
+        if (!address || address.customerId !== effectiveDto.customerId) {
           throw new BadRequestException(
             'Shipping address does not belong to this customer',
           );
         }
       }
 
-      if (dto.newAddress && dto.shippingAddressId == null) {
-        const addr = em.create(Address, {
-          customerId: null,
-          street: dto.newAddress.street,
-          houseNumber: dto.newAddress.houseNumber,
-          postalCode: dto.newAddress.postalCode,
-          city: dto.newAddress.city,
-          province: dto.newAddress.province ?? null,
-          country: dto.newAddress.country,
-          isPrimary: false,
-        });
-        const savedAddr = await em.save(Address, addr);
-        dto.shippingAddressId = savedAddr.id;
-      }
-
       const orderNumber = await this.generateOrderNumber(em);
 
       const createdByUser = await em.findOne(User, { where: { email: createdBy } });
-      if (!createdByUser && dto.onBehalfOf) {
-        throw new BadRequestException(`User ${dto.onBehalfOf} not found`);
+      if (!createdByUser && effectiveDto.onBehalfOf) {
+        throw new BadRequestException(`User ${effectiveDto.onBehalfOf} not found`);
       }
       const createdByName = createdByUser
         ? [createdByUser.firstName, createdByUser.lastName].filter(Boolean).join(' ') || createdBy
         : createdBy;
 
-      const nominalShippingCost = dto.shippingCost ?? 0;
+      const nominalShippingCost = effectiveDto.shippingCost ?? 0;
 
       const order = em.create(Order, {
         orderNumber,
-        customerId: dto.customerId ?? null,
-        shippingAddressId: dto.shippingAddressId ?? null,
-        deliveryOption: dto.deliveryOption,
-        description: dto.description ?? null,
-        vatPercentage: dto.vatPercentage ?? null,
+        customerId: effectiveDto.customerId ?? null,
+        shippingAddressId: effectiveDto.shippingAddressId ?? null,
+        deliveryOption: effectiveDto.deliveryOption,
+        description: effectiveDto.description ?? null,
+        vatPercentage: effectiveDto.vatPercentage ?? null,
         status: OrderStatus.Draft,
         orderSource: 'manual',
         nominalShippingCost,
@@ -177,15 +175,25 @@ export class OrdersService {
         createdBy,
         createdByName,
         updatedBy: createdBy,
+        shippingSnapshot: effectiveDto.newAddress
+          ? {
+              street: effectiveDto.newAddress.street,
+              houseNumber: effectiveDto.newAddress.houseNumber,
+              postalCode: effectiveDto.newAddress.postalCode,
+              city: effectiveDto.newAddress.city,
+              province: effectiveDto.newAddress.province ?? null,
+              country: effectiveDto.newAddress.country,
+            }
+          : null,
       });
       const savedOrder = await em.save(Order, order);
 
-      const productIds = dto.lineItems.map((li) => li.productId);
+      const productIds = effectiveDto.lineItems.map((li) => li.productId);
       const products = await em.find(Product, { where: { id: In(productIds) } });
       const productMap = new Map(products.map((p) => [p.id, p]));
 
       const lineItems: LineItem[] = [];
-      for (const liDto of dto.lineItems) {
+      for (const liDto of effectiveDto.lineItems) {
         const product = productMap.get(liDto.productId);
         if (!product)
           throw new NotFoundException(`Product ${liDto.productId} not found`);
@@ -277,6 +285,129 @@ export class OrdersService {
 
       order.updatedBy = updatedBy;
 
+      await this.recalculateAndSaveOrder(order, em);
+
+      return em.findOne(Order, {
+        where: { id },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      }) as Promise<Order>;
+    });
+  }
+
+  async bulkEdit(
+    id: number,
+    dto: BulkEditOrderDto,
+    updatedBy: string,
+  ): Promise<Order> {
+    return this.dataSource.transaction(async (em) => {
+      const order = await em.findOne(Order, {
+        where: { id },
+        relations: { lineItems: true, customer: true, shippingAddress: true },
+      });
+      if (!order) throw new NotFoundException(`Order ${id} not found`);
+
+      if (TERMINAL_STATUSES.includes(order.status)) {
+        throw new BadRequestException(
+          'Order cannot be modified in its current status',
+        );
+      }
+
+      if (dto.description !== undefined)
+        order.description = dto.description ?? null;
+      if (dto.deliveryOption !== undefined)
+        order.deliveryOption = dto.deliveryOption;
+      if (dto.trackingUrl !== undefined)
+        order.trackingUrl = dto.trackingUrl ?? null;
+      if (dto.shippingAddressId !== undefined) {
+        const address = await em.findOne(Address, {
+          where: { id: dto.shippingAddressId },
+        });
+        if (!address || address.customerId !== order.customerId) {
+          throw new BadRequestException(
+            'Shipping address does not belong to this customer',
+          );
+        }
+        order.shippingAddressId = dto.shippingAddressId;
+      }
+      if (dto.shippingCost !== undefined)
+        order.nominalShippingCost = dto.shippingCost;
+
+      if (dto.removeItemIds?.length) {
+        const remaining = order.lineItems.length - dto.removeItemIds.length;
+        if (remaining < 1) {
+          throw new BadRequestException(
+            'Cannot remove all line items from an order',
+          );
+        }
+        const toRemove = order.lineItems.filter((li) =>
+          dto.removeItemIds!.includes(li.id),
+        );
+        await em.remove(LineItem, toRemove);
+        order.lineItems = order.lineItems.filter(
+          (li) => !dto.removeItemIds!.includes(li.id),
+        );
+      }
+
+      if (dto.updateItems?.length) {
+        for (const upd of dto.updateItems) {
+          const li = order.lineItems.find((li) => li.id === upd.id);
+          if (!li)
+            throw new NotFoundException(
+              `Line item ${upd.id} not found for order ${id}`,
+            );
+          if (upd.quantity !== undefined) li.quantity = upd.quantity;
+          if (upd.discount !== undefined) li.discount = upd.discount;
+          li.lineTotalExclVat = this.calc.calcLineTotal({
+            unitPrice: li.unitPrice,
+            quantity: li.quantity,
+            discount: li.discount,
+          });
+          const product = await em.findOne(Product, {
+            where: { id: li.productId },
+          });
+          li.isFulfillable = this.calc.isFulfillable(
+            product?.stock ?? null,
+            li.quantity,
+          );
+          await em.save(LineItem, li);
+        }
+      }
+
+      if (dto.addItems?.length) {
+        const productIds = dto.addItems.map((i) => i.productId);
+        const products = await em.find(Product, { where: { id: In(productIds) } });
+        const productMap = new Map(products.map((p) => [p.id, p]));
+        for (const item of dto.addItems) {
+          const product = productMap.get(item.productId);
+          if (!product)
+            throw new NotFoundException(`Product ${item.productId} not found`);
+          if (product.status !== ProductStatus.Active)
+            throw new BadRequestException(
+              `Product ${item.productId} is not active`,
+            );
+          const lineTotal = this.calc.calcLineTotal({
+            unitPrice: product.basePrice ?? 0,
+            quantity: item.quantity,
+            discount: item.discount ?? 0,
+          });
+          const newItem = em.create(LineItem, {
+            orderId: id,
+            productId: item.productId,
+            productName:
+              product.name?.en ?? product.name?.nl ?? String(item.productId),
+            sku: product.barcode ?? null,
+            quantity: item.quantity,
+            unitPrice: product.basePrice ?? 0,
+            discount: item.discount ?? 0,
+            lineTotalExclVat: lineTotal,
+            isFulfillable: this.calc.isFulfillable(product.stock, item.quantity),
+          });
+          const saved = await em.save(LineItem, newItem);
+          order.lineItems.push(saved);
+        }
+      }
+
+      order.updatedBy = updatedBy;
       await this.recalculateAndSaveOrder(order, em);
 
       return em.findOne(Order, {
@@ -490,14 +621,15 @@ export class OrdersService {
     const totalResult = await this.orderRepo
       .createQueryBuilder('o')
       .select('COALESCE(SUM(o.totalInclVat), 0)', 'total')
-      .where('o.status = :status', { status: 'completed' })
+      .where('o.status = :status', { status: OrderStatus.Completed })
+      .andWhere("o.createdAt >= NOW() - INTERVAL '12 months'")
       .getRawOne<{ total: string }>();
 
     const monthlyResult = await this.orderRepo
       .createQueryBuilder('o')
       .select("TO_CHAR(DATE_TRUNC('month', o.createdAt), 'YYYY-MM')", 'month')
       .addSelect('COALESCE(SUM(o.totalInclVat), 0)', 'revenue')
-      .where('o.status = :status', { status: 'completed' })
+      .where('o.status = :status', { status: OrderStatus.Completed })
       .andWhere("o.createdAt >= NOW() - INTERVAL '12 months'")
       .groupBy("DATE_TRUNC('month', o.createdAt)")
       .orderBy("DATE_TRUNC('month', o.createdAt)", 'ASC')

@@ -24,6 +24,10 @@ export class OrderCalculationService {
     this.threshold = isFinite(raw) ? raw : 150;
   }
 
+  getThreshold(): number {
+    return this.threshold;
+  }
+
   calcLineTotal(item: LineItemInput): number {
     return round4(item.unitPrice * item.quantity * (1 - item.discount / 100));
   }

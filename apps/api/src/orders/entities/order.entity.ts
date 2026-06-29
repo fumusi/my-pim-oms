@@ -42,6 +42,16 @@ export class Order {
   @JoinColumn({ name: 'shipping_address_id' })
   shippingAddress!: Address | null;
 
+  @Column({ type: 'jsonb', nullable: true, name: 'shipping_snapshot' })
+  shippingSnapshot!: {
+    street: string;
+    houseNumber: string;
+    postalCode: string;
+    city: string;
+    province: string | null;
+    country: string;
+  } | null;
+
   @Column({
     type: 'enum',
     enum: OrderStatus,

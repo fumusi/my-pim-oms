@@ -288,7 +288,6 @@ function ExactOnlineSection() {
 // ── Buyer dashboard ───────────────────────────────────────────────────────────
 
 function BuyerOrdersDashboard() {
-  const user = useSelector((s: RootState) => s.auth.user)
   const navigate = useNavigate()
 
   const { data, isLoading, isError } = useQuery({

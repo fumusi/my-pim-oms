@@ -80,6 +80,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     customer,
     shippingAddressId: 1,
     shippingAddress,
+    shippingSnapshot: null,
     status: OrderStatus.Open,
     description: null,
     orderSource: 'manual',

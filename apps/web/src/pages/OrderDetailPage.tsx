@@ -176,16 +176,19 @@ export function OrderDetailPage() {
                 </div>
               </>
             )}
-            {order.shippingAddress && (
-              <div className="cust-detail-field">
-                <span className="modal-label">Shipping address</span>
-                <span className="cust-detail-value">
-                  {order.shippingAddress.street} {order.shippingAddress.houseNumber},{' '}
-                  {order.shippingAddress.postalCode} {order.shippingAddress.city},{' '}
-                  {order.shippingAddress.country}
-                </span>
-              </div>
-            )}
+            {(order.shippingAddress ?? order.shippingSnapshot) && (() => {
+              const addr = order.shippingAddress ?? order.shippingSnapshot!
+              return (
+                <div className="cust-detail-field">
+                  <span className="modal-label">Shipping address</span>
+                  <span className="cust-detail-value">
+                    {addr.street} {addr.houseNumber},{' '}
+                    {addr.postalCode} {addr.city},{' '}
+                    {addr.country}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
 
           <div className="dash-card">

@@ -70,17 +70,18 @@ export class OrderInvoiceService {
         ]
       : [];
 
-    const addressSection: Content[] = order.shippingAddress
+    const addr = order.shippingAddress ?? order.shippingSnapshot;
+    const addressSection: Content[] = addr
       ? [
           { text: 'Ship To', style: 'sectionHeader' },
           {
             text: [
-              `${order.shippingAddress.street} ${order.shippingAddress.houseNumber}`,
+              `${addr.street} ${addr.houseNumber}`,
               ', ',
-              `${order.shippingAddress.postalCode} ${order.shippingAddress.city}`,
-              order.shippingAddress.province ? `, ${order.shippingAddress.province}` : '',
+              `${addr.postalCode} ${addr.city}`,
+              addr.province ? `, ${addr.province}` : '',
               ', ',
-              order.shippingAddress.country,
+              addr.country,
             ].join(''),
           },
         ]

@@ -10,19 +10,16 @@ import {
   getOrder,
   createOrder,
   updateOrder,
-  addLineItem,
-  updateLineItem,
-  removeLineItem,
+  bulkEditOrder,
+  getOrdersConfig,
   type DeliveryOption,
+  type BulkEditOrderBody,
 } from '../api/orders'
 import { getCustomers, getCustomer, type Address } from '../api/customers'
 import { getUsers } from '../api/admin'
 import { getPimProducts, getPimProductById, type PimProduct } from '../api/pim-products'
 import { getApiError } from '../utils/format'
 import type { RootState } from '../store'
-
-// Must match the backend FREE_SHIPPING_THRESHOLD env var (default: 150)
-const FREE_SHIPPING_THRESHOLD = 150
 
 const step1Schema = z.object({
   customerId: z.number().int().positive().optional(),
@@ -168,6 +165,12 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
     enabled: isAdmin,
   })
 
+  const { data: ordersConfig } = useQuery({
+    queryKey: ['orders-config'],
+    queryFn: () => getOrdersConfig().then((r) => r.data),
+    staleTime: 60_000,
+  })
+
   useEffect(() => {
     if (isAdmin || buyerCustomerId == null || isEdit) return
     setValue('customerId', buyerCustomerId)
@@ -176,7 +179,7 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
       setSelectedCustomerAddresses(res.data.addresses ?? [])
       const primary = res.data.addresses?.find((a) => a.isPrimary) ?? res.data.addresses?.[0]
       if (primary) setValue('shippingAddressId', primary.id)
-    })
+    }).catch(() => toast.error('Failed to load customer data'))
   }, [isAdmin, buyerCustomerId, isEdit, setValue])
 
   useEffect(() => {
@@ -196,7 +199,7 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
         unitPrice: p.basePrice ?? 0,
         discount: 0,
       })
-    })
+    }).catch(() => toast.error('Failed to load product'))
   }, [prefillProductId, append, getValues])
 
   const [prefilled, setPrefilled] = useState(false)
@@ -290,58 +293,36 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
   const editMutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const orig = existingOrder!
-      const patchBody: Parameters<typeof updateOrder>[1] = {}
-      if (values.description !== orig.description) patchBody.description = values.description
-      if (values.deliveryOption !== orig.deliveryOption) patchBody.deliveryOption = values.deliveryOption as DeliveryOption
-      if (values.trackingUrl !== orig.trackingUrl) patchBody.trackingUrl = values.trackingUrl
-      if (values.shippingAddressId !== orig.shippingAddress?.id) patchBody.shippingAddressId = values.shippingAddressId
-      if (values.shippingCost !== orig.shippingCost) patchBody.shippingCost = values.shippingCost
+      const body: BulkEditOrderBody = {}
 
-      const promises: Promise<unknown>[] = []
+      if (values.description !== orig.description) body.description = values.description
+      if (values.deliveryOption !== orig.deliveryOption) body.deliveryOption = values.deliveryOption as DeliveryOption
+      if (values.trackingUrl !== orig.trackingUrl) body.trackingUrl = values.trackingUrl
+      if (values.shippingAddressId !== orig.shippingAddress?.id) body.shippingAddressId = values.shippingAddressId
+      if (values.shippingCost !== orig.shippingCost) body.shippingCost = values.shippingCost
 
-      if (Object.keys(patchBody).length > 0) {
-        promises.push(updateOrder(orderId!, patchBody))
-      }
-
-      const origIds = new Set(orig.lineItems.map((li) => li.id))
       const formIds = new Set(
         values.lineItems.filter((li) => li.existingItemId != null).map((li) => li.existingItemId!),
       )
 
-      for (const origLi of orig.lineItems) {
-        if (!formIds.has(origLi.id)) {
-          promises.push(removeLineItem(orderId!, origLi.id))
-        }
-      }
+      body.removeItemIds = orig.lineItems
+        .filter((li) => !formIds.has(li.id))
+        .map((li) => li.id)
 
-      for (const li of values.lineItems) {
-        if (li.existingItemId != null) {
+      body.updateItems = values.lineItems
+        .filter((li) => li.existingItemId != null)
+        .filter((li) => {
           const origLi = orig.lineItems.find((o) => o.id === li.existingItemId)
-          if (
-            origLi &&
-            (li.quantity !== origLi.quantity ||
-              li.discount !== origLi.discount)
-          ) {
-            promises.push(
-              updateLineItem(orderId!, li.existingItemId, {
-                quantity: li.quantity,
-                discount: li.discount,
-              }),
-            )
-          }
-        } else {
-          promises.push(
-            addLineItem(orderId!, {
-              productId: li.productId,
-              quantity: li.quantity,
-              discount: li.discount,
-            }),
-          )
-        }
-      }
+          return origLi && (li.quantity !== origLi.quantity || li.discount !== origLi.discount)
+        })
+        .map((li) => ({ id: li.existingItemId!, quantity: li.quantity, discount: li.discount }))
 
-      await Promise.all(promises)
-      return orderId!
+      body.addItems = values.lineItems
+        .filter((li) => li.existingItemId == null)
+        .map((li) => ({ productId: li.productId, quantity: li.quantity, discount: li.discount }))
+
+      const res = await bulkEditOrder(orderId!, body)
+      return res.data.id
     },
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ['order', id] })
@@ -393,7 +374,7 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
   })
 
   const totalExclVat = lineItemTotals.reduce((s, t) => s + t, 0)
-  const freeShippingApplied = totalExclVat >= FREE_SHIPPING_THRESHOLD
+  const freeShippingApplied = totalExclVat >= (ordersConfig?.freeShippingThreshold ?? 150)
   const effectiveShipping = freeShippingApplied ? 0 : Number(watchedShippingCost ?? 0)
   const vatPct = Number(watchedVatPercentage ?? 0)
   const vatAmount = vatPct > 0 ? totalExclVat * (vatPct / 100) : 0

@@ -8,10 +8,10 @@ export class AddCustomerNumberSeq1782374700000 implements MigrationInterface {
     await qr.query(`
       SELECT setval(
         'customer_number_seq',
-        COALESCE(
+        GREATEST(1, COALESCE(
           MAX(CAST(SUBSTRING(customer_number FROM 6) AS INTEGER)),
           0
-        )
+        ))
       )
       FROM customers
     `);
