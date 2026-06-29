@@ -334,6 +334,28 @@ export class PriceListsService {
     await this.cplRepo.remove(cpl);
   }
 
+  async getAssignedCustomers(priceListId: number): Promise<Array<{
+    customerId: number;
+    customerName: string;
+    customerEmail: string;
+    assignedAt: Date;
+    assignedBy: string | null;
+  }>> {
+    const rows = await this.cplRepo
+      .createQueryBuilder('cpl')
+      .innerJoinAndSelect('cpl.customer', 'c')
+      .where('cpl.priceListId = :priceListId', { priceListId })
+      .orderBy('cpl.assignedAt', 'DESC')
+      .getMany();
+    return rows.map((r) => ({
+      customerId: r.customerId,
+      customerName: r.customer.name,
+      customerEmail: r.customer.email,
+      assignedAt: r.assignedAt,
+      assignedBy: r.assignedBy,
+    }));
+  }
+
   async resolvePrice(
     productId: number,
     customerId: number,
