@@ -34,7 +34,10 @@ export class PriceListsController {
   @Get()
   @Roles(Role.Admin, Role.User)
   findAll(@Query() query: FindPriceListsQueryDto, @Req() req: AuthRequest) {
-    const scopedCustomerId = req.user.role === Role.Admin ? undefined : (req.user.customerId ?? undefined);
+    if (req.user.role !== Role.Admin && req.user.customerId == null) {
+      throw new ForbiddenException('No customer account linked to this user');
+    }
+    const scopedCustomerId = req.user.role === Role.Admin ? undefined : req.user.customerId!;
     return this.service.findAll(query, scopedCustomerId);
   }
 
@@ -52,7 +55,10 @@ export class PriceListsController {
   @Get(':id')
   @Roles(Role.Admin, Role.User)
   findById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
-    const scopedCustomerId = req.user.role === Role.Admin ? undefined : (req.user.customerId ?? undefined);
+    if (req.user.role !== Role.Admin && req.user.customerId == null) {
+      throw new ForbiddenException('No customer account linked to this user');
+    }
+    const scopedCustomerId = req.user.role === Role.Admin ? undefined : req.user.customerId!;
     return this.service.findById(id, scopedCustomerId);
   }
 

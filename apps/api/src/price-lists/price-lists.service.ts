@@ -288,7 +288,8 @@ export class PriceListsService {
       throw new NotFoundException(`Price list ${priceListId} not found`);
     }
 
-    return this.dataSource.transaction('SERIALIZABLE', async (em) => {
+    try {
+    return await this.dataSource.transaction('SERIALIZABLE', async (em) => {
       const existing = await em
         .createQueryBuilder(CustomerPriceList, 'cpl')
         .innerJoin('cpl.priceList', 'pl')
@@ -315,6 +316,12 @@ export class PriceListsService {
       });
       return em.save(CustomerPriceList, cpl);
     });
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as any).code === '40001') {
+        throw new BadRequestException('Concurrent conflict, please retry');
+      }
+      throw err;
+    }
   }
 
   async unassignCustomer(priceListId: number, customerId: number): Promise<void> {
