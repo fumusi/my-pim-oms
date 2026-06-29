@@ -38,8 +38,10 @@ export class PriceListsController {
 
   @Get('resolve')
   @Roles(Role.Admin, Role.User)
-  resolvePrice(@Query() query: ResolvePriceQueryDto) {
-    return this.service.resolvePrice(query.productId, query.customerId);
+  resolvePrice(@Query() query: ResolvePriceQueryDto, @Req() req: AuthRequest) {
+    const customerId =
+      req.user.role === Role.Admin ? query.customerId : (req.user.customerId ?? query.customerId);
+    return this.service.resolvePrice(query.productId, customerId);
   }
 
   @Get(':id')

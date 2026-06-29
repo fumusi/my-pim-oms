@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { PriceListsService } from './price-lists.service';
 import { PriceList } from './entities/price-list.entity';
@@ -154,5 +154,102 @@ describe('PriceListsService.resolvePrice', () => {
     productRepo.findOneBy.mockResolvedValue(null);
 
     await expect(service.resolvePrice(999, 42)).rejects.toThrow(NotFoundException);
+  });
+
+  it('applies discount when price list item has a discount', async () => {
+    const pl = makePriceList({ id: 1, name: 'Sale List', status: PriceListStatus.Active });
+    const cpl = makeCustomerPriceList(pl);
+    const item = makePriceListItem({ priceListId: 1, productId: 5, customPrice: 10.0, discount: 10 });
+
+    cplQb.getOne.mockResolvedValue(cpl);
+    itemRepo.findOneBy.mockResolvedValue(item);
+
+    const result = await service.resolvePrice(5, 42);
+
+    expect(result.source).toBe('price_list');
+    expect(result.effectivePrice).toBe(9.0);
+    expect(result.priceListName).toBe('Sale List');
+  });
+});
+
+describe('PriceListsService.assignCustomer', () => {
+  let service: PriceListsService;
+  let cplRepo: { createQueryBuilder: jest.Mock; findOneBy: jest.Mock; count: jest.Mock };
+  let plRepo: { findOneBy: jest.Mock };
+  let cplQb: ReturnType<typeof makeCplQbMock>;
+  let mockEm: {
+    createQueryBuilder: jest.Mock;
+    findOneBy: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    cplQb = makeCplQbMock();
+    mockEm = {
+      createQueryBuilder: jest.fn().mockReturnValue(cplQb),
+      findOneBy: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation((_, data) => ({ ...data })),
+      save: jest.fn().mockImplementation((_, entity) => Promise.resolve(entity)),
+    };
+    cplRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(cplQb),
+      findOneBy: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(0),
+    };
+    plRepo = {
+      findOneBy: jest.fn().mockResolvedValue(makePriceList()),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PriceListsService,
+        {
+          provide: getRepositoryToken(PriceList),
+          useValue: plRepo,
+        },
+        {
+          provide: getRepositoryToken(PriceListItem),
+          useValue: {
+            findOneBy: jest.fn(),
+            find: jest.fn().mockResolvedValue([]),
+            createQueryBuilder: jest.fn().mockReturnValue({
+              leftJoinAndSelect: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+            }),
+          },
+        },
+        { provide: getRepositoryToken(CustomerPriceList), useValue: cplRepo },
+        { provide: getRepositoryToken(Product), useValue: { findOneBy: jest.fn() } },
+        {
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn().mockImplementation((cb: (em: typeof mockEm) => Promise<unknown>) => cb(mockEm)),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get(PriceListsService);
+  });
+
+  it('throws BadRequestException when customer already has an active price list', async () => {
+    const pl = makePriceList({ id: 2, status: PriceListStatus.Active });
+    const existingCpl = makeCustomerPriceList(pl);
+    cplQb.getOne.mockResolvedValue(existingCpl);
+
+    await expect(
+      service.assignCustomer(1, { customerId: 42 }, 'admin@test.com'),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('throws BadRequestException when customer is already assigned to this exact price list', async () => {
+    cplQb.getOne.mockResolvedValue(null);
+    mockEm.findOneBy.mockResolvedValue(makeCustomerPriceList(makePriceList()));
+
+    await expect(
+      service.assignCustomer(1, { customerId: 42 }, 'admin@test.com'),
+    ).rejects.toThrow(BadRequestException);
   });
 });

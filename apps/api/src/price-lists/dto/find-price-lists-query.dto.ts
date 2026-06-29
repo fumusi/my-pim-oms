@@ -9,6 +9,9 @@ const FindPriceListsQuerySchema = z.object({
   status: z.nativeEnum(PriceListStatus).optional(),
   activeNow: z.coerce.boolean().optional(),
   archived: z.coerce.boolean().default(false),
-});
+}).refine(
+  (d) => !(d.activeNow === true && d.status === PriceListStatus.Inactive),
+  { message: 'activeNow=true is incompatible with status=inactive' },
+);
 
 export class FindPriceListsQueryDto extends createZodDto(FindPriceListsQuerySchema) {}

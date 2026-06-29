@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { PriceList } from './entities/price-list.entity';
 import { PriceListItem } from './entities/price-list-item.entity';
 import { CustomerPriceList } from './entities/customer-price-list.entity';
@@ -103,7 +103,6 @@ export class PriceListsService {
     if (dto.description !== undefined) priceList.description = dto.description ?? null;
     if (dto.startDate !== undefined) priceList.startDate = dto.startDate ?? null;
     if (dto.endDate !== undefined) priceList.endDate = dto.endDate ?? null;
-    if (dto.status !== undefined) priceList.status = dto.status;
 
     priceList.updatedBy = updatedBy;
     return this.plRepo.save(priceList);
@@ -145,7 +144,7 @@ export class PriceListsService {
     const count = await this.cplRepo.count({ where: { priceListId: id } });
     if (count > 0) {
       throw new BadRequestException(
-        `Cannot delete price list assigned to ${count} customer(s)`,
+        `Cannot archive price list assigned to ${count} customer(s)`,
       );
     }
     priceList.archivedAt = new Date();
@@ -240,7 +239,14 @@ export class PriceListsService {
     }
 
     if (batch.length > 0) {
-      await this.itemRepo.save(batch);
+      try {
+        await this.itemRepo.save(batch);
+      } catch (err) {
+        if (err instanceof QueryFailedError && (err as any).code === '23505') {
+          throw new BadRequestException('Duplicate product detected — concurrent request conflict');
+        }
+        throw err;
+      }
     }
 
     return { added: batch.length, skipped };
@@ -256,31 +262,33 @@ export class PriceListsService {
       throw new NotFoundException(`Price list ${priceListId} not found`);
     }
 
-    const existing = await this.cplRepo
-      .createQueryBuilder('cpl')
-      .innerJoin('cpl.priceList', 'pl')
-      .where('cpl.customerId = :customerId', { customerId: dto.customerId })
-      .andWhere('pl.status = :status', { status: PriceListStatus.Active })
-      .getOne();
+    return this.dataSource.transaction(async (em) => {
+      const existing = await em
+        .createQueryBuilder(CustomerPriceList, 'cpl')
+        .innerJoin('cpl.priceList', 'pl')
+        .where('cpl.customerId = :customerId', { customerId: dto.customerId })
+        .andWhere('pl.status = :status', { status: PriceListStatus.Active })
+        .getOne();
 
-    if (existing) {
-      throw new BadRequestException('Customer already has an active price list assigned');
-    }
+      if (existing) {
+        throw new BadRequestException('Customer already has an active price list assigned');
+      }
 
-    const duplicate = await this.cplRepo.findOneBy({
-      customerId: dto.customerId,
-      priceListId,
+      const duplicate = await em.findOneBy(CustomerPriceList, {
+        customerId: dto.customerId,
+        priceListId,
+      });
+      if (duplicate) {
+        throw new BadRequestException('Customer is already assigned to this price list');
+      }
+
+      const cpl = em.create(CustomerPriceList, {
+        customerId: dto.customerId,
+        priceListId,
+        assignedBy,
+      });
+      return em.save(CustomerPriceList, cpl);
     });
-    if (duplicate) {
-      throw new BadRequestException('Customer is already assigned to this price list');
-    }
-
-    const cpl = this.cplRepo.create({
-      customerId: dto.customerId,
-      priceListId,
-      assignedBy,
-    });
-    return this.cplRepo.save(cpl);
   }
 
   async unassignCustomer(priceListId: number, customerId: number): Promise<void> {
@@ -301,15 +309,13 @@ export class PriceListsService {
     source: 'price_list' | 'base_price';
     priceListName?: string;
   }> {
-    const today = new Date().toISOString().slice(0, 10);
-
     const cpl = await this.cplRepo
       .createQueryBuilder('cpl')
       .innerJoinAndSelect('cpl.priceList', 'pl')
       .where('cpl.customerId = :customerId', { customerId })
       .andWhere('pl.status = :status', { status: PriceListStatus.Active })
-      .andWhere('(pl.start_date IS NULL OR pl.start_date <= :today)', { today })
-      .andWhere('(pl.end_date IS NULL OR pl.end_date >= :today)', { today })
+      .andWhere('(pl.start_date IS NULL OR pl.start_date <= CURRENT_DATE)')
+      .andWhere('(pl.end_date IS NULL OR pl.end_date >= CURRENT_DATE)')
       .getOne();
 
     if (cpl) {
@@ -318,8 +324,12 @@ export class PriceListsService {
         productId,
       });
       if (item) {
+        const effectivePrice =
+          item.discount != null
+            ? parseFloat((item.customPrice * (1 - item.discount / 100)).toFixed(4))
+            : item.customPrice;
         return {
-          effectivePrice: item.customPrice,
+          effectivePrice,
           source: 'price_list',
           priceListName: cpl.priceList.name,
         };
@@ -335,20 +345,14 @@ export class PriceListsService {
   }
 
   async deactivateExpiredPriceLists(): Promise<{ deactivated: number }> {
-    const expired = await this.plRepo
-      .createQueryBuilder('pl')
-      .where('pl.status = :status', { status: PriceListStatus.Active })
-      .andWhere('pl.end_date < CURRENT_DATE')
-      .getMany();
+    const result = await this.plRepo
+      .createQueryBuilder()
+      .update(PriceList)
+      .set({ status: PriceListStatus.Inactive })
+      .where('status = :status', { status: PriceListStatus.Active })
+      .andWhere('end_date < CURRENT_DATE')
+      .execute();
 
-    for (const pl of expired) {
-      pl.status = PriceListStatus.Inactive;
-    }
-
-    if (expired.length > 0) {
-      await this.plRepo.save(expired);
-    }
-
-    return { deactivated: expired.length };
+    return { deactivated: result.affected ?? 0 };
   }
 }

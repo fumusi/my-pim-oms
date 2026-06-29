@@ -6,6 +6,9 @@ const CreatePriceListSchema = z.object({
   description: z.string().max(1000).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});
+}).refine(
+  (d) => !d.startDate || !d.endDate || d.startDate <= d.endDate,
+  { message: 'startDate must be before endDate' },
+);
 
 export class CreatePriceListDto extends createZodDto(CreatePriceListSchema) {}
