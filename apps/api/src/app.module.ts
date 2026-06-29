@@ -14,6 +14,7 @@ import { RedisModule } from './redis/redis.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CustomersModule } from './customers/customers.module';
 import { OrdersModule } from './orders/orders.module';
+import { PriceListsModule } from './price-lists/price-lists.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { OrdersModule } from './orders/orders.module';
     CategoriesModule,
     CustomersModule,
     OrdersModule,
+    PriceListsModule,
     HealthModule,
   ],
   providers: [
