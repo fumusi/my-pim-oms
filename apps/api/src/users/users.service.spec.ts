@@ -31,6 +31,7 @@ const makeJwt = (overrides: Partial<JwtPayload> = {}): JwtPayload => ({
   sub: 1,
   email: 'test@example.com',
   role: Role.User,
+  customerId: null,
   jti: 'test-jti',
   exp: Math.floor(Date.now() / 1000) + 3600,
   ...overrides,

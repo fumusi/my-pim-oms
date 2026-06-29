@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import type { RootState } from '../store'
 import { getExactStatus, getExactAuthorizeUrl, startExactSync, getExactSyncStatus } from '../api/exact'
 import { getPimProducts } from '../api/pim-products'
 import { getUsers } from '../api/admin'
+import { getOrders, getOrdersRevenue, type RevenueSummary } from '../api/orders'
+import { formatDate } from '../utils/format'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -283,11 +285,105 @@ function ExactOnlineSection() {
   )
 }
 
+// ── Buyer dashboard ───────────────────────────────────────────────────────────
+
+function BuyerOrdersDashboard() {
+  const navigate = useNavigate()
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['orders', 'buyer'],
+    queryFn: () => getOrders({ archived: false }).then((r) => r.data),
+  })
+
+  const orders = data?.data ?? []
+
+  return (
+    <div className="row g-3 mb-4">
+      <div className="col-12">
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <div>
+              <div className="dash-card-title">My Orders</div>
+              <div className="dash-card-sub">
+                {data ? `${data.total} order${data.total === 1 ? '' : 's'}` : 'Loading…'}
+              </div>
+            </div>
+            <button
+              className="exact-btn exact-btn-primary"
+              onClick={() => navigate({ to: '/orders/new' })}
+            >
+              + New Order
+            </button>
+          </div>
+
+          {isLoading && !data && (
+            <div className="profile-loading">
+              <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
+            </div>
+          )}
+
+          {isError && (
+            <div className="profile-loading">
+              <p style={{ color: '#f87171' }}>Failed to load orders.</p>
+            </div>
+          )}
+
+          {!isLoading && !isError && orders.length === 0 && (
+            <NoData message="You haven't placed any orders yet" />
+          )}
+
+          {!isError && orders.length > 0 && (
+            <div className="users-table-wrap">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Status</th>
+                    <th>Delivery</th>
+                    <th>Total incl. VAT</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr
+                      key={o.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => navigate({ to: '/orders/$id', params: { id: String(o.id) } })}
+                    >
+                      <td className="users-td-muted" style={{ fontSize: '0.78rem' }}>
+                        {o.orderNumber}
+                      </td>
+                      <td>
+                        <span className={`order-status-badge order-status-${o.status}`}>
+                          {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="users-td-muted">
+                        {o.deliveryOption.charAt(0).toUpperCase() + o.deliveryOption.slice(1)}
+                      </td>
+                      <td className="users-td-muted">
+                        {o.totalInclVat != null ? '€' + o.totalInclVat.toFixed(2) : '—'}
+                      </td>
+                      <td className="users-td-muted">{formatDate(o.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
+  const navigate = useNavigate()
 
   const { data: productsPage, isLoading: productsLoading } = useQuery({
     queryKey: ['product-count'],
@@ -305,28 +401,28 @@ export function DashboardPage() {
     queryFn: () => getPimProducts({ page: 1, limit: 1, inStock: 'low_stock' }).then((r) => r.data),
   })
 
+  const { data: recentOrders, isLoading: recentOrdersLoading } = useQuery({
+    queryKey: ['recent-orders'],
+    queryFn: () => getOrders({ page: 1, limit: 5 }).then((r) => r.data),
+    enabled: isAdmin,
+    staleTime: 30_000,
+  })
+
+  const { data: revenueData, isLoading: revenueLoading } = useQuery({
+    queryKey: ['orders-revenue'],
+    queryFn: () => getOrdersRevenue().then((r) => r.data),
+    enabled: isAdmin,
+    staleTime: 60_000,
+  })
+
   const productCount = productsPage != null ? String(productsPage.total) : null
   const userCount = usersData != null ? String(usersData.meta.total) : null
   const lowStockCount = lowStockData != null ? String(lowStockData.total) : null
+  const orderCount = recentOrders != null ? String(recentOrders.total) : null
+  const revenueMax = revenueData ? Math.max(...revenueData.monthlyRevenue.map((m) => m.revenue), 1) : 1
 
   if (!isAdmin) {
-    return (
-      <div>
-        <div className="row g-3 mb-4">
-          <div className="col-12">
-            <div className="dash-card">
-              <div className="dash-card-header">
-                <div>
-                  <div className="dash-card-title">My Recent Orders</div>
-                  <div className="dash-card-sub">Your latest orders will appear here</div>
-                </div>
-              </div>
-              <NoData message="You haven't placed any orders yet" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <BuyerOrdersDashboard />
   }
 
   return (
@@ -348,11 +444,13 @@ export function DashboardPage() {
         <div className="col-6 col-xl-3">
           <StatCard
             label="Total Orders"
-            value={null}
-            note="coming soon"
+            value={orderCount}
+            note="active orders"
             accentColor="#3b82f6"
             accentBg="rgba(59, 130, 246, 0.14)"
             icon={<ClipboardIcon />}
+            loading={recentOrdersLoading}
+            href="/orders"
           />
         </div>
         <div className="col-6 col-xl-3">
@@ -389,10 +487,52 @@ export function DashboardPage() {
             <div className="dash-card-header">
               <div>
                 <div className="dash-card-title">Revenue Overview</div>
-                <div className="dash-card-sub">Monthly revenue — last 12 months</div>
+                <div className="dash-card-sub">
+                  Completed orders · last 12 months
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, fontSize: '1.15rem', color: '#e0e2f0' }}>
+                  {revenueLoading ? (
+                    <span className="spinner-border spinner-border-sm" style={{ color: '#7c3aed' }} />
+                  ) : (
+                    `€${(revenueData?.revenue12Months ?? 0).toFixed(2)}`
+                  )}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#9396a5' }}>last 12 months</div>
               </div>
             </div>
-            <NoData message="Revenue data not available yet" />
+
+            {revenueLoading && !revenueData && (
+              <div className="profile-loading">
+                <div className="spinner-border" style={{ color: '#7c3aed' }} role="status" />
+              </div>
+            )}
+
+            {!revenueLoading && (!revenueData || revenueData.monthlyRevenue.length === 0) && (
+              <NoData message="No completed orders yet" />
+            )}
+
+            {revenueData && revenueData.monthlyRevenue.length > 0 && (
+                <div style={{ padding: '0.5rem 1rem 1rem' }}>
+                  {revenueData.monthlyRevenue.map((m) => {
+                    const pct = (m.revenue / revenueMax) * 100
+                    const [year, month] = m.month.split('-')
+                    const label = new Date(Number(year), Number(month) - 1).toLocaleString('default', { month: 'short', year: '2-digit' })
+                    return (
+                      <div key={m.month} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                        <span style={{ width: '3.5rem', fontSize: '0.75rem', color: '#9396a5', flexShrink: 0 }}>{label}</span>
+                        <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: '3px', height: '10px', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: '#7c3aed', borderRadius: '3px', transition: 'width 0.3s' }} />
+                        </div>
+                        <span style={{ width: '5rem', fontSize: '0.75rem', color: '#e0e2f0', textAlign: 'right', flexShrink: 0 }}>
+                          €{m.revenue.toFixed(2)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+            )}
           </div>
         </div>
 
@@ -404,7 +544,39 @@ export function DashboardPage() {
                 <div className="dash-card-sub">Latest activity</div>
               </div>
             </div>
-            <NoData message="No orders yet" />
+            {recentOrdersLoading && !recentOrders && (
+              <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                <div className="spinner-border spinner-border-sm" style={{ color: '#7c3aed' }} role="status" />
+              </div>
+            )}
+            {!recentOrdersLoading && (!recentOrders || recentOrders.data.length === 0) && (
+              <NoData message="No orders yet" />
+            )}
+            {recentOrders && recentOrders.data.length > 0 && (
+              <div className="dash-recent-orders">
+                {recentOrders.data.map((o) => (
+                  <div key={o.id} className="dash-recent-order-row" style={{ cursor: 'pointer' }} onClick={() => navigate({ to: '/orders/$id', params: { id: String(o.id) } })}>
+                    <div className="dash-recent-order-left">
+                      <span className="dash-recent-order-num">{o.orderNumber}</span>
+                      <span className="dash-recent-order-cust">{o.createdByName ?? o.createdBy ?? '—'}</span>
+                    </div>
+                    <div className="dash-recent-order-right">
+                      <span className={`order-status-badge order-status-${o.status}`}>
+                        {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
+                      </span>
+                      <span className="dash-recent-order-total">
+                        {o.totalInclVat != null ? '€' + o.totalInclVat.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Link to="/orders" style={{ fontSize: '0.78rem', color: '#7c3aed', textDecoration: 'none' }}>
+                    View all orders →
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

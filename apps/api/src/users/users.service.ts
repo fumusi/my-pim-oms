@@ -122,6 +122,10 @@ export class UsersService {
       qb.andWhere('u.isActive = :isActive', { isActive: query.isActive });
     }
 
+    if (query.customerId) {
+      qb.andWhere('u.customerId = :customerId', { customerId: query.customerId });
+    }
+
     const [users, total] = await qb.getManyAndCount();
 
     return {

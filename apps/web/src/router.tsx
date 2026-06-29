@@ -6,6 +6,8 @@ import {
   redirect,
   Outlet,
   useNavigate,
+  useParams,
+  useSearch,
 } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
@@ -28,6 +30,8 @@ import { ProductDetailPage } from './pages/ProductDetailPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { CustomerDetailPage } from './pages/CustomerDetailPage'
+import { OrderDetailPage } from './pages/OrderDetailPage'
+import { OrderFormPage } from './pages/OrderFormPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -137,7 +141,63 @@ const ordersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/orders',
   staticData: { title: 'Orders' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    page: typeof s.page === 'number' && s.page >= 1 ? s.page : 1,
+    search: typeof s.search === 'string' ? s.search : undefined,
+    status:
+      s.status === 'draft' || s.status === 'open' || s.status === 'partial' ||
+      s.status === 'completed' || s.status === 'cancelled'
+        ? (s.status as 'draft' | 'open' | 'partial' | 'completed' | 'cancelled')
+        : undefined,
+    deliveryOption:
+      s.deliveryOption === 'dhl' || s.deliveryOption === 'ups' || s.deliveryOption === 'pickup'
+        ? (s.deliveryOption as 'dhl' | 'ups' | 'pickup')
+        : undefined,
+    dateFrom: typeof s.dateFrom === 'string' ? s.dateFrom : undefined,
+    dateTo: typeof s.dateTo === 'string' ? s.dateTo : undefined,
+    archived: s.archived === true || s.archived === 'true',
+  }),
   component: OrdersPage,
+})
+
+const orderDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders/$id',
+  staticData: { title: 'Order' },
+  component: OrderDetailPage,
+})
+
+function OrderNewPage() {
+  const { productId } = useSearch({ from: '/app/orders/new' })
+  return <OrderFormPage prefillProductId={productId} />
+}
+
+function OrderEditPage() {
+  const { id } = useParams({ from: '/app/orders/$id/edit' })
+  return <OrderFormPage orderId={parseInt(id, 10)} />
+}
+
+const orderNewRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders/new',
+  staticData: { title: 'New Order' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    productId: typeof s.productId === 'number' ? s.productId : undefined,
+  }),
+  component: OrderNewPage,
+})
+
+const orderEditRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/orders/$id/edit',
+  staticData: { title: 'Edit Order' },
+  beforeLoad: () => {
+    if (store.getState().auth.user?.role !== 'admin') {
+      toast.error('Access denied')
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: OrderEditPage,
 })
 
 const profileRoute = createRoute({
@@ -224,6 +284,9 @@ const routeTree = rootRoute.addChildren([
     categoriesRoute,
     categoryDetailRoute,
     ordersRoute,
+    orderNewRoute,
+    orderDetailRoute,
+    orderEditRoute,
     profileRoute,
     usersRoute,
     customersRoute,

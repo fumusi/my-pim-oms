@@ -8,6 +8,7 @@ const FindUsersQuerySchema = z.object({
   search: z.string().max(200).optional(),
   role: z.nativeEnum(Role).optional(),
   isActive: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  customerId: z.coerce.number().int().positive().optional(),
 });
 
 export class FindUsersQueryDto extends createZodDto(FindUsersQuerySchema) {}

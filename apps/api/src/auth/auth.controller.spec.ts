@@ -109,6 +109,7 @@ describe('AuthController', () => {
         sub: 1,
         email: 'a@b.com',
         role: Role.User,
+        customerId: null,
         jti: 'jti-abc',
         iat: 1000,
         exp: 2000,
@@ -141,6 +142,7 @@ describe('AuthController', () => {
         sub: 1,
         email: 'a@b.com',
         role: Role.User,
+        customerId: null,
         jti: 'jti-abc',
         exp: Math.floor(Date.now() / 1000) + 3600,
       };

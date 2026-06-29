@@ -216,6 +216,12 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, search:
           </div>
 
           <div className="cat-header-controls">
+            <button
+              className="exact-btn exact-btn-primary"
+              onClick={() => navigate({ to: '/orders/new', search: { productId: product.id } })}
+            >
+              Order
+            </button>
             {isAdmin && !product.archivedAt && (
               <>
                 <button className="exact-btn exact-btn-outline" onClick={() => setEditOpen(true)}>
