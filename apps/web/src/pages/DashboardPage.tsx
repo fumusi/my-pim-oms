@@ -496,7 +496,7 @@ export function DashboardPage() {
                   {revenueLoading ? (
                     <span className="spinner-border spinner-border-sm" style={{ color: '#7c3aed' }} />
                   ) : (
-                    `€${(revenueData?.totalRevenue ?? 0).toFixed(2)}`
+                    `€${(revenueData?.revenue12Months ?? 0).toFixed(2)}`
                   )}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#9396a5' }}>last 12 months</div>

@@ -141,7 +141,7 @@ export interface UpdateLineItemBody {
 }
 
 export interface RevenueSummary {
-  totalRevenue: number
+  revenue12Months: number
   monthlyRevenue: Array<{ month: string; revenue: number }>
 }
 

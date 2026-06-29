@@ -25,7 +25,10 @@ export const CreateOrderSchema = z.object({
     province: z.string().optional(),
     country: z.string().min(1),
   }).optional(),
-});
+}).refine(
+  (d) => !(d.shippingAddressId != null && d.newAddress != null),
+  { message: 'Provide either shippingAddressId or newAddress, not both' },
+);
 
 export class CreateOrderDto extends createZodDto(CreateOrderSchema) {}
 export class CreateLineItemDto extends createZodDto(CreateLineItemSchema) {}

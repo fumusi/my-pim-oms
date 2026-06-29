@@ -343,7 +343,8 @@ export class OrdersService {
           dto.removeItemIds!.includes(li.id),
         ).length;
         const remaining = order.lineItems.length - validCount;
-        if (remaining < 1) {
+        const incomingCount = dto.addItems?.length ?? 0;
+        if (remaining + incomingCount < 1) {
           throw new BadRequestException(
             'Cannot remove all line items from an order',
           );
@@ -633,7 +634,7 @@ export class OrdersService {
   }
 
   async getRevenueSummary(): Promise<{
-    totalRevenue: number;
+    revenue12Months: number;
     monthlyRevenue: Array<{ month: string; revenue: number }>;
   }> {
     const totalResult = await this.orderRepo
@@ -654,7 +655,7 @@ export class OrdersService {
       .getRawMany<{ month: string; revenue: string }>();
 
     return {
-      totalRevenue: parseFloat(totalResult?.total ?? '0'),
+      revenue12Months: parseFloat(totalResult?.total ?? '0'),
       monthlyRevenue: monthlyResult.map((r) => ({
         month: r.month,
         revenue: parseFloat(r.revenue),
