@@ -319,6 +319,11 @@ export class OrdersService {
       if (dto.trackingUrl !== undefined)
         order.trackingUrl = dto.trackingUrl ?? null;
       if (dto.shippingAddressId !== undefined) {
+        if (order.customerId == null) {
+          throw new BadRequestException(
+            'Cannot change shipping address on a guest order',
+          );
+        }
         const address = await em.findOne(Address, {
           where: { id: dto.shippingAddressId },
         });
@@ -328,12 +333,16 @@ export class OrdersService {
           );
         }
         order.shippingAddressId = dto.shippingAddressId;
+        order.shippingSnapshot = null;
       }
       if (dto.shippingCost !== undefined)
         order.nominalShippingCost = dto.shippingCost;
 
       if (dto.removeItemIds?.length) {
-        const remaining = order.lineItems.length - dto.removeItemIds.length;
+        const validCount = order.lineItems.filter((li) =>
+          dto.removeItemIds!.includes(li.id),
+        ).length;
+        const remaining = order.lineItems.length - validCount;
         if (remaining < 1) {
           throw new BadRequestException(
             'Cannot remove all line items from an order',
@@ -349,6 +358,15 @@ export class OrdersService {
       }
 
       if (dto.updateItems?.length) {
+        const updatedLineItems = order.lineItems.filter((li) =>
+          dto.updateItems!.some((upd) => upd.id === li.id),
+        );
+        const updateProductIds = [...new Set(updatedLineItems.map((li) => li.productId))];
+        const updateProducts = await em.find(Product, {
+          where: { id: In(updateProductIds) },
+        });
+        const updateProductMap = new Map(updateProducts.map((p) => [p.id, p]));
+
         for (const upd of dto.updateItems) {
           const li = order.lineItems.find((li) => li.id === upd.id);
           if (!li)
@@ -362,9 +380,7 @@ export class OrdersService {
             quantity: li.quantity,
             discount: li.discount,
           });
-          const product = await em.findOne(Product, {
-            where: { id: li.productId },
-          });
+          const product = updateProductMap.get(li.productId);
           li.isFulfillable = this.calc.isFulfillable(
             product?.stock ?? null,
             li.quantity,
@@ -410,10 +426,12 @@ export class OrdersService {
       order.updatedBy = updatedBy;
       await this.recalculateAndSaveOrder(order, em);
 
-      return em.findOne(Order, {
+      const result = await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true, customer: true, shippingAddress: true },
-      }) as Promise<Order>;
+      });
+      if (!result) throw new NotFoundException(`Order ${id} not found`);
+      return result;
     });
   }
 

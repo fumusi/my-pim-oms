@@ -76,6 +76,7 @@ export function OrderDetailPage() {
     selectedStatus !== '' ? selectedStatus : nextStatuses[0]
 
   const subtotal = order.lineItems.reduce((sum, li) => sum + (li.lineTotalExclVat ?? 0), 0)
+  const shippingAddr = order.shippingAddress ?? order.shippingSnapshot
 
   return (
     <div className="cust-detail-page">
@@ -176,19 +177,16 @@ export function OrderDetailPage() {
                 </div>
               </>
             )}
-            {(order.shippingAddress ?? order.shippingSnapshot) && (() => {
-              const addr = order.shippingAddress ?? order.shippingSnapshot!
-              return (
-                <div className="cust-detail-field">
-                  <span className="modal-label">Shipping address</span>
-                  <span className="cust-detail-value">
-                    {addr.street} {addr.houseNumber},{' '}
-                    {addr.postalCode} {addr.city},{' '}
-                    {addr.country}
-                  </span>
-                </div>
-              )
-            })()}
+            {shippingAddr && (
+              <div className="cust-detail-field">
+                <span className="modal-label">Shipping address</span>
+                <span className="cust-detail-value">
+                  {shippingAddr.street} {shippingAddr.houseNumber},{' '}
+                  {shippingAddr.postalCode} {shippingAddr.city},{' '}
+                  {shippingAddr.country}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="dash-card">

@@ -305,21 +305,24 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
         values.lineItems.filter((li) => li.existingItemId != null).map((li) => li.existingItemId!),
       )
 
-      body.removeItemIds = orig.lineItems
+      const removeItemIds = orig.lineItems
         .filter((li) => !formIds.has(li.id))
         .map((li) => li.id)
+      if (removeItemIds.length > 0) body.removeItemIds = removeItemIds
 
-      body.updateItems = values.lineItems
+      const updateItems = values.lineItems
         .filter((li) => li.existingItemId != null)
         .filter((li) => {
           const origLi = orig.lineItems.find((o) => o.id === li.existingItemId)
           return origLi && (li.quantity !== origLi.quantity || li.discount !== origLi.discount)
         })
         .map((li) => ({ id: li.existingItemId!, quantity: li.quantity, discount: li.discount }))
+      if (updateItems.length > 0) body.updateItems = updateItems
 
-      body.addItems = values.lineItems
+      const addItems = values.lineItems
         .filter((li) => li.existingItemId == null)
         .map((li) => ({ productId: li.productId, quantity: li.quantity, discount: li.discount }))
+      if (addItems.length > 0) body.addItems = addItems
 
       const res = await bulkEditOrder(orderId!, body)
       return res.data.id

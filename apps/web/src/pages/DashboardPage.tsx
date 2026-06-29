@@ -491,12 +491,15 @@ export function DashboardPage() {
                   Completed orders · last 12 months
                 </div>
               </div>
-              <div style={{ fontWeight: 700, fontSize: '1.15rem', color: '#e0e2f0' }}>
-                {revenueLoading ? (
-                  <span className="spinner-border spinner-border-sm" style={{ color: '#7c3aed' }} />
-                ) : (
-                  `€${(revenueData?.totalRevenue ?? 0).toFixed(2)}`
-                )}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, fontSize: '1.15rem', color: '#e0e2f0' }}>
+                  {revenueLoading ? (
+                    <span className="spinner-border spinner-border-sm" style={{ color: '#7c3aed' }} />
+                  ) : (
+                    `€${(revenueData?.totalRevenue ?? 0).toFixed(2)}`
+                  )}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#9396a5' }}>last 12 months</div>
               </div>
             </div>
 
