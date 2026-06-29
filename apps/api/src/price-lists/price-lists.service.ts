@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -34,8 +35,18 @@ export class PriceListsService {
 
   async findAll(
     query: FindPriceListsQueryDto,
+    scopedCustomerId?: number,
   ): Promise<{ data: PriceList[]; total: number; page: number; limit: number }> {
     const qb = this.plRepo.createQueryBuilder('pl');
+
+    if (scopedCustomerId != null) {
+      qb.innerJoin(
+        'customer_price_lists',
+        'cpl',
+        'cpl.price_list_id = pl.id AND cpl.customer_id = :cid',
+        { cid: scopedCustomerId },
+      );
+    }
 
     if (query.archived === true) {
       qb.where('pl.archivedAt IS NOT NULL');
@@ -66,11 +77,17 @@ export class PriceListsService {
 
   async findById(
     id: number,
+    scopedCustomerId?: number,
   ): Promise<PriceList & { items: PriceListItem[]; customerCount: number }> {
     const priceList = await this.plRepo.findOneBy({ id });
 
     if (!priceList) {
       throw new NotFoundException(`Price list ${id} not found`);
+    }
+
+    if (scopedCustomerId != null) {
+      const access = await this.cplRepo.findOneBy({ priceListId: id, customerId: scopedCustomerId });
+      if (!access) throw new ForbiddenException();
     }
 
     const items = await this.itemRepo
@@ -126,6 +143,9 @@ export class PriceListsService {
     const priceList = await this.plRepo.findOneBy({ id });
     if (!priceList) {
       throw new NotFoundException(`Price list ${id} not found`);
+    }
+    if (!priceList.archivedAt) {
+      throw new BadRequestException('Price list must be archived before it can be deleted');
     }
     await this.dataSource.transaction(async (em) => {
       const count = await em.count(CustomerPriceList, { where: { priceListId: id } });
@@ -268,7 +288,7 @@ export class PriceListsService {
       throw new NotFoundException(`Price list ${priceListId} not found`);
     }
 
-    return this.dataSource.transaction(async (em) => {
+    return this.dataSource.transaction('SERIALIZABLE', async (em) => {
       const existing = await em
         .createQueryBuilder(CustomerPriceList, 'cpl')
         .innerJoin('cpl.priceList', 'pl')

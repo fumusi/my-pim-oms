@@ -33,8 +33,9 @@ export class PriceListsController {
 
   @Get()
   @Roles(Role.Admin, Role.User)
-  findAll(@Query() query: FindPriceListsQueryDto) {
-    return this.service.findAll(query);
+  findAll(@Query() query: FindPriceListsQueryDto, @Req() req: AuthRequest) {
+    const scopedCustomerId = req.user.role === Role.Admin ? undefined : (req.user.customerId ?? undefined);
+    return this.service.findAll(query, scopedCustomerId);
   }
 
   @Get('resolve')
@@ -50,8 +51,9 @@ export class PriceListsController {
 
   @Get(':id')
   @Roles(Role.Admin, Role.User)
-  findById(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findById(id);
+  findById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    const scopedCustomerId = req.user.role === Role.Admin ? undefined : (req.user.customerId ?? undefined);
+    return this.service.findById(id, scopedCustomerId);
   }
 
   @Post()

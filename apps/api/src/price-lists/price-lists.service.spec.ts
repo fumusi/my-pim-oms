@@ -225,7 +225,10 @@ describe('PriceListsService.assignCustomer', () => {
         {
           provide: DataSource,
           useValue: {
-            transaction: jest.fn().mockImplementation((cb: (em: typeof mockEm) => Promise<unknown>) => cb(mockEm)),
+            transaction: jest.fn().mockImplementation((...args: unknown[]) => {
+              const cb = args[args.length - 1] as (em: typeof mockEm) => Promise<unknown>;
+              return cb(mockEm);
+            }),
           },
         },
       ],

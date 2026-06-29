@@ -10,8 +10,8 @@ export class RestoreUserIndexes1782741000000 implements MigrationInterface {
     );
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_users_customer_id"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_users_reset_token"`);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public async down(_queryRunner: QueryRunner): Promise<void> {
+    // intentionally empty — rolling back a "restore" migration would recreate the broken state
   }
 }
