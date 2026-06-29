@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -39,8 +40,11 @@ export class PriceListsController {
   @Get('resolve')
   @Roles(Role.Admin, Role.User)
   resolvePrice(@Query() query: ResolvePriceQueryDto, @Req() req: AuthRequest) {
+    if (req.user.role !== Role.Admin && req.user.customerId == null) {
+      throw new ForbiddenException('No customer account linked to this user');
+    }
     const customerId =
-      req.user.role === Role.Admin ? query.customerId : (req.user.customerId ?? query.customerId);
+      req.user.role === Role.Admin ? query.customerId : req.user.customerId!;
     return this.service.resolvePrice(query.productId, customerId);
   }
 

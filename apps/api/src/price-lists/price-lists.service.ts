@@ -127,13 +127,15 @@ export class PriceListsService {
     if (!priceList) {
       throw new NotFoundException(`Price list ${id} not found`);
     }
-    const count = await this.cplRepo.count({ where: { priceListId: id } });
-    if (count > 0) {
-      throw new BadRequestException(
-        `Cannot delete price list assigned to ${count} customer(s)`,
-      );
-    }
-    await this.plRepo.remove(priceList);
+    await this.dataSource.transaction(async (em) => {
+      const count = await em.count(CustomerPriceList, { where: { priceListId: id } });
+      if (count > 0) {
+        throw new BadRequestException(
+          `Cannot delete price list assigned to ${count} customer(s)`,
+        );
+      }
+      await em.remove(PriceList, priceList);
+    });
   }
 
   async archive(id: number, updatedBy: string): Promise<void> {
@@ -141,15 +143,17 @@ export class PriceListsService {
     if (!priceList) {
       throw new NotFoundException(`Price list ${id} not found`);
     }
-    const count = await this.cplRepo.count({ where: { priceListId: id } });
-    if (count > 0) {
-      throw new BadRequestException(
-        `Cannot archive price list assigned to ${count} customer(s)`,
-      );
-    }
-    priceList.archivedAt = new Date();
-    priceList.updatedBy = updatedBy;
-    await this.plRepo.save(priceList);
+    await this.dataSource.transaction(async (em) => {
+      const count = await em.count(CustomerPriceList, { where: { priceListId: id } });
+      if (count > 0) {
+        throw new BadRequestException(
+          `Cannot archive price list assigned to ${count} customer(s)`,
+        );
+      }
+      priceList.archivedAt = new Date();
+      priceList.updatedBy = updatedBy;
+      await em.save(PriceList, priceList);
+    });
   }
 
   async addItem(
@@ -242,8 +246,10 @@ export class PriceListsService {
       try {
         await this.itemRepo.save(batch);
       } catch (err) {
-        if (err instanceof QueryFailedError && (err as any).code === '23505') {
-          throw new BadRequestException('Duplicate product detected — concurrent request conflict');
+        if (err instanceof QueryFailedError) {
+          const code = (err as any).code;
+          if (code === '23505') throw new BadRequestException('Duplicate product detected — concurrent request conflict');
+          if (code === '23503') throw new BadRequestException('One or more products not found');
         }
         throw err;
       }
@@ -314,6 +320,7 @@ export class PriceListsService {
       .innerJoinAndSelect('cpl.priceList', 'pl')
       .where('cpl.customerId = :customerId', { customerId })
       .andWhere('pl.status = :status', { status: PriceListStatus.Active })
+      .andWhere('pl.archivedAt IS NULL')
       .andWhere('(pl.start_date IS NULL OR pl.start_date <= CURRENT_DATE)')
       .andWhere('(pl.end_date IS NULL OR pl.end_date >= CURRENT_DATE)')
       .getOne();
