@@ -51,7 +51,7 @@ export class PriceListsController {
     const customerId =
       req.user.role === Role.Admin ? query.customerId : req.user.customerId!;
     if (customerId == null) {
-      throw new BadRequestException('customerId is required for admin requests');
+      throw new BadRequestException('customerId is required');
     }
     return this.service.resolvePrice(query.productId, customerId);
   }

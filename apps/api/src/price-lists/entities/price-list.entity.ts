@@ -2,10 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { PriceListStatus } from '../../common/enums/price-list-status.enum';
+import { PriceListItem } from './price-list-item.entity';
 
 @Entity('price_lists')
 export class PriceList {
@@ -41,4 +43,7 @@ export class PriceList {
 
   @Column({ type: 'timestamptz', nullable: true, name: 'archived_at' })
   archivedAt!: Date | null;
+
+  @OneToMany(() => PriceListItem, (item) => item.priceList)
+  items!: PriceListItem[];
 }

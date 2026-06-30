@@ -19,38 +19,8 @@ import { AddProductModal } from '../components/AddProductModal'
 import { BulkAddModal } from '../components/BulkAddModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { AssignCustomerModal } from '../components/AssignCustomerModal'
-import { formatDate, getApiError } from '../utils/format'
-
-function StatusBadge({ status, archivedAt }: { status: string; archivedAt: string | null }) {
-  if (archivedAt) return <span className="cust-status-badge cust-status-archived">Archived</span>
-  if (status === 'active') return <span className="cust-status-badge cust-status-active">Active</span>
-  return <span className="cust-status-badge cust-status-inactive">Inactive</span>
-}
-
-function ActiveNowBadge({ status, archivedAt, startDate, endDate }: { status: string; archivedAt: string | null; startDate: string | null; endDate: string | null }) {
-  const today = new Date().toISOString().slice(0, 10)
-  const afterStart = !startDate || today >= startDate
-  const beforeEnd = !endDate || today <= endDate
-  if (archivedAt || status !== 'active' || !afterStart || !beforeEnd) return null
-  return <span className="cust-status-badge cust-status-active" style={{ fontSize: '0.7rem' }}>Active now</span>
-}
-
-function SectionCard({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <div className="dash-card">
-      <div className="cust-section-header">
-        <div className="dash-card-title">{title}</div>
-        {action}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function calcEffectivePrice(customPrice: number, discount: number | null): number {
-  if (discount == null) return customPrice
-  return parseFloat((customPrice * (1 - discount / 100)).toFixed(4))
-}
+import { PriceListStatusBadge, PriceListActiveNowBadge, PriceListSectionCard } from '../components/PriceListBadges'
+import { formatDate, getApiError, calcEffectivePrice } from '../utils/format'
 
 function resolveProductName(item: PriceListItem): string {
   return item.product?.name?.en ?? item.product?.name?.nl ?? `Product #${item.productId}`
@@ -93,7 +63,11 @@ export function PriceListDetailPage() {
 
   const archiveMutation = useMutation({
     mutationFn: () => archivePriceList(priceListId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['price-list', priceListId] }); toast.success('Archived') },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['price-list', priceListId] })
+      toast.success('Archived')
+      setArchiveConfirmOpen(false)
+    },
     onError: (err) => toast.error(getApiError(err)),
   })
 
@@ -136,8 +110,8 @@ export function PriceListDetailPage() {
         <div className="cust-detail-header-left">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h1 className="cust-detail-name">{pl.name}</h1>
-            <StatusBadge status={pl.status} archivedAt={pl.archivedAt} />
-            <ActiveNowBadge status={pl.status} archivedAt={pl.archivedAt} startDate={pl.startDate} endDate={pl.endDate} />
+            <PriceListStatusBadge status={pl.status} archivedAt={pl.archivedAt} />
+            <PriceListActiveNowBadge status={pl.status} archivedAt={pl.archivedAt} startDate={pl.startDate} endDate={pl.endDate} />
           </div>
           {pl.description && <div className="users-td-muted" style={{ marginTop: 4 }}>{pl.description}</div>}
         </div>
@@ -161,23 +135,23 @@ export function PriceListDetailPage() {
       </div>
 
       <div className="cust-detail-grid">
-        <SectionCard title="General information">
+        <PriceListSectionCard title="General information">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0' }}>
             {pl.startDate && <div className="cust-detail-field"><span className="modal-label">Start date</span><span className="cust-detail-value">{pl.startDate}</span></div>}
             {pl.endDate && <div className="cust-detail-field"><span className="modal-label">End date</span><span className="cust-detail-value">{pl.endDate}</span></div>}
             <div className="cust-detail-field"><span className="modal-label">Created</span><span className="cust-detail-value">{formatDate(pl.createdAt)}{pl.createdBy ? ` by ${pl.createdBy}` : ''}</span></div>
             <div className="cust-detail-field"><span className="modal-label">Updated</span><span className="cust-detail-value">{formatDate(pl.updatedAt)}{pl.updatedBy ? ` by ${pl.updatedBy}` : ''}</span></div>
           </div>
-        </SectionCard>
-        <SectionCard title="Overview">
+        </PriceListSectionCard>
+        <PriceListSectionCard title="Overview">
           <div style={{ padding: '12px 0' }}>
             <div className="cust-detail-field"><span className="modal-label">Products</span><span className="cust-detail-value">{pl.items.length}</span></div>
             <div className="cust-detail-field"><span className="modal-label">Assigned customers</span><span className="cust-detail-value">{pl.customerCount}</span></div>
           </div>
-        </SectionCard>
+        </PriceListSectionCard>
       </div>
 
-      <SectionCard
+      <PriceListSectionCard
         title="Products"
         action={isAdmin ? (
           <div style={{ display: 'flex', gap: 8 }}>
@@ -285,10 +259,10 @@ export function PriceListDetailPage() {
             </table>
           </div>
         )}
-      </SectionCard>
+      </PriceListSectionCard>
 
       {isAdmin && (
-        <SectionCard
+        <PriceListSectionCard
           title="Assigned Customers"
           action={isAdmin && !pl.archivedAt ? (
             <button className="exact-btn exact-btn-primary" onClick={() => setAssignCustomerOpen(true)}>
@@ -330,7 +304,7 @@ export function PriceListDetailPage() {
               </table>
             </div>
           )}
-        </SectionCard>
+        </PriceListSectionCard>
       )}
 
       {archiveConfirmOpen && (
@@ -340,7 +314,7 @@ export function PriceListDetailPage() {
           confirmLabel="Archive"
           danger
           loading={archiveMutation.isPending}
-          onConfirm={() => { archiveMutation.mutate(); setArchiveConfirmOpen(false) }}
+          onConfirm={() => archiveMutation.mutate()}
           onCancel={() => setArchiveConfirmOpen(false)}
         />
       )}

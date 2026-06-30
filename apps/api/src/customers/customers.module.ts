@@ -5,14 +5,13 @@ import { Contact } from './entities/contact.entity';
 import { Address } from './entities/address.entity';
 import { User } from '../users/entities/user.entity';
 import { PriceList } from '../price-lists/entities/price-list.entity';
-import { PriceListItem } from '../price-lists/entities/price-list-item.entity';
 import { CustomerPriceList } from '../price-lists/entities/customer-price-list.entity';
 import { CustomersController } from './customers.controller';
 import { CustomersService } from './customers.service';
 import { CustomersScheduleService } from './customers-schedule.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Customer, Contact, Address, User, PriceList, PriceListItem, CustomerPriceList])],
+  imports: [TypeOrmModule.forFeature([Customer, Contact, Address, User, PriceList, CustomerPriceList])],
   controllers: [CustomersController],
   providers: [CustomersService, CustomersScheduleService],
   exports: [CustomersService],

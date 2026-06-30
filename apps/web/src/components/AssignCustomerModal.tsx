@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCustomers, type Customer } from '../api/customers'
 import { assignCustomerToPriceList, getAssignedCustomerIds } from '../api/price-lists'
 import { getApiError } from '../utils/format'
+import { useDebounce } from '../hooks/useDebounce'
 
 interface Props {
   priceListId: number
@@ -14,23 +15,9 @@ interface Props {
 
 export function AssignCustomerModal({ priceListId, alreadyAssignedIds, onClose, onAssigned }: Props) {
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedSearch = useDebounce(search, 300)
   const [selected, setSelected] = useState<Customer | null>(null)
   const [isAssigning, setIsAssigning] = useState(false)
-
-  function handleSearchChange(value: string) {
-    setSearch(value)
-    if (debounceTimer) clearTimeout(debounceTimer)
-    const timer = setTimeout(() => setDebouncedSearch(value), 300)
-    setDebounceTimer(timer)
-  }
-
-  useEffect(() => {
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer)
-    }
-  }, [debounceTimer])
 
   const { data: customersData } = useQuery({
     queryKey: ['customers-for-assign', debouncedSearch],
@@ -69,7 +56,7 @@ export function AssignCustomerModal({ priceListId, alreadyAssignedIds, onClose, 
           className="modal-input"
           placeholder="Search customers…"
           value={search}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           autoFocus
           style={{ marginBottom: '0.5rem' }}
         />

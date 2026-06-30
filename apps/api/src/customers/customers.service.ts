@@ -12,7 +12,6 @@ import { Contact } from './entities/contact.entity';
 import { Address } from './entities/address.entity';
 import { User } from '../users/entities/user.entity';
 import { PriceList } from '../price-lists/entities/price-list.entity';
-import { PriceListItem } from '../price-lists/entities/price-list-item.entity';
 import { CustomerPriceList } from '../price-lists/entities/customer-price-list.entity';
 import { CustomerStatus } from '../common/enums/customer-status.enum';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
@@ -54,7 +53,6 @@ export class CustomersService {
     @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(CustomerPriceList) private readonly cplRepo: Repository<CustomerPriceList>,
-    @InjectRepository(PriceListItem) private readonly plItemRepo: Repository<PriceListItem>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -377,17 +375,13 @@ export class CustomersService {
     const cpl = await this.cplRepo
       .createQueryBuilder('cpl')
       .innerJoinAndSelect('cpl.priceList', 'pl')
+      .leftJoinAndSelect('pl.items', 'pli')
+      .leftJoinAndSelect('pli.product', 'p')
       .where('cpl.customerId = :customerId', { customerId })
       .orderBy('cpl.assignedAt', 'DESC')
       .getOne();
 
     if (!cpl) return null;
-
-    const items = await this.plItemRepo
-      .createQueryBuilder('pli')
-      .leftJoinAndSelect('pli.product', 'p')
-      .where('pli.priceListId = :id', { id: cpl.priceListId })
-      .getMany();
 
     return {
       id: cpl.priceList.id,
@@ -397,7 +391,7 @@ export class CustomersService {
       endDate: cpl.priceList.endDate,
       archivedAt: cpl.priceList.archivedAt,
       assignedAt: cpl.assignedAt,
-      items: items.map((item) => ({
+      items: (cpl.priceList.items ?? []).map((item) => ({
         id: item.id,
         productId: item.productId,
         customPrice: item.customPrice,

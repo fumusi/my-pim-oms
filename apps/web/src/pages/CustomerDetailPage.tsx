@@ -1,4 +1,4 @@
-import { useState, Fragment, useEffect } from 'react'
+import { useState, Fragment } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -28,17 +28,9 @@ import {
 import { getPriceLists, assignCustomerToPriceList, unassignCustomerFromPriceList } from '../api/price-lists'
 import { getUsers, adminUpdateUser } from '../api/admin'
 import { formatDate, getApiError } from '../utils/format'
+import { useDebounce } from '../hooks/useDebounce'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CustomerDrawer } from '../components/CustomerDrawer'
-
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
-  return debounced
-}
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -370,6 +362,7 @@ export function CustomerDetailPage() {
       assignCustomerToPriceList(priceListId, customerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-price-list', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['price-lists'] })
       setShowPlPicker(false)
       toast.success('Price list assigned')
     },

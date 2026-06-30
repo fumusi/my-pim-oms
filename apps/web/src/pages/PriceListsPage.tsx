@@ -5,47 +5,10 @@ import { useSelector } from 'react-redux'
 import type { RootState } from '../store'
 import {
   getPriceLists,
-  type PriceList,
   type PriceListStatus,
 } from '../api/price-lists'
 import { PriceListDrawer } from '../components/PriceListDrawer'
-
-function StatusBadge({
-  status,
-  archivedAt,
-}: {
-  status: PriceListStatus
-  archivedAt: string | null
-}) {
-  if (archivedAt) return <span className="cust-status-badge cust-status-archived">Archived</span>
-  if (status === 'active') return <span className="cust-status-badge cust-status-active">Active</span>
-  return <span className="cust-status-badge cust-status-inactive">Inactive</span>
-}
-
-function ActiveNowBadge({
-  status,
-  archivedAt,
-  startDate,
-  endDate,
-}: {
-  status: PriceListStatus
-  archivedAt: string | null
-  startDate: string | null
-  endDate: string | null
-}) {
-  const today = new Date().toISOString().slice(0, 10)
-  const afterStart = !startDate || today >= startDate
-  const beforeEnd = !endDate || today <= endDate
-  if (archivedAt || status !== 'active' || !afterStart || !beforeEnd) return null
-  return (
-    <span
-      className="cust-status-badge cust-status-active"
-      style={{ marginLeft: 6, fontSize: '0.7rem' }}
-    >
-      Active now
-    </span>
-  )
-}
+import { PriceListStatusBadge, PriceListActiveNowBadge } from '../components/PriceListBadges'
 
 export function PriceListsPage() {
   const queryClient = useQueryClient()
@@ -79,7 +42,6 @@ export function PriceListsPage() {
   })
 
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<PriceList | null>(null)
 
   function setFilter(
     updates: Partial<{ status: PriceListStatus | undefined; activeNow: boolean | undefined }>,
@@ -107,10 +69,7 @@ export function PriceListsPage() {
           {isAdmin && (
             <button
               className="exact-btn exact-btn-primary"
-              onClick={() => {
-                setEditTarget(null)
-                setDrawerOpen(true)
-              }}
+              onClick={() => setDrawerOpen(true)}
             >
               + New price list
             </button>
@@ -205,12 +164,12 @@ export function PriceListsPage() {
                       )}
                     </td>
                     <td>
-                      <StatusBadge status={pl.status} archivedAt={pl.archivedAt} />
+                      <PriceListStatusBadge status={pl.status} archivedAt={pl.archivedAt} />
                     </td>
                     <td className="users-td-muted">{pl.startDate ?? '—'}</td>
                     <td className="users-td-muted">{pl.endDate ?? '—'}</td>
                     <td>
-                      <ActiveNowBadge status={pl.status} archivedAt={pl.archivedAt} startDate={pl.startDate} endDate={pl.endDate} />
+                      <PriceListActiveNowBadge status={pl.status} archivedAt={pl.archivedAt} startDate={pl.startDate} endDate={pl.endDate} />
                     </td>
                   </tr>
                 ))}
@@ -246,15 +205,11 @@ export function PriceListsPage() {
 
       {drawerOpen && (
         <PriceListDrawer
-          priceList={editTarget}
-          onClose={() => {
-            setDrawerOpen(false)
-            setEditTarget(null)
-          }}
+          priceList={null}
+          onClose={() => setDrawerOpen(false)}
           onSaved={() => {
             queryClient.invalidateQueries({ queryKey: ['price-lists'] })
             setDrawerOpen(false)
-            setEditTarget(null)
           }}
         />
       )}

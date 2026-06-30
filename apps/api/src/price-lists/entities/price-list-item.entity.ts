@@ -18,7 +18,7 @@ export class PriceListItem {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => PriceList, { onDelete: 'CASCADE' })
+  @ManyToOne(() => PriceList, (pl) => pl.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'price_list_id' })
   priceList!: PriceList;
 

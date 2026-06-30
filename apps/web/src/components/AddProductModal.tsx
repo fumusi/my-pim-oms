@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getPimProducts, type PimProduct } from '../api/pim-products'
 import { addPriceListItem } from '../api/price-lists'
 import { getApiError } from '../utils/format'
+import { useDebounce } from '../hooks/useDebounce'
 
 interface Props {
   priceListId: number
@@ -18,23 +19,11 @@ function resolveProductName(p: PimProduct): string {
 
 export function AddProductModal({ priceListId, existingProductIds, onClose, onAdded }: Props) {
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedSearch = useDebounce(search, 300)
   const [selected, setSelected] = useState<PimProduct | null>(null)
   const [customPrice, setCustomPrice] = useState('')
   const [discount, setDiscount] = useState('')
   const [isAdding, setIsAdding] = useState(false)
-
-  useEffect(() => {
-    return () => { if (debounceTimer) clearTimeout(debounceTimer) }
-  }, [debounceTimer])
-
-  function handleSearchChange(value: string) {
-    setSearch(value)
-    if (debounceTimer) clearTimeout(debounceTimer)
-    const timer = setTimeout(() => setDebouncedSearch(value), 300)
-    setDebounceTimer(timer)
-  }
 
   const { data } = useQuery({
     queryKey: ['pim-products-search', debouncedSearch],
@@ -69,7 +58,7 @@ export function AddProductModal({ priceListId, existingProductIds, onClose, onAd
           className="modal-input"
           placeholder="Search products…"
           value={search}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           autoFocus
         />
 
