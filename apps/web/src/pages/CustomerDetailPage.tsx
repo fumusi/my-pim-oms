@@ -31,6 +31,7 @@ import { formatDate, getApiError } from '../utils/format'
 import { useDebounce } from '../hooks/useDebounce'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CustomerDrawer } from '../components/CustomerDrawer'
+import { EntityHistory } from '../components/EntityHistory'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -1033,6 +1034,8 @@ export function CustomerDetailPage() {
               )}
             </SectionCard>
           )}
+
+          <EntityHistory entityType="Customer" entityId={customerId} />
 
           {removingPriceList && (
             <ConfirmModal

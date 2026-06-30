@@ -34,6 +34,7 @@ import { OrderDetailPage } from './pages/OrderDetailPage'
 import { OrderFormPage } from './pages/OrderFormPage'
 import { PriceListsPage } from './pages/PriceListsPage'
 import { PriceListDetailPage } from './pages/PriceListDetailPage'
+import { ActivityLogPage } from './pages/ActivityLogPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -274,6 +275,19 @@ const priceListsRoute = createRoute({
   component: PriceListsPage,
 })
 
+const activityLogRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/activity-log',
+  staticData: { title: 'Activity Log' },
+  beforeLoad: () => {
+    if (store.getState().auth.user?.role !== 'admin') {
+      toast.error('Access denied')
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: ActivityLogPage,
+})
+
 const customersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/customers',
@@ -319,6 +333,7 @@ const routeTree = rootRoute.addChildren([
     customerDetailRoute,
     priceListsRoute,
     priceListDetailRoute,
+    activityLogRoute,
   ]),
 ])
 

@@ -17,6 +17,7 @@ import { resolvePrice } from '../api/price-lists'
 import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ProductDrawer } from '../components/ProductDrawer'
+import { EntityHistory } from '../components/EntityHistory'
 
 // ── Small reusable pieces ─────────────────────────────────────────────────────
 
@@ -561,6 +562,8 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, search:
         </SectionCard>
 
       </div>
+
+      <EntityHistory entityType="Product" entityId={productId} />
 
       {/* Edit drawer */}
       {editOpen && (
