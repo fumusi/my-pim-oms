@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { AppException } from '../common/exceptions/app.exception';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Customer } from './entities/customer.entity';
 import { Contact } from './entities/contact.entity';
@@ -230,7 +229,7 @@ export class CustomersService {
     return this.dataSource.transaction(async (em) => {
       const count = await em.count(Contact, { where: { customerId } });
       if (count >= 10) {
-        throw new AppException('Cannot add more than 10 contacts');
+        throw new BadRequestException('Cannot add more than 10 contacts');
       }
       if (dto.isPrimary) {
         await em.createQueryBuilder()

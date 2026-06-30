@@ -18,7 +18,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const path = request.url;
+    const path = request.path;
     const method = request.method;
 
     let statusCode: number;
@@ -70,11 +70,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else {
       statusCode = 500;
       message = 'Internal server error';
-      const stack = exception instanceof Error ? exception.stack : String(exception);
-      this.logger.error(`[${method}] ${path} — ${statusCode} ${message}`, stack);
     }
 
-    this.logger.log(`[${method}] ${path} — ${statusCode} ${message}`);
+    const logLine = `[${method}] ${path} — ${statusCode} ${message}`;
+    if (statusCode >= 500) {
+      const stack = exception instanceof Error ? exception.stack : String(exception);
+      this.logger.error(logLine, stack);
+    } else {
+      this.logger.log(logLine);
+    }
 
     response.status(statusCode).json({
       statusCode,

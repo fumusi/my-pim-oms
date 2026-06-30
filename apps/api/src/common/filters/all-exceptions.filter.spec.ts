@@ -7,7 +7,7 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 const mockJson = jest.fn();
 const mockStatus = jest.fn().mockReturnValue({ json: mockJson });
 const mockGetResponse = jest.fn().mockReturnValue({ status: mockStatus });
-const mockGetRequest = jest.fn().mockReturnValue({ url: '/api/test', method: 'GET' });
+const mockGetRequest = jest.fn().mockReturnValue({ path: '/api/test', method: 'GET' });
 const mockSwitchToHttp = jest.fn().mockReturnValue({
   getResponse: mockGetResponse,
   getRequest: mockGetRequest,
@@ -27,6 +27,7 @@ describe('AllExceptionsFilter', () => {
       getResponse: mockGetResponse,
       getRequest: mockGetRequest,
     });
+
   });
 
   it('handles ZodValidationException with 400 and populated errors array', () => {
@@ -103,6 +104,34 @@ describe('AllExceptionsFilter', () => {
     const payload = mockJson.mock.calls[0][0];
     expect(payload.statusCode).toBe(500);
     expect(payload.message).toBe('Internal server error');
+    expect(payload.errors).toEqual([]);
+  });
+
+  it('handles QueryFailedError with unknown DB error code → 500', () => {
+    const err = new QueryFailedError('', [], new Error());
+    (err as any).code = '23000';
+
+    filter.catch(err, host);
+
+    expect(mockStatus).toHaveBeenCalledWith(500);
+    const payload = mockJson.mock.calls[0][0];
+    expect(payload.statusCode).toBe(500);
+    expect(payload.message).toBe('Database error');
+    expect(payload.errors).toEqual([]);
+  });
+
+  it('handles HttpException with array message field', () => {
+    const ex = new HttpException(
+      { message: ['email must be an email', 'name must not be empty'] },
+      HttpStatus.BAD_REQUEST,
+    );
+
+    filter.catch(ex, host);
+
+    expect(mockStatus).toHaveBeenCalledWith(400);
+    const payload = mockJson.mock.calls[0][0];
+    expect(payload.statusCode).toBe(400);
+    expect(payload.message).toBe('email must be an email, name must not be empty');
     expect(payload.errors).toEqual([]);
   });
 });
