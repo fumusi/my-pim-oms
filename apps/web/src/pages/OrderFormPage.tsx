@@ -18,6 +18,7 @@ import {
 import { getCustomers, getCustomer, type Address } from '../api/customers'
 import { getUsers } from '../api/admin'
 import { getPimProducts, getPimProductById, type PimProduct } from '../api/pim-products'
+import { resolvePrice } from '../api/price-lists'
 import { getApiError } from '../utils/format'
 import type { RootState } from '../store'
 
@@ -202,7 +203,16 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
     }).catch(() => toast.error('Failed to load product'))
   }, [prefillProductId, append, getValues])
 
+  const [priceSources, setPriceSources] = useState<Map<number, { source: 'price_list' | 'base_price'; priceListName?: string }>>(new Map())
+  const prevCustomerIdRef = useRef<number | undefined>(undefined)
   const [prefilled, setPrefilled] = useState(false)
+
+  useEffect(() => {
+    if (watchedCustomerId !== prevCustomerIdRef.current) {
+      prevCustomerIdRef.current = watchedCustomerId
+      if (prefilled) setPriceSources(new Map())
+    }
+  }, [watchedCustomerId, prefilled])
 
   useEffect(() => {
     if (!existingOrder || prefilled) return
@@ -751,18 +761,35 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
                         <div
                           key={p.id}
                           className={`order-form-product-item${alreadyAdded ? ' order-form-product-item--disabled' : ''}`}
-                          onMouseDown={() => {
+                          onMouseDown={async () => {
                             if (alreadyAdded) return
+                            setProductSearch('')
+                            setProductDropdownOpen(false)
+
+                            const customerId = watchedCustomerId ?? buyerCustomerId ?? undefined
+                            let unitPrice = p.basePrice ?? 0
+                            let resolvedSource: { source: 'price_list' | 'base_price'; priceListName?: string } = { source: 'base_price' }
+
+                            if (customerId != null) {
+                              try {
+                                const resolved = await resolvePrice(p.id, customerId)
+                                unitPrice = resolved.effectivePrice
+                                resolvedSource = { source: resolved.source, priceListName: resolved.priceListName }
+                              } catch {
+                                // fallback to base price silently
+                              }
+                            }
+
                             append({
                               productId: p.id,
                               productName: getProductName(p),
                               stock: p.stock,
                               quantity: 1,
-                              unitPrice: p.basePrice ?? 0,
+                              unitPrice,
                               discount: 0,
                             })
-                            setProductSearch('')
-                            setProductDropdownOpen(false)
+
+                            setPriceSources((prev) => new Map(prev).set(p.id, resolvedSource))
                           }}
                         >
                           <span style={{ color: '#e0e2f0', fontWeight: 500 }}>
@@ -836,8 +863,41 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
                                 </div>
                               )}
                             </td>
-                            <td className="users-td-muted">
-                              €{price.toFixed(2)}
+                            <td>
+                              {isAdmin ? (
+                                <div>
+                                  <input
+                                    className="modal-input"
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    style={{ width: '90px' }}
+                                    {...register(`lineItems.${idx}.unitPrice`, { valueAsNumber: true })}
+                                  />
+                                  {(() => {
+                                    const src = priceSources.get(field.productId)
+                                    if (!src) return null
+                                    return (
+                                      <div style={{ fontSize: '0.7rem', color: src.source === 'price_list' ? '#7c3aed' : '#6b6e87', marginTop: '2px' }}>
+                                        {src.source === 'price_list' ? `From price list: ${src.priceListName}` : 'Base price'}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="users-td-muted">€{price.toFixed(2)}</span>
+                                  {(() => {
+                                    const src = priceSources.get(field.productId)
+                                    if (!src) return null
+                                    return (
+                                      <div style={{ fontSize: '0.7rem', color: src.source === 'price_list' ? '#7c3aed' : '#6b6e87', marginTop: '2px' }}>
+                                        {src.source === 'price_list' ? `From: ${src.priceListName}` : 'Base price'}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              )}
                             </td>
                             <td>
                               {isAdmin ? (

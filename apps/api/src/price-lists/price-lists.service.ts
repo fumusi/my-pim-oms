@@ -204,7 +204,14 @@ export class PriceListsService {
       customPrice: dto.customPrice,
       discount: dto.discount ?? null,
     });
-    return this.itemRepo.save(item);
+    try {
+      return await this.itemRepo.save(item);
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+        throw new BadRequestException('Product already in this price list');
+      }
+      throw err;
+    }
   }
 
   async updateItem(
@@ -334,6 +341,28 @@ export class PriceListsService {
     await this.cplRepo.remove(cpl);
   }
 
+  async getAssignedCustomers(priceListId: number): Promise<Array<{
+    customerId: number;
+    customerName: string;
+    customerEmail: string;
+    assignedAt: Date;
+    assignedBy: string | null;
+  }>> {
+    const rows = await this.cplRepo
+      .createQueryBuilder('cpl')
+      .innerJoinAndSelect('cpl.customer', 'c')
+      .where('cpl.priceListId = :priceListId', { priceListId })
+      .orderBy('cpl.assignedAt', 'DESC')
+      .getMany();
+    return rows.map((r) => ({
+      customerId: r.customerId,
+      customerName: r.customer.name,
+      customerEmail: r.customer.email,
+      assignedAt: r.assignedAt,
+      assignedBy: r.assignedBy,
+    }));
+  }
+
   async resolvePrice(
     productId: number,
     customerId: number,
@@ -376,6 +405,15 @@ export class PriceListsService {
     }
 
     return { effectivePrice: product.basePrice ?? 0, source: 'base_price' };
+  }
+
+  async getAssignedCustomerIds(): Promise<number[]> {
+    const rows = await this.cplRepo
+      .createQueryBuilder('cpl')
+      .select('cpl.customerId', 'customerId')
+      .distinct(true)
+      .getRawMany<{ customerId: number }>();
+    return rows.map((r) => Number(r.customerId));
   }
 
   async deactivateExpiredPriceLists(): Promise<{ deactivated: number }> {

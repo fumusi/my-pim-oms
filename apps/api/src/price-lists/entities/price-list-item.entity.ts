@@ -18,18 +18,18 @@ export class PriceListItem {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => PriceList, { onDelete: 'CASCADE' })
+  @ManyToOne(() => PriceList, (pl) => pl.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'price_list_id' })
   priceList!: PriceList;
 
-  @Column({ name: 'price_list_id', insert: false, update: false })
+  @Column({ name: 'price_list_id' })
   priceListId!: number;
 
   @ManyToOne(() => Product, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
   product!: Product;
 
-  @Column({ name: 'product_id', insert: false, update: false })
+  @Column({ name: 'product_id' })
   productId!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 4, name: 'custom_price', transformer: decimalTransformer })

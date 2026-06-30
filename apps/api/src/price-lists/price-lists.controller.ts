@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -49,7 +50,22 @@ export class PriceListsController {
     }
     const customerId =
       req.user.role === Role.Admin ? query.customerId : req.user.customerId!;
+    if (customerId == null) {
+      throw new BadRequestException('customerId is required');
+    }
     return this.service.resolvePrice(query.productId, customerId);
+  }
+
+  @Get('assigned-customer-ids')
+  @Roles(Role.Admin)
+  getAssignedCustomerIds() {
+    return this.service.getAssignedCustomerIds();
+  }
+
+  @Get(':id/customers')
+  @Roles(Role.Admin)
+  getAssignedCustomers(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getAssignedCustomers(id);
   }
 
   @Get(':id')

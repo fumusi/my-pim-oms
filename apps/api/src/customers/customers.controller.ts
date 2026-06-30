@@ -42,6 +42,12 @@ export class CustomersController {
     return this.service.create(dto, req.user.email);
   }
 
+  @Get(':id/price-list')
+  @Roles(Role.Admin)
+  getCustomerPriceList(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getCustomerPriceList(id);
+  }
+
   @Get(':id')
   @Roles(Role.Admin, Role.User)
   async findOne(

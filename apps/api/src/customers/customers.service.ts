@@ -11,6 +11,8 @@ import { Customer } from './entities/customer.entity';
 import { Contact } from './entities/contact.entity';
 import { Address } from './entities/address.entity';
 import { User } from '../users/entities/user.entity';
+import { PriceList } from '../price-lists/entities/price-list.entity';
+import { CustomerPriceList } from '../price-lists/entities/customer-price-list.entity';
 import { CustomerStatus } from '../common/enums/customer-status.enum';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -50,6 +52,7 @@ export class CustomersService {
     @InjectRepository(Contact) private readonly contactRepo: Repository<Contact>,
     @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(CustomerPriceList) private readonly cplRepo: Repository<CustomerPriceList>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -366,6 +369,47 @@ export class CustomersService {
 
     address.isPrimary = true;
     return address;
+  }
+
+  async getCustomerPriceList(customerId: number) {
+    const cpl = await this.cplRepo
+      .createQueryBuilder('cpl')
+      .innerJoinAndSelect('cpl.priceList', 'pl')
+      .leftJoinAndSelect('pl.items', 'pli')
+      .leftJoinAndSelect('pli.product', 'p')
+      .where('cpl.customerId = :customerId', { customerId })
+      .orderBy('cpl.assignedAt', 'DESC')
+      .getOne();
+
+    if (!cpl) return null;
+
+    return {
+      id: cpl.priceList.id,
+      name: cpl.priceList.name,
+      status: cpl.priceList.status,
+      startDate: cpl.priceList.startDate,
+      endDate: cpl.priceList.endDate,
+      archivedAt: cpl.priceList.archivedAt,
+      assignedAt: cpl.assignedAt,
+      items: (cpl.priceList.items ?? []).map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        customPrice: item.customPrice,
+        discount: item.discount,
+        effectivePrice:
+          item.discount != null
+            ? parseFloat((item.customPrice * (1 - item.discount / 100)).toFixed(4))
+            : item.customPrice,
+        product: item.product
+          ? {
+              id: item.product.id,
+              name: item.product.name,
+              barcode: item.product.barcode,
+              basePrice: item.product.basePrice,
+            }
+          : null,
+      })),
+    };
   }
 
   async deactivateExpiredCustomers(): Promise<DeactivateResult> {

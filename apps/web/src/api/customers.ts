@@ -157,3 +157,31 @@ export const deleteAddress = (customerId: number, addressId: number) =>
 
 export const setPrimaryAddress = (customerId: number, addressId: number) =>
   api.patch<Address>(`/customers/${customerId}/addresses/${addressId}/primary`)
+
+export interface CustomerPriceListItem {
+  id: number
+  productId: number
+  customPrice: number
+  discount: number | null
+  effectivePrice: number
+  product: {
+    id: number
+    name: { nl?: string; en?: string; de?: string } | null
+    barcode: string | null
+    basePrice: number | null
+  } | null
+}
+
+export interface CustomerPriceList {
+  id: number
+  name: string
+  status: string
+  startDate: string | null
+  endDate: string | null
+  archivedAt: string | null
+  assignedAt: string
+  items: CustomerPriceListItem[]
+}
+
+export const getCustomerPriceList = (customerId: number) =>
+  api.get<CustomerPriceList | null>(`/customers/${customerId}/price-list`).then((r) => r.data)

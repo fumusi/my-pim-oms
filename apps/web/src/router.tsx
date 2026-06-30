@@ -32,6 +32,8 @@ import { CustomersPage } from './pages/CustomersPage'
 import { CustomerDetailPage } from './pages/CustomerDetailPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
 import { OrderFormPage } from './pages/OrderFormPage'
+import { PriceListsPage } from './pages/PriceListsPage'
+import { PriceListDetailPage } from './pages/PriceListDetailPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -248,6 +250,30 @@ const customerDetailRoute = createRoute({
   component: CustomerDetailPage,
 })
 
+const priceListDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/price-lists/$id',
+  staticData: { title: 'Price List' },
+  component: PriceListDetailPage,
+})
+
+const priceListsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/price-lists',
+  staticData: { title: 'Price Lists' },
+  validateSearch: (s: Record<string, unknown>) => ({
+    page: typeof s.page === 'number' && s.page >= 1 ? s.page : 1,
+    search: typeof s.search === 'string' ? s.search : undefined,
+    status:
+      s.status === 'active' || s.status === 'inactive'
+        ? (s.status as 'active' | 'inactive')
+        : undefined,
+    activeNow: s.activeNow === true || s.activeNow === 'true' ? true : undefined,
+    archived: s.archived === true || s.archived === 'true' ? true : undefined,
+  }),
+  component: PriceListsPage,
+})
+
 const customersRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/customers',
@@ -291,6 +317,8 @@ const routeTree = rootRoute.addChildren([
     usersRoute,
     customersRoute,
     customerDetailRoute,
+    priceListsRoute,
+    priceListDetailRoute,
   ]),
 ])
 
