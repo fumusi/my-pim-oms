@@ -8,6 +8,8 @@ import { ItemsService } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import { ProductsService } from '../products/products.service';
 
 const makeCategory = (overrides: Partial<Category> = {}): Category =>
   ({
@@ -55,12 +57,18 @@ describe('CategoriesService', () => {
     unassignFromCategory: jest.fn(),
   };
 
+  const productsService = {
+    findAll: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CategoriesService,
         { provide: getRepositoryToken(Category), useValue: categoryRepo },
         { provide: ItemsService, useValue: itemsService },
+        { provide: ProductsService, useValue: productsService },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 
@@ -117,16 +125,18 @@ describe('CategoriesService', () => {
 
     it('returns category with productCount and paginated products', async () => {
       const cat = makeCategory();
-      const paginatedProducts = { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } };
       categoryRepo.findOne.mockResolvedValue(cat);
-      itemsService.countByCategory.mockResolvedValue(5);
-      itemsService.findByCategoryId.mockResolvedValue(paginatedProducts);
+      productsService.findAll
+        .mockResolvedValueOnce({ total: 5, data: [] })
+        .mockResolvedValueOnce({ total: 5, data: [] });
 
       const result = await service.findOneDetail(1, 1, 20);
 
       expect(result?.productCount).toBe(5);
-      expect(result?.products).toBe(paginatedProducts);
-      expect(itemsService.findByCategoryId).toHaveBeenCalledWith(1, 1, 20, undefined);
+      expect(result?.products.meta.total).toBe(5);
+      expect(productsService.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ categoryId: 1, page: 1, limit: 1 }),
+      );
     });
   });
 
@@ -218,7 +228,7 @@ describe('CategoriesService', () => {
     it('throws EntityNotFoundError for a non-existent category', async () => {
       categoryRepo.findOneOrFail.mockRejectedValue(new EntityNotFoundError(Category, { id: 999 }));
 
-      await expect(service.delete(999)).rejects.toBeInstanceOf(EntityNotFoundError);
+      await expect(service.delete(999, 'admin@test.com')).rejects.toBeInstanceOf(EntityNotFoundError);
       expect(itemsService.countByCategory).not.toHaveBeenCalled();
     });
 
@@ -226,8 +236,8 @@ describe('CategoriesService', () => {
       categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
       itemsService.countByCategory.mockResolvedValue(3);
 
-      await expect(service.delete(1)).rejects.toBeInstanceOf(BadRequestException);
-      await expect(service.delete(1)).rejects.toMatchObject({
+      await expect(service.delete(1, 'admin@test.com')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.delete(1, 'admin@test.com')).rejects.toMatchObject({
         message: 'Cannot delete category: 3 products still assigned',
       });
       expect(categoryRepo.delete).not.toHaveBeenCalled();
@@ -237,7 +247,7 @@ describe('CategoriesService', () => {
       categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
       itemsService.countByCategory.mockResolvedValue(1);
 
-      await expect(service.delete(1)).rejects.toMatchObject({
+      await expect(service.delete(1, 'admin@test.com')).rejects.toMatchObject({
         message: 'Cannot delete category: 1 product still assigned',
       });
     });
@@ -247,7 +257,7 @@ describe('CategoriesService', () => {
       itemsService.countByCategory.mockResolvedValue(0);
       categoryRepo.delete.mockResolvedValue({ affected: 1 });
 
-      await service.delete(1);
+      await service.delete(1, 'admin@test.com');
 
       expect(categoryRepo.delete).toHaveBeenCalledWith(1);
     });

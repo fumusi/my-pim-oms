@@ -199,8 +199,8 @@ export class CategoriesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    await this.categoriesService.delete(id);
+  async delete(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    await this.categoriesService.delete(id, req.user.email);
   }
 
   // ── POST /categories/:id/assign ────────────────────────────────────────────────

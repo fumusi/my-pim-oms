@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { User } from './entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 import { RedisService } from '../redis/redis.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import type { UpdateMeDto } from './dto/update-me.dto';
 import type { AdminUpdateUserDto } from './dto/admin-update-user.dto';
@@ -56,6 +57,7 @@ export class UsersService {
     private readonly repo: Repository<User>,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
+    private readonly auditLogService: AuditLogService,
   ) {
     const raw = this.config.get<string>('JWT_EXPIRES_IN', '1h');
     this.accessTokenTtl = Math.floor(ms(raw as ms.StringValue) / 1000);
@@ -143,6 +145,7 @@ export class UsersService {
     adminId: number,
     targetId: number,
     dto: AdminUpdateUserDto,
+    performedBy?: string,
   ): Promise<UserProfile> {
     if (adminId === targetId) {
       throw new BadRequestException('Use /users/me to update your own account');
@@ -162,6 +165,15 @@ export class UsersService {
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     if (dto.customerId !== undefined) patch.customerId = dto.customerId;
 
+    const changedFields: Record<string, { old: unknown; new: unknown }> = {};
+    for (const key of Object.keys(patch) as (keyof Partial<User>)[]) {
+      const oldVal = (user as unknown as Record<string, unknown>)[key];
+      const newVal = (patch as unknown as Record<string, unknown>)[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changedFields[key] = { old: oldVal, new: newVal };
+      }
+    }
+
     await this.repo.update(targetId, patch);
 
     if (dto.isActive === false) {
@@ -171,10 +183,11 @@ export class UsersService {
       await this.redis.del(`bl:user:${targetId}`);
     }
 
+    void this.auditLogService.log('User', targetId, 'update', changedFields, performedBy ?? 'system');
     return this.toProfile({ ...user, ...patch });
   }
 
-  async adminDeleteUser(adminId: number, targetId: number): Promise<void> {
+  async adminDeleteUser(adminId: number, targetId: number, performedBy?: string): Promise<void> {
     if (adminId === targetId) {
       throw new BadRequestException('Admin cannot delete their own account');
     }
@@ -185,6 +198,7 @@ export class UsersService {
     await this.repo.update(targetId, { isActive: false });
     await this.redis.del(`rt:${targetId}`);
     await this.redis.set(`bl:user:${targetId}`, '1', this.accessTokenTtl);
+    void this.auditLogService.log('User', targetId, 'delete', null, performedBy ?? 'system', { snapshot: { ...user } });
   }
 
   getUserImportTemplate(): Buffer {

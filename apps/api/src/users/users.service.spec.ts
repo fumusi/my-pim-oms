@@ -6,6 +6,7 @@ import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
 import { RedisService } from '../redis/redis.service';
 import { Role } from '../common/enums/role.enum';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 const makeUser = (overrides: Partial<User> = {}): User =>
@@ -76,6 +77,7 @@ describe('UsersService', () => {
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: RedisService, useValue: redis },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('1h') } },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 
@@ -211,7 +213,7 @@ describe('UsersService', () => {
       repo.update.mockResolvedValue({});
       redis.del.mockResolvedValue(undefined);
 
-      const result = await service.adminUpdateUser(2, 1, { role: Role.Admin });
+      const result = await service.adminUpdateUser(2, 1, { role: Role.Admin }, 'admin@test.com');
 
       expect(repo.update).toHaveBeenCalledWith(
         1,

@@ -182,8 +182,8 @@ export class PriceListsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Price list not found' })
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.service.delete(id);
+  delete(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.service.delete(id, req.user.email);
   }
 
   @Post(':id/items/bulk')

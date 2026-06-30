@@ -116,8 +116,8 @@ export class ProductsController {
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  bulkArchive(@Body() dto: BulkArchiveDto) {
-    return this.productsService.bulkArchive(dto.ids);
+  bulkArchive(@Body() dto: BulkArchiveDto, @Req() req: AuthRequest) {
+    return this.productsService.bulkArchive(dto.ids, req.user.email);
   }
 
   @Patch('bulk/status')
@@ -128,8 +128,8 @@ export class ProductsController {
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  bulkUpdateStatus(@Body() dto: BulkStatusDto) {
-    return this.productsService.bulkUpdateStatus(dto.ids, dto.status);
+  bulkUpdateStatus(@Body() dto: BulkStatusDto, @Req() req: AuthRequest) {
+    return this.productsService.bulkUpdateStatus(dto.ids, dto.status, req.user.email);
   }
 
   @Delete('bulk')
@@ -139,8 +139,8 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Products deleted' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  bulkRemove(@Body() dto: BulkDeleteDto) {
-    return this.productsService.bulkRemove(dto.ids);
+  bulkRemove(@Body() dto: BulkDeleteDto, @Req() req: AuthRequest) {
+    return this.productsService.bulkRemove(dto.ids, req.user.email);
   }
 
   @Get(':id')
@@ -187,8 +187,8 @@ export class ProductsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.productsService.remove(id, req.user.email);
   }
 
   @Patch(':id/archive')
@@ -200,8 +200,8 @@ export class ProductsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  archive(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.archive(id);
+  archive(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.productsService.archive(id, req.user.email);
   }
 
   @Patch(':id/status')
@@ -217,8 +217,9 @@ export class ProductsController {
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProductStatusDto,
+    @Req() req: AuthRequest,
   ) {
-    return this.productsService.updateStatus(id, dto.status);
+    return this.productsService.updateStatus(id, dto.status, req.user.email);
   }
 
   private flattenLang(product: Product, lang: string): object {

@@ -8,6 +8,7 @@ import { PriceListItem } from './entities/price-list-item.entity';
 import { CustomerPriceList } from './entities/customer-price-list.entity';
 import { Product } from '../products/entities/product.entity';
 import { PriceListStatus } from '../common/enums/price-list-status.enum';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 function makeCplQbMock(result: CustomerPriceList | null = null) {
   const qb = {
@@ -100,6 +101,7 @@ describe('PriceListsService.resolvePrice', () => {
         { provide: getRepositoryToken(CustomerPriceList), useValue: cplRepo },
         { provide: getRepositoryToken(Product), useValue: productRepo },
         { provide: DataSource, useValue: {} },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 
@@ -231,6 +233,7 @@ describe('PriceListsService.assignCustomer', () => {
             }),
           },
         },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 

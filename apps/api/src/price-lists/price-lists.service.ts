@@ -11,6 +11,7 @@ import { PriceListItem } from './entities/price-list-item.entity';
 import { CustomerPriceList } from './entities/customer-price-list.entity';
 import { Product } from '../products/entities/product.entity';
 import { PriceListStatus } from '../common/enums/price-list-status.enum';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { CreatePriceListDto } from './dto/create-price-list.dto';
 import { UpdatePriceListDto } from './dto/update-price-list.dto';
 import { FindPriceListsQueryDto } from './dto/find-price-lists-query.dto';
@@ -31,6 +32,7 @@ export class PriceListsService {
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
     private readonly dataSource: DataSource,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async findAll(
@@ -103,7 +105,9 @@ export class PriceListsService {
 
   async create(dto: CreatePriceListDto, createdBy: string): Promise<PriceList> {
     const priceList = this.plRepo.create({ ...dto, createdBy });
-    return this.plRepo.save(priceList);
+    const saved = await this.plRepo.save(priceList);
+    void this.auditLogService.log('PriceList', saved.id, 'create', null, createdBy, { snapshot: { ...saved } });
+    return saved;
   }
 
   async update(
@@ -116,13 +120,35 @@ export class PriceListsService {
       throw new NotFoundException(`Price list ${id} not found`);
     }
 
-    if (dto.name !== undefined) priceList.name = dto.name;
-    if (dto.description !== undefined) priceList.description = dto.description ?? null;
-    if (dto.startDate !== undefined) priceList.startDate = dto.startDate ?? null;
-    if (dto.endDate !== undefined) priceList.endDate = dto.endDate ?? null;
+    const changedFields: Record<string, { old: unknown; new: unknown }> = {};
+
+    if (dto.name !== undefined) {
+      if (priceList.name !== dto.name) changedFields['name'] = { old: priceList.name, new: dto.name };
+      priceList.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      if (JSON.stringify(priceList.description) !== JSON.stringify(dto.description ?? null)) {
+        changedFields['description'] = { old: priceList.description, new: dto.description ?? null };
+      }
+      priceList.description = dto.description ?? null;
+    }
+    if (dto.startDate !== undefined) {
+      if (JSON.stringify(priceList.startDate) !== JSON.stringify(dto.startDate ?? null)) {
+        changedFields['startDate'] = { old: priceList.startDate, new: dto.startDate ?? null };
+      }
+      priceList.startDate = dto.startDate ?? null;
+    }
+    if (dto.endDate !== undefined) {
+      if (JSON.stringify(priceList.endDate) !== JSON.stringify(dto.endDate ?? null)) {
+        changedFields['endDate'] = { old: priceList.endDate, new: dto.endDate ?? null };
+      }
+      priceList.endDate = dto.endDate ?? null;
+    }
 
     priceList.updatedBy = updatedBy;
-    return this.plRepo.save(priceList);
+    const saved = await this.plRepo.save(priceList);
+    void this.auditLogService.log('PriceList', id, 'update', changedFields, updatedBy);
+    return saved;
   }
 
   async updateStatus(
@@ -134,12 +160,15 @@ export class PriceListsService {
     if (!priceList) {
       throw new NotFoundException(`Price list ${id} not found`);
     }
+    const oldStatus = priceList.status;
     priceList.status = status;
     priceList.updatedBy = updatedBy;
-    return this.plRepo.save(priceList);
+    const saved = await this.plRepo.save(priceList);
+    void this.auditLogService.log('PriceList', id, 'status_change', null, updatedBy, { from: oldStatus, to: status });
+    return saved;
   }
 
-  async delete(id: number): Promise<void> {
+  async delete(id: number, performedBy?: string): Promise<void> {
     const priceList = await this.plRepo.findOneBy({ id });
     if (!priceList) {
       throw new NotFoundException(`Price list ${id} not found`);
@@ -147,6 +176,7 @@ export class PriceListsService {
     if (!priceList.archivedAt) {
       throw new BadRequestException('Price list must be archived before it can be deleted');
     }
+    const snapshot = { ...priceList };
     await this.dataSource.transaction(async (em) => {
       const count = await em.count(CustomerPriceList, { where: { priceListId: id } });
       if (count > 0) {
@@ -156,6 +186,7 @@ export class PriceListsService {
       }
       await em.remove(PriceList, priceList);
     });
+    void this.auditLogService.log('PriceList', id, 'delete', null, performedBy ?? 'system', { snapshot });
   }
 
   async archive(id: number, updatedBy: string): Promise<void> {
@@ -174,6 +205,7 @@ export class PriceListsService {
       priceList.updatedBy = updatedBy;
       await em.save(PriceList, priceList);
     });
+    void this.auditLogService.log('PriceList', id, 'archive', null, updatedBy, { snapshot: { ...priceList } });
   }
 
   async addItem(

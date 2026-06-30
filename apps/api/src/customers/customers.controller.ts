@@ -133,8 +133,8 @@ export class CustomersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.service.remove(id, req.user.email);
   }
 
   @Patch(':id/archive')
@@ -146,8 +146,8 @@ export class CustomersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
-  archive(@Param('id', ParseIntPipe) id: number) {
-    return this.service.archive(id);
+  archive(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
+    return this.service.archive(id, req.user.email);
   }
 
   @Post(':id/contacts')

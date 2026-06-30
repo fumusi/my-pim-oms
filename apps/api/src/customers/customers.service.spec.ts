@@ -6,7 +6,10 @@ import { CustomersService } from './customers.service';
 import { Customer } from './entities/customer.entity';
 import { Contact } from './entities/contact.entity';
 import { Address } from './entities/address.entity';
+import { User } from '../users/entities/user.entity';
+import { CustomerPriceList } from '../price-lists/entities/customer-price-list.entity';
 import { CustomerStatus } from '../common/enums/customer-status.enum';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 function makeQbMock(result: [Customer[], number] = [[], 0]) {
   const qb: Record<string, jest.Mock> = {
@@ -140,7 +143,10 @@ describe('CustomersService', () => {
         { provide: getRepositoryToken(Customer), useValue: customerRepo },
         { provide: getRepositoryToken(Contact), useValue: contactRepo },
         { provide: getRepositoryToken(Address), useValue: addressRepo },
+        { provide: getRepositoryToken(User), useValue: { find: jest.fn().mockResolvedValue([]) } },
+        { provide: getRepositoryToken(CustomerPriceList), useValue: { createQueryBuilder: jest.fn(), findOneBy: jest.fn() } },
         { provide: DataSource, useValue: dataSource },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 
