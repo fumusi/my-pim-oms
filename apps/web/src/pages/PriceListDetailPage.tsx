@@ -42,8 +42,8 @@ export function PriceListDetailPage() {
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [editPrice, setEditPrice] = useState('')
   const [editDiscount, setEditDiscount] = useState('')
-  const [removeItemTarget, setRemoveItemTarget] = useState<number | null>(null)
-  const [unassignTarget, setUnassignTarget] = useState<number | null>(null)
+  const [removeItemTarget, setRemoveItemTarget] = useState<PriceListItem | null>(null)
+  const [unassignTarget, setUnassignTarget] = useState<{ customerId: number; customerName: string } | null>(null)
 
   const { data: pl, isLoading, isError } = useQuery({
     queryKey: ['price-list', priceListId],
@@ -253,7 +253,8 @@ export function PriceListDetailPage() {
                             >Edit</button>
                             <button
                               className="cust-sub-btn cust-sub-btn-danger"
-                              onClick={() => setRemoveItemTarget(item.id)}
+                              disabled={removeItemMutation.isPending}
+                              onClick={() => setRemoveItemTarget(item)}
                             >Remove</button>
                           </div>
                         </td>
@@ -300,7 +301,8 @@ export function PriceListDetailPage() {
                       <td>
                         <button
                           className="cust-sub-btn cust-sub-btn-danger"
-                          onClick={() => setUnassignTarget(c.customerId)}
+                          disabled={unassignMutation.isPending}
+                          onClick={() => setUnassignTarget({ customerId: c.customerId, customerName: c.customerName })}
                         >Remove</button>
                       </td>
                     </tr>
@@ -327,11 +329,11 @@ export function PriceListDetailPage() {
       {removeItemTarget != null && (
         <ConfirmModal
           title="Remove product"
-          message="Remove this product from the price list?"
+          message={`Remove "${resolveProductName(removeItemTarget)}" from this price list?`}
           confirmLabel="Remove"
           danger
           loading={removeItemMutation.isPending}
-          onConfirm={() => removeItemMutation.mutate(removeItemTarget)}
+          onConfirm={() => removeItemMutation.mutate(removeItemTarget.id)}
           onCancel={() => setRemoveItemTarget(null)}
         />
       )}
@@ -339,11 +341,11 @@ export function PriceListDetailPage() {
       {unassignTarget != null && (
         <ConfirmModal
           title="Unassign customer"
-          message="Remove this customer from the price list?"
+          message={`Remove "${unassignTarget.customerName}" from this price list?`}
           confirmLabel="Remove"
           danger
           loading={unassignMutation.isPending}
-          onConfirm={() => unassignMutation.mutate(unassignTarget)}
+          onConfirm={() => unassignMutation.mutate(unassignTarget.customerId)}
           onCancel={() => setUnassignTarget(null)}
         />
       )}

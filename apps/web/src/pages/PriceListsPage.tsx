@@ -108,7 +108,7 @@ export function PriceListsPage() {
             <input
               type="checkbox"
               checked={activeNow ?? false}
-              onChange={(e) => setFilter({ activeNow: e.target.checked || undefined })}
+              onChange={(e) => setFilter({ activeNow: e.target.checked || undefined, archived: undefined })}
             />
             Currently active
           </label>
