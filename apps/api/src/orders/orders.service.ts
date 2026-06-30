@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AppException } from '../common/exceptions/app.exception';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
@@ -673,7 +674,7 @@ export class OrdersService {
     }
 
     if (order.archivedAt != null) {
-      throw new BadRequestException('Order is already archived');
+      throw new AppException('Order is already archived');
     }
 
     order.archiveReason = reason;

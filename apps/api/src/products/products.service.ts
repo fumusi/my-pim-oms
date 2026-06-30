@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { AppException } from '../common/exceptions/app.exception';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { Product } from './entities/product.entity';
@@ -133,7 +134,7 @@ export class ProductsService {
     // Placeholder: replace with real query once the orders module is implemented
     const orderCount = await this.countOrderReferences(id, false);
     if (orderCount > 0) {
-      throw new BadRequestException('Cannot delete product referenced in an order');
+      throw new AppException('Cannot delete product referenced in an order');
     }
 
     await this.repo.remove(product);
