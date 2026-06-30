@@ -191,7 +191,7 @@ export class PriceListsController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Bulk add products to price list (admin)' })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Products added to price list' })
+  @ApiResponse({ status: 201, description: 'Products added to price list' })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
