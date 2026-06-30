@@ -1,10 +1,12 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../common/decorators/public.decorator';
 import type { Response } from 'express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -14,6 +16,9 @@ export class HealthController {
 
   @Get()
   @Public()
+  @ApiOperation({ summary: 'Health check' })
+  @ApiResponse({ status: 200, description: 'All systems healthy' })
+  @ApiResponse({ status: 503, description: 'One or more systems degraded' })
   async check(@Res({ passthrough: true }) res: Response) {
     const [db, redis] = await Promise.all([
       this.checkDb(),

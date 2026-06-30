@@ -16,6 +16,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Request } from 'express';
@@ -29,6 +30,7 @@ import { UpdateMeDto } from './dto/update-me.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { FindUsersQueryDto } from './dto/pagination.dto';
 
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -36,11 +38,20 @@ export class UsersController {
   // ── Self-service endpoints (all roles) ──────────────────────────────────────
 
   @Get('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get own profile' })
+  @ApiResponse({ status: 200, description: 'Own profile' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMe(@Req() req: Request & { user: JwtPayload }) {
     return this.usersService.getMe(req.user.sub);
   }
 
   @Patch('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update own profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateMe(
     @Req() req: Request & { user: JwtPayload },
     @Body() dto: UpdateMeDto,
@@ -50,6 +61,10 @@ export class UsersController {
 
   @Delete('me')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete own account' })
+  @ApiResponse({ status: 204, description: 'Account deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deleteMe(@Req() req: Request & { user: JwtPayload }) {
     await this.usersService.deleteMe(req.user.sub, req.user);
   }
@@ -58,12 +73,22 @@ export class UsersController {
 
   @Get()
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List users (admin)' })
+  @ApiResponse({ status: 200, description: 'List of users' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   findAll(@Query() query: FindUsersQueryDto) {
     return this.usersService.findAll(query);
   }
 
   @Get('import/template')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Download user import CSV template' })
+  @ApiResponse({ status: 200, description: 'CSV template file' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   getImportTemplate(@Res() res: Response) {
     const buffer = this.usersService.getUserImportTemplate();
     res.set({
@@ -76,6 +101,12 @@ export class UsersController {
 
   @Post('import')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Import users from CSV' })
+  @ApiResponse({ status: 200, description: 'Import result' })
+  @ApiResponse({ status: 400, description: 'Invalid file' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -100,6 +131,14 @@ export class UsersController {
 
   @Patch(':id')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Admin update user' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'User updated' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   adminUpdateUser(
     @Req() req: Request & { user: JwtPayload },
     @Param('id', ParseIntPipe) id: number,
@@ -111,6 +150,13 @@ export class UsersController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Admin delete user' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 204, description: 'User deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   async adminDeleteUser(
     @Req() req: Request & { user: JwtPayload },
     @Param('id', ParseIntPipe) id: number,
