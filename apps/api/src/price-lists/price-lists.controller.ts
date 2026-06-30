@@ -52,6 +52,12 @@ export class PriceListsController {
     return this.service.resolvePrice(query.productId, customerId);
   }
 
+  @Get('assigned-customer-ids')
+  @Roles(Role.Admin)
+  getAssignedCustomerIds() {
+    return this.service.getAssignedCustomerIds();
+  }
+
   @Get(':id/customers')
   @Roles(Role.Admin)
   getAssignedCustomers(@Param('id', ParseIntPipe) id: number) {

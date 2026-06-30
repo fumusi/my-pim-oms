@@ -1,20 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearch, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
-import { toast } from 'sonner'
 import type { RootState } from '../store'
 import {
   getPriceLists,
-  updatePriceListStatus,
-  archivePriceList,
-  deletePriceList,
   type PriceList,
   type PriceListStatus,
 } from '../api/price-lists'
 import { PriceListDrawer } from '../components/PriceListDrawer'
-import { ConfirmModal } from '../components/ConfirmModal'
-import { getApiError } from '../utils/format'
 
 function StatusBadge({
   status,
@@ -82,44 +76,6 @@ export function PriceListsPage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<PriceList | null>(null)
-  const [archiveTarget, setArchiveTarget] = useState<PriceList | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<PriceList | null>(null)
-
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: PriceListStatus }) =>
-      updatePriceListStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] })
-      toast.success('Status updated')
-    },
-    onError: (err) => toast.error(getApiError(err)),
-  })
-
-  const archiveMutation = useMutation({
-    mutationFn: (id: number) => archivePriceList(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] })
-      toast.success('Price list archived')
-      setArchiveTarget(null)
-    },
-    onError: (err) => {
-      toast.error(getApiError(err))
-      setArchiveTarget(null)
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => deletePriceList(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] })
-      toast.success('Price list deleted')
-      setDeleteTarget(null)
-    },
-    onError: (err) => {
-      toast.error(getApiError(err))
-      setDeleteTarget(null)
-    },
-  })
 
   function setFilter(
     updates: Partial<{ status: PriceListStatus | undefined; activeNow: boolean | undefined }>,
@@ -225,7 +181,6 @@ export function PriceListsPage() {
                   <th>End date</th>
                   <th>Period</th>
                   <th>Customers</th>
-                  {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -255,56 +210,6 @@ export function PriceListsPage() {
                       <ActiveNowBadge startDate={pl.startDate} endDate={pl.endDate} />
                     </td>
                     <td className="users-td-muted">—</td>
-                    {isAdmin && (
-                      <td>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <button
-                            className="exact-btn"
-                            style={{ fontSize: '0.75rem', padding: '2px 10px' }}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditTarget(pl)
-                              setDrawerOpen(true)
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="exact-btn"
-                            style={{ fontSize: '0.75rem', padding: '2px 10px' }}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              statusMutation.mutate({
-                                id: pl.id,
-                                status: pl.status === 'active' ? 'inactive' : 'active',
-                              })
-                            }}
-                          >
-                            {pl.status === 'active' ? 'Deactivate' : 'Activate'}
-                          </button>
-                          {!pl.archivedAt && (
-                            <button
-                              className="exact-btn"
-                              style={{ fontSize: '0.75rem', padding: '2px 10px' }}
-                              onClick={(e) => { e.stopPropagation(); setArchiveTarget(pl) }}
-                            >
-                              Archive
-                            </button>
-                          )}
-                          <button
-                            className="exact-btn"
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '2px 10px',
-                              color: '#f87171',
-                            }}
-                            onClick={(e) => { e.stopPropagation(); setDeleteTarget(pl) }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -336,30 +241,6 @@ export function PriceListsPage() {
           </div>
         )}
       </div>
-
-      {archiveTarget && (
-        <ConfirmModal
-          title="Archive price list"
-          message={`Archive "${archiveTarget.name}"? This cannot be undone if customers are assigned.`}
-          confirmLabel="Archive"
-          danger
-          loading={archiveMutation.isPending}
-          onConfirm={() => archiveMutation.mutate(archiveTarget.id)}
-          onCancel={() => setArchiveTarget(null)}
-        />
-      )}
-
-      {deleteTarget && (
-        <ConfirmModal
-          title="Delete price list"
-          message={`Permanently delete "${deleteTarget.name}"? The price list must be archived and have no assigned customers.`}
-          confirmLabel="Delete"
-          danger
-          loading={deleteMutation.isPending}
-          onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
 
       {drawerOpen && (
         <PriceListDrawer

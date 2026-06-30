@@ -70,7 +70,7 @@ export function BulkAddModal({ priceListId, onClose, onDone }: Props) {
         <h3 className="modal-title">Bulk Add Products</h3>
 
         <div style={{ marginBottom: 16 }}>
-          <button className="exact-btn" onClick={handleDownloadTemplate}>
+          <button className="exact-btn exact-btn-secondary" onClick={handleDownloadTemplate}>
             Download template
           </button>
         </div>

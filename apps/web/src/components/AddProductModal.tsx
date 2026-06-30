@@ -74,7 +74,7 @@ export function AddProductModal({ priceListId, existingProductIds, onClose, onAd
             {filtered.map((p) => (
               <button
                 key={p.id}
-                className="exact-btn"
+                className="exact-btn exact-btn-outline"
                 style={{ textAlign: 'left', padding: '6px 10px', fontSize: '0.85rem' }}
                 onClick={() => { setSelected(p); setSearch(resolveProductName(p)) }}
               >

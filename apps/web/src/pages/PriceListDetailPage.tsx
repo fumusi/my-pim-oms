@@ -18,6 +18,7 @@ import { PriceListDrawer } from '../components/PriceListDrawer'
 import { AddProductModal } from '../components/AddProductModal'
 import { BulkAddModal } from '../components/BulkAddModal'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { AssignCustomerModal } from '../components/AssignCustomerModal'
 import { formatDate, getApiError } from '../utils/format'
 
 function StatusBadge({ status, archivedAt }: { status: string; archivedAt: string | null }) {
@@ -67,6 +68,7 @@ export function PriceListDetailPage() {
   const [addProductOpen, setAddProductOpen] = useState(false)
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [assignCustomerOpen, setAssignCustomerOpen] = useState(false)
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [editPrice, setEditPrice] = useState('')
   const [editDiscount, setEditDiscount] = useState('')
@@ -141,10 +143,10 @@ export function PriceListDetailPage() {
         </div>
         {isAdmin && (
           <div className="cust-detail-header-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="exact-btn exact-btn-outline" onClick={() => setEditDrawerOpen(true)}>Edit</button>
+            <button className="exact-btn exact-btn-secondary" onClick={() => setEditDrawerOpen(true)}>Edit</button>
             {!pl.archivedAt && (
               <button
-                className="exact-btn"
+                className="exact-btn exact-btn-secondary"
                 onClick={() => statusMutation.mutate(pl.status === 'active' ? 'inactive' : 'active')}
                 disabled={statusMutation.isPending}
               >
@@ -152,7 +154,7 @@ export function PriceListDetailPage() {
               </button>
             )}
             {!pl.archivedAt && (
-              <button className="exact-btn" onClick={() => setArchiveConfirmOpen(true)}>Archive</button>
+              <button className="exact-btn exact-btn-danger-outline" onClick={() => setArchiveConfirmOpen(true)}>Archive</button>
             )}
           </div>
         )}
@@ -179,7 +181,7 @@ export function PriceListDetailPage() {
         title="Products"
         action={isAdmin ? (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="exact-btn" onClick={() => setBulkAddOpen(true)}>Bulk Add</button>
+            <button className="exact-btn exact-btn-secondary" onClick={() => setBulkAddOpen(true)}>Bulk Add</button>
             <button className="exact-btn exact-btn-primary" onClick={() => setAddProductOpen(true)}>+ Add Product</button>
           </div>
         ) : undefined}
@@ -233,8 +235,7 @@ export function PriceListDetailPage() {
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
-                            className="exact-btn exact-btn-primary"
-                            style={{ fontSize: '0.75rem', padding: '2px 10px' }}
+                            className="cust-sub-btn"
                             disabled={updateItemMutation.isPending}
                             onClick={() => {
                               const price = parseFloat(editPrice)
@@ -244,8 +245,7 @@ export function PriceListDetailPage() {
                             }}
                           >Save</button>
                           <button
-                            className="exact-btn"
-                            style={{ fontSize: '0.75rem', padding: '2px 10px' }}
+                            className="cust-sub-btn"
                             onClick={() => setEditingItemId(null)}
                           >Cancel</button>
                         </div>
@@ -263,8 +263,7 @@ export function PriceListDetailPage() {
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button
-                              className="exact-btn"
-                              style={{ fontSize: '0.75rem', padding: '2px 10px' }}
+                              className="cust-sub-btn"
                               onClick={() => {
                                 setEditingItemId(item.id)
                                 setEditPrice(String(item.customPrice))
@@ -272,8 +271,7 @@ export function PriceListDetailPage() {
                               }}
                             >Edit</button>
                             <button
-                              className="exact-btn"
-                              style={{ fontSize: '0.75rem', padding: '2px 10px', color: '#f87171' }}
+                              className="cust-sub-btn cust-sub-btn-danger"
                               disabled={removeItemMutation.isPending}
                               onClick={() => removeItemMutation.mutate(item.id)}
                             >Remove</button>
@@ -290,7 +288,14 @@ export function PriceListDetailPage() {
       </SectionCard>
 
       {isAdmin && (
-        <SectionCard title="Assigned Customers">
+        <SectionCard
+          title="Assigned Customers"
+          action={isAdmin && !pl.archivedAt ? (
+            <button className="exact-btn exact-btn-primary" onClick={() => setAssignCustomerOpen(true)}>
+              + Assign Customer
+            </button>
+          ) : undefined}
+        >
           {!assignedCustomers || assignedCustomers.length === 0 ? (
             <div className="profile-loading"><p style={{ color: '#6b6e87' }}>No customers assigned</p></div>
           ) : (
@@ -314,8 +319,7 @@ export function PriceListDetailPage() {
                       <td className="users-td-muted">{c.assignedBy ?? '—'}</td>
                       <td>
                         <button
-                          className="exact-btn"
-                          style={{ fontSize: '0.75rem', padding: '2px 10px', color: '#f87171' }}
+                          className="cust-sub-btn cust-sub-btn-danger"
                           disabled={unassignMutation.isPending}
                           onClick={() => unassignMutation.mutate(c.customerId)}
                         >Remove</button>
@@ -338,6 +342,19 @@ export function PriceListDetailPage() {
           loading={archiveMutation.isPending}
           onConfirm={() => { archiveMutation.mutate(); setArchiveConfirmOpen(false) }}
           onCancel={() => setArchiveConfirmOpen(false)}
+        />
+      )}
+
+      {assignCustomerOpen && (
+        <AssignCustomerModal
+          priceListId={priceListId}
+          alreadyAssignedIds={new Set((assignedCustomers ?? []).map((c) => c.customerId))}
+          onClose={() => setAssignCustomerOpen(false)}
+          onAssigned={() => {
+            queryClient.invalidateQueries({ queryKey: ['price-list-customers', priceListId] })
+            queryClient.invalidateQueries({ queryKey: ['price-list', priceListId] })
+            setAssignCustomerOpen(false)
+          }}
         />
       )}
 

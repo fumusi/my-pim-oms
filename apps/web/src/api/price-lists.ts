@@ -121,3 +121,18 @@ export const bulkAddPriceListItems = (
 
 export const unassignCustomerFromPriceList = (priceListId: number, customerId: number) =>
   api.delete(`/price-lists/${priceListId}/customers/${customerId}`)
+
+export const assignCustomerToPriceList = (priceListId: number, customerId: number) =>
+  api.post(`/price-lists/${priceListId}/customers`, { customerId }).then((r) => r.data)
+
+export const getAssignedCustomerIds = () =>
+  api.get<number[]>('/price-lists/assigned-customer-ids').then((r) => r.data)
+
+export interface ResolvedPrice {
+  effectivePrice: number
+  source: 'price_list' | 'base_price'
+  priceListName?: string
+}
+
+export const resolvePrice = (productId: number, customerId?: number) =>
+  api.get<ResolvedPrice>('/price-lists/resolve', { params: { productId, customerId } }).then((r) => r.data)

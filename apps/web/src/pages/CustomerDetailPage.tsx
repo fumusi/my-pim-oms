@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -20,14 +20,25 @@ import {
   updateAddress,
   deleteAddress,
   setPrimaryAddress,
+  getCustomerPriceList,
   type CustomerDetail,
   type Contact,
   type Address,
 } from '../api/customers'
+import { getPriceLists, assignCustomerToPriceList, unassignCustomerFromPriceList } from '../api/price-lists'
 import { getUsers, adminUpdateUser } from '../api/admin'
 import { formatDate, getApiError } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CustomerDrawer } from '../components/CustomerDrawer'
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
+}
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -241,11 +252,15 @@ export function CustomerDetailPage() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
 
+  const [activeTab, setActiveTab] = useState<'overview' | 'price-list'>('overview')
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [showMemberPicker, setShowMemberPicker] = useState(false)
   const [memberSearch, setMemberSearch] = useState('')
+  const [plSearch, setPlSearch] = useState('')
+  const [showPlPicker, setShowPlPicker] = useState(false)
+  const [removingPriceList, setRemovingPriceList] = useState(false)
 
   // Contact state
   const [showContactForm, setShowContactForm] = useState(false)
@@ -317,6 +332,19 @@ export function CustomerDetailPage() {
     enabled: showMemberPicker,
   })
 
+  const { data: customerPriceList, isLoading: plLoading } = useQuery({
+    queryKey: ['customer-price-list', customerId],
+    queryFn: () => getCustomerPriceList(customerId),
+    enabled: isAdmin && activeTab === 'price-list',
+  })
+
+  const debouncedPlSearch = useDebounce(plSearch, 300)
+  const { data: priceListsData } = useQuery({
+    queryKey: ['price-lists-for-assign', debouncedPlSearch],
+    queryFn: () => getPriceLists({ search: debouncedPlSearch || undefined, status: 'active', limit: 20 }),
+    enabled: isAdmin && showPlPicker,
+  })
+
   const addMemberMutation = useMutation({
     mutationFn: (userId: number) => adminUpdateUser(userId, { customerId }),
     onSuccess: () => {
@@ -333,6 +361,27 @@ export function CustomerDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
       toast.success('User removed from customer')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const assignPriceListMutation = useMutation({
+    mutationFn: ({ priceListId }: { priceListId: number }) =>
+      assignCustomerToPriceList(priceListId, customerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-price-list', customerId] })
+      setShowPlPicker(false)
+      toast.success('Price list assigned')
+    },
+    onError: (err) => toast.error(getApiError(err)),
+  })
+
+  const removePriceListMutation = useMutation({
+    mutationFn: () => unassignCustomerFromPriceList(customerPriceList!.id, customerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-price-list', customerId] })
+      setRemovingPriceList(false)
+      toast.success('Price list removed')
     },
     onError: (err) => toast.error(getApiError(err)),
   })
@@ -514,6 +563,20 @@ export function CustomerDetailPage() {
         )}
       </div>
 
+      <div className="cust-tabs" style={{ display: 'flex', gap: '0.25rem', marginBottom: '1rem' }}>
+        {(['overview', 'price-list'] as const).map((tab) => (
+          <button
+            key={tab}
+            className={`cust-tab-btn${activeTab === tab ? ' cust-tab-btn--active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === 'overview' ? 'Overview' : 'Price List'}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
       {/* Two-column grid */}
       <div className="cust-detail-grid">
         <SectionCard title="General information">
@@ -830,6 +893,167 @@ export function CustomerDetailPage() {
           <p className="shell-empty-hint">Order management coming soon.</p>
         </div>
       </SectionCard>
+        </>
+      )}
+
+      {activeTab === 'price-list' && (
+        <div>
+          {plLoading ? (
+            <div className="profile-loading"><div className="spinner-border" style={{ color: '#7c3aed' }} /></div>
+          ) : customerPriceList ? (
+            <>
+              <SectionCard
+                title="Assigned Price List"
+                action={isAdmin ? (
+                  <button
+                    className="exact-btn"
+                    style={{ color: '#f87171' }}
+                    onClick={() => setRemovingPriceList(true)}
+                  >
+                    Remove Assignment
+                  </button>
+                ) : undefined}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 0' }}>
+                  <div className="cust-detail-field">
+                    <span className="modal-label">Name</span>
+                    <span
+                      className="cust-detail-value"
+                      style={{ cursor: 'pointer', color: '#7c3aed' }}
+                      onClick={() => navigate({ to: '/price-lists/$id', params: { id: String(customerPriceList.id) } })}
+                    >
+                      {customerPriceList.name} ↗
+                    </span>
+                  </div>
+                  <div className="cust-detail-field">
+                    <span className="modal-label">Status</span>
+                    <span className="cust-detail-value">{customerPriceList.status}</span>
+                  </div>
+                  {customerPriceList.startDate && (
+                    <div className="cust-detail-field">
+                      <span className="modal-label">Start date</span>
+                      <span className="cust-detail-value">{customerPriceList.startDate}</span>
+                    </div>
+                  )}
+                  {customerPriceList.endDate && (
+                    <div className="cust-detail-field">
+                      <span className="modal-label">End date</span>
+                      <span className="cust-detail-value">{customerPriceList.endDate}</span>
+                    </div>
+                  )}
+                </div>
+
+                {customerPriceList.status === 'active' && !customerPriceList.archivedAt ? (
+                  <div style={{ padding: '8px 12px', background: '#1a1d2e', borderRadius: 6, marginTop: 8, fontSize: '0.8rem', color: '#7c3aed' }}>
+                    Order prices for this customer will use price list rates
+                  </div>
+                ) : (
+                  <div style={{ padding: '8px 12px', background: '#1a1d2e', borderRadius: 6, marginTop: 8, fontSize: '0.8rem', color: '#9396a5' }}>
+                    Price list is {customerPriceList.archivedAt ? 'archived' : 'inactive'} — orders will use base prices
+                  </div>
+                )}
+              </SectionCard>
+
+              <SectionCard title="Products in Price List">
+                {customerPriceList.items.length === 0 ? (
+                  <p style={{ color: '#6b6e87', fontSize: '0.85rem', padding: '0.5rem 0' }}>No products in this price list.</p>
+                ) : (
+                  <div className="users-table-wrap">
+                    <table className="users-table">
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>SKU</th>
+                          <th>Custom price</th>
+                          <th>Discount</th>
+                          <th>Effective price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customerPriceList.items.map((item) => (
+                          <tr key={item.id}>
+                            <td style={{ color: '#e0e2f0', fontWeight: 500 }}>
+                              {item.product?.name?.en ?? item.product?.name?.nl ?? `Product #${item.productId}`}
+                            </td>
+                            <td className="users-td-muted">{item.product?.barcode ?? '—'}</td>
+                            <td className="users-td-muted">€{item.customPrice.toFixed(2)}</td>
+                            <td className="users-td-muted">{item.discount != null ? `${item.discount}%` : '—'}</td>
+                            <td style={{ color: '#7c3aed', fontWeight: 500 }}>€{item.effectivePrice.toFixed(4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </SectionCard>
+            </>
+          ) : (
+            <SectionCard title="Price List">
+              <div style={{ padding: '1rem 0' }}>
+                <p style={{ color: '#6b6e87', fontSize: '0.85rem', marginBottom: '0.75rem' }}>No price list assigned to this customer.</p>
+                <p style={{ color: '#9396a5', fontSize: '0.8rem', marginBottom: '1rem' }}>Orders will use base prices for all products.</p>
+                {isAdmin && (
+                  <button
+                    className="exact-btn exact-btn-primary"
+                    onClick={() => setShowPlPicker(true)}
+                  >
+                    + Assign Price List
+                  </button>
+                )}
+              </div>
+
+              {isAdmin && showPlPicker && (
+                <div className="cust-sub-form" style={{ marginTop: '1rem' }}>
+                  <input
+                    className="cust-filter-input"
+                    style={{ width: '100%', marginBottom: '0.5rem' }}
+                    placeholder="Search price lists…"
+                    value={plSearch}
+                    onChange={(e) => setPlSearch(e.target.value)}
+                    autoFocus
+                  />
+                  <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {(priceListsData?.data ?? []).map((pl) => (
+                      <button
+                        key={pl.id}
+                        className="cust-sub-btn"
+                        style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}
+                        disabled={assignPriceListMutation.isPending}
+                        onClick={() => assignPriceListMutation.mutate({ priceListId: pl.id })}
+                      >
+                        <span style={{ color: '#e0e2f0' }}>{pl.name}</span>
+                        <span className="users-td-muted" style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                          {pl.status}{pl.startDate ? ` · from ${pl.startDate}` : ''}{pl.endDate ? ` · to ${pl.endDate}` : ''}
+                        </span>
+                      </button>
+                    ))}
+                    {(priceListsData?.data ?? []).length === 0 && (
+                      <p style={{ color: '#6b6e87', fontSize: '0.8rem' }}>No active price lists found.</p>
+                    )}
+                  </div>
+                  <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+                    <button className="users-action-btn" onClick={() => { setShowPlPicker(false); setPlSearch('') }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {removingPriceList && (
+            <ConfirmModal
+              title="Remove price list assignment"
+              message={`Remove "${customerPriceList?.name}" from ${customer.name}?`}
+              confirmLabel="Remove"
+              danger
+              loading={removePriceListMutation.isPending}
+              onConfirm={() => removePriceListMutation.mutate()}
+              onCancel={() => setRemovingPriceList(false)}
+            />
+          )}
+        </div>
+      )}
 
       {/* Delete confirm */}
       {deleteOpen && (

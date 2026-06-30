@@ -204,7 +204,14 @@ export class PriceListsService {
       customPrice: dto.customPrice,
       discount: dto.discount ?? null,
     });
-    return this.itemRepo.save(item);
+    try {
+      return await this.itemRepo.save(item);
+    } catch (err) {
+      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+        throw new BadRequestException('Product already in this price list');
+      }
+      throw err;
+    }
   }
 
   async updateItem(
@@ -398,6 +405,15 @@ export class PriceListsService {
     }
 
     return { effectivePrice: product.basePrice ?? 0, source: 'base_price' };
+  }
+
+  async getAssignedCustomerIds(): Promise<number[]> {
+    const rows = await this.cplRepo
+      .createQueryBuilder('cpl')
+      .select('cpl.customer_id', 'customerId')
+      .distinct(true)
+      .getRawMany<{ customerId: number }>();
+    return rows.map((r) => Number(r.customerId));
   }
 
   async deactivateExpiredPriceLists(): Promise<{ deactivated: number }> {

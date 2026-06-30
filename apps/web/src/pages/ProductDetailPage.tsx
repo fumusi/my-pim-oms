@@ -13,6 +13,7 @@ import {
   type ProductStatus,
 } from '../api/pim-products'
 import { getExactItemById } from '../api/products'
+import { resolvePrice } from '../api/price-lists'
 import { resolveName, formatDate, getApiError, type Lang } from '../utils/format'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { ProductDrawer } from '../components/ProductDrawer'
@@ -92,6 +93,12 @@ export function ProductDetailPage() {
     queryKey: ['exact-item', product?.exactId],
     queryFn: () => getExactItemById(product!.exactId!).then((r) => r.data),
     enabled: !!product?.exactId,
+  })
+
+  const { data: priceResolution } = useQuery({
+    queryKey: ['resolve-price', productId, user?.customerId],
+    queryFn: () => resolvePrice(productId),
+    enabled: !isAdmin && !!user?.customerId,
   })
 
   const archiveMutation = useMutation({
@@ -285,18 +292,39 @@ onClick={() => navigate({ to: '/products', search: { page: 1, limit: 20, search:
 
         {/* Pricing */}
         <SectionCard title="Pricing">
-          <Field
-            label="Base price"
-            value={product.basePrice != null ? `${product.basePrice}${product.currency ? ' ' + product.currency : ''}` : null}
-          />
-          <Field label="Sales VAT code" value={product.salesVatCode} />
-          {isAdmin && (
+          {!isAdmin && priceResolution ? (
+            <>
+              <div className="cat-detail-info-field">
+                <span className="modal-label">Your price</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="cat-detail-info-value">
+                    €{priceResolution.effectivePrice.toFixed(2)}{product.currency ? ' ' + product.currency : ''}
+                  </span>
+                  {priceResolution.source === 'price_list' && (
+                    <span className="cust-status-badge cust-status-active" style={{ fontSize: '0.7rem' }}>
+                      {priceResolution.priceListName}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <Field label="Sales VAT code" value={product.salesVatCode} />
+            </>
+          ) : (
             <>
               <Field
-                label="Purchase price"
-                value={product.purchasePrice != null ? `${product.purchasePrice}${product.currency ? ' ' + product.currency : ''}` : null}
+                label="Base price"
+                value={product.basePrice != null ? `${product.basePrice}${product.currency ? ' ' + product.currency : ''}` : null}
               />
-              <Field label="Purchase VAT code" value={product.purchaseVatCode} />
+              <Field label="Sales VAT code" value={product.salesVatCode} />
+              {isAdmin && (
+                <>
+                  <Field
+                    label="Purchase price"
+                    value={product.purchasePrice != null ? `${product.purchasePrice}${product.currency ? ' ' + product.currency : ''}` : null}
+                  />
+                  <Field label="Purchase VAT code" value={product.purchaseVatCode} />
+                </>
+              )}
             </>
           )}
         </SectionCard>
