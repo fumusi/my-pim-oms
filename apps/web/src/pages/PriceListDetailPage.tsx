@@ -42,6 +42,8 @@ export function PriceListDetailPage() {
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [editPrice, setEditPrice] = useState('')
   const [editDiscount, setEditDiscount] = useState('')
+  const [removeItemTarget, setRemoveItemTarget] = useState<number | null>(null)
+  const [unassignTarget, setUnassignTarget] = useState<number | null>(null)
 
   const { data: pl, isLoading, isError } = useQuery({
     queryKey: ['price-list', priceListId],
@@ -73,7 +75,11 @@ export function PriceListDetailPage() {
 
   const removeItemMutation = useMutation({
     mutationFn: (itemId: number) => removePriceListItem(priceListId, itemId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['price-list', priceListId] }); toast.success('Product removed') },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['price-list', priceListId] })
+      setRemoveItemTarget(null)
+      toast.success('Product removed')
+    },
     onError: (err) => toast.error(getApiError(err)),
   })
 
@@ -89,6 +95,7 @@ export function PriceListDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['price-list', priceListId] })
       queryClient.invalidateQueries({ queryKey: ['price-list-customers', priceListId] })
+      setUnassignTarget(null)
       toast.success('Customer unassigned')
     },
     onError: (err) => toast.error(getApiError(err)),
@@ -246,8 +253,7 @@ export function PriceListDetailPage() {
                             >Edit</button>
                             <button
                               className="cust-sub-btn cust-sub-btn-danger"
-                              disabled={removeItemMutation.isPending}
-                              onClick={() => removeItemMutation.mutate(item.id)}
+                              onClick={() => setRemoveItemTarget(item.id)}
                             >Remove</button>
                           </div>
                         </td>
@@ -294,8 +300,7 @@ export function PriceListDetailPage() {
                       <td>
                         <button
                           className="cust-sub-btn cust-sub-btn-danger"
-                          disabled={unassignMutation.isPending}
-                          onClick={() => unassignMutation.mutate(c.customerId)}
+                          onClick={() => setUnassignTarget(c.customerId)}
                         >Remove</button>
                       </td>
                     </tr>
@@ -316,6 +321,30 @@ export function PriceListDetailPage() {
           loading={archiveMutation.isPending}
           onConfirm={() => archiveMutation.mutate()}
           onCancel={() => setArchiveConfirmOpen(false)}
+        />
+      )}
+
+      {removeItemTarget != null && (
+        <ConfirmModal
+          title="Remove product"
+          message="Remove this product from the price list?"
+          confirmLabel="Remove"
+          danger
+          loading={removeItemMutation.isPending}
+          onConfirm={() => removeItemMutation.mutate(removeItemTarget)}
+          onCancel={() => setRemoveItemTarget(null)}
+        />
+      )}
+
+      {unassignTarget != null && (
+        <ConfirmModal
+          title="Unassign customer"
+          message="Remove this customer from the price list?"
+          confirmLabel="Remove"
+          danger
+          loading={unassignMutation.isPending}
+          onConfirm={() => unassignMutation.mutate(unassignTarget)}
+          onCancel={() => setUnassignTarget(null)}
         />
       )}
 

@@ -16,7 +16,7 @@ export function PriceListsPage() {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
 
-  const { page, search, status, activeNow } = useSearch({ from: '/app/price-lists' })
+  const { page, search, status, activeNow, archived } = useSearch({ from: '/app/price-lists' })
   const limit = 20
 
   const [searchInput, setSearchInput] = useState(search ?? '')
@@ -36,15 +36,15 @@ export function PriceListsPage() {
   }, [searchInput]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['price-lists', page, limit, search, status, activeNow],
+    queryKey: ['price-lists', page, limit, search, status, activeNow, archived],
     queryFn: () =>
-      getPriceLists({ page, limit, search: search || undefined, status, activeNow }),
+      getPriceLists({ page, limit, search: search || undefined, status, activeNow, archived }),
   })
 
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   function setFilter(
-    updates: Partial<{ status: PriceListStatus | undefined; activeNow: boolean | undefined }>,
+    updates: Partial<{ status: PriceListStatus | undefined; activeNow: boolean | undefined; archived: boolean | undefined }>,
   ) {
     navigate({ to: '/price-lists', search: (prev) => ({ ...prev, ...updates, page: 1 }) })
   }
@@ -111,6 +111,23 @@ export function PriceListsPage() {
               onChange={(e) => setFilter({ activeNow: e.target.checked || undefined })}
             />
             Currently active
+          </label>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              color: '#9396a5',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={archived ?? false}
+              onChange={(e) => setFilter({ archived: e.target.checked || undefined, activeNow: undefined })}
+            />
+            Show archived
           </label>
         </div>
 

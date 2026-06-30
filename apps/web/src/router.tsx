@@ -269,6 +269,7 @@ const priceListsRoute = createRoute({
         ? (s.status as 'active' | 'inactive')
         : undefined,
     activeNow: s.activeNow === true || s.activeNow === 'true' ? true : undefined,
+    archived: s.archived === true || s.archived === 'true' ? true : undefined,
   }),
   component: PriceListsPage,
 })

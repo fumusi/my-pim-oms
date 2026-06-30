@@ -9,24 +9,26 @@ interface Props {
   onDone: () => void
 }
 
-function parseCsv(text: string): Array<{ productId: number; customPrice: number; discount?: number }> {
-  return text
-    .split('\n')
-    .slice(1)
-    .filter((l) => l.trim())
-    .map((line) => {
-      const [productId, customPrice, discount] = line.split(',')
-      return {
-        productId: parseInt(productId.trim(), 10),
-        customPrice: parseFloat(customPrice.trim()),
-        ...(discount?.trim() ? { discount: parseFloat(discount.trim()) } : {}),
-      }
-    })
-    .filter((r) => !isNaN(r.productId) && !isNaN(r.customPrice))
+function parseCsv(text: string): {
+  rows: Array<{ productId: number; customPrice: number; discount?: number }>
+  skipped: number
+} {
+  const lines = text.split('\n').slice(1).filter((l) => l.trim())
+  const rows: Array<{ productId: number; customPrice: number; discount?: number }> = []
+  let skipped = 0
+  for (const line of lines) {
+    const [productId, customPrice, discount] = line.split(',')
+    const id = parseInt(productId?.trim(), 10)
+    const price = parseFloat(customPrice?.trim())
+    if (isNaN(id) || isNaN(price)) { skipped++; continue }
+    rows.push({ productId: id, customPrice: price, ...(discount?.trim() ? { discount: parseFloat(discount.trim()) } : {}) })
+  }
+  return { rows, skipped }
 }
 
 export function BulkAddModal({ priceListId, onClose, onDone }: Props) {
   const [parsedRows, setParsedRows] = useState<Array<{ productId: number; customPrice: number; discount?: number }>>([])
+  const [skippedRows, setSkippedRows] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
 
   function handleDownloadTemplate() {
@@ -45,7 +47,9 @@ export function BulkAddModal({ priceListId, onClose, onDone }: Props) {
     const reader = new FileReader()
     reader.onload = (ev) => {
       const text = ev.target?.result as string
-      setParsedRows(parseCsv(text))
+      const { rows, skipped } = parseCsv(text)
+      setParsedRows(rows)
+      setSkippedRows(skipped)
     }
     reader.readAsText(file)
   }
@@ -80,9 +84,9 @@ export function BulkAddModal({ priceListId, onClose, onDone }: Props) {
           <input type="file" accept=".csv" onChange={handleFile} style={{ display: 'block', marginTop: 6 }} />
         </div>
 
-        {parsedRows.length > 0 && (
-          <p style={{ color: '#6b6e87', fontSize: '0.85rem', marginBottom: 12 }}>
-            {parsedRows.length} rows parsed
+        {(parsedRows.length > 0 || skippedRows > 0) && (
+          <p style={{ color: skippedRows > 0 ? '#fbbf24' : '#6b6e87', fontSize: '0.85rem', marginBottom: 12 }}>
+            {parsedRows.length} rows parsed{skippedRows > 0 ? `, ${skippedRows} skipped (invalid data)` : ''}
           </p>
         )}
 

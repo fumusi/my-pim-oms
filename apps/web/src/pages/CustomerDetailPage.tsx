@@ -971,7 +971,7 @@ export function CustomerDetailPage() {
                             <td className="users-td-muted">{item.product?.barcode ?? '—'}</td>
                             <td className="users-td-muted">€{item.customPrice.toFixed(2)}</td>
                             <td className="users-td-muted">{item.discount != null ? `${item.discount}%` : '—'}</td>
-                            <td style={{ color: '#7c3aed', fontWeight: 500 }}>€{item.effectivePrice.toFixed(4)}</td>
+                            <td style={{ color: '#7c3aed', fontWeight: 500 }}>€{item.effectivePrice.toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>

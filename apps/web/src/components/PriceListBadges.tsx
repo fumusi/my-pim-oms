@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from 'react'
 import type { PriceListStatus } from '../api/price-lists'
 
 export function PriceListStatusBadge({
@@ -23,7 +24,7 @@ export function PriceListActiveNowBadge({
   archivedAt: string | null
   startDate: string | null
   endDate: string | null
-  style?: React.CSSProperties
+  style?: CSSProperties
 }) {
   const today = new Date().toISOString().slice(0, 10)
   const afterStart = !startDate || today >= startDate
@@ -42,8 +43,8 @@ export function PriceListSectionCard({
   action,
 }: {
   title: string
-  children: React.ReactNode
-  action?: React.ReactNode
+  children: ReactNode
+  action?: ReactNode
 }) {
   return (
     <div className="dash-card">
