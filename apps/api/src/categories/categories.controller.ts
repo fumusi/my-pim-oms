@@ -13,6 +13,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { z } from 'zod';
 import { createZodDto } from 'nestjs-zod';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -62,6 +63,7 @@ function stripTemplate<T extends { template?: unknown }>(item: T): Omit<T, 'temp
   return rest as Omit<T, 'template'>;
 }
 
+@ApiTags('Categories')
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
@@ -69,6 +71,10 @@ export class CategoriesController {
   // ── GET /categories ────────────────────────────────────────────────────────────
 
   @Get()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List categories' })
+  @ApiResponse({ status: 200, description: 'List of categories' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async findAll(@Query() query: ListQueryDto, @Req() req: AuthRequest) {
     const isAdmin = req.user.role === Role.Admin;
     // Non-admin always sees active only; admin can filter or sees all non-archived.
@@ -88,6 +94,12 @@ export class CategoriesController {
   // ── GET /categories/:id ────────────────────────────────────────────────────────
 
   @Get(':id')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get category detail with products' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Category detail' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
     @Query() query: DetailQueryDto,
@@ -110,6 +122,12 @@ export class CategoriesController {
 
   @Post()
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create category (admin)' })
+  @ApiResponse({ status: 201, description: 'Category created' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   create(@Body() dto: CreateCategoryDto, @Req() req: AuthRequest) {
     return this.categoriesService.create(dto, req.user.email);
   }
@@ -118,6 +136,14 @@ export class CategoriesController {
 
   @Patch(':id')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update category (admin)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Category updated' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCategoryDto,
@@ -130,6 +156,14 @@ export class CategoriesController {
 
   @Patch(':id/status')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update category status (admin)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Category status updated' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   setStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: StatusDto,
@@ -142,6 +176,13 @@ export class CategoriesController {
 
   @Patch(':id/archive')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Archive category (admin)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Category archived' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   archive(@Param('id', ParseIntPipe) id: number, @Req() req: AuthRequest) {
     return this.categoriesService.archive(id, req.user.email);
   }
@@ -151,6 +192,13 @@ export class CategoriesController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete category (admin)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 204, description: 'Category deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.categoriesService.delete(id);
   }
@@ -159,6 +207,14 @@ export class CategoriesController {
 
   @Post(':id/assign')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Assign products to category (admin)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Products assigned' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   assignProducts(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignProductsDto) {
     return this.categoriesService.assignProducts(id, dto.productIds);
   }
@@ -167,6 +223,14 @@ export class CategoriesController {
 
   @Post(':id/unassign')
   @Roles(Role.Admin)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Unassign products from category (admin)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Products unassigned' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   unassignProducts(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignProductsDto) {
     return this.categoriesService.unassignProducts(id, dto.productIds);
   }

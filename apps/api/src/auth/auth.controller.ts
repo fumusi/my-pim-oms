@@ -2,6 +2,7 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus,
   Post, Query, Req, Res, UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response, CookieOptions } from 'express';
@@ -24,6 +25,7 @@ const cookieOptions = (): CookieOptions => ({
   maxAge: 30 * 24 * 60 * 60 * 1000,
 });
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -34,6 +36,9 @@ export class AuthController {
   @Post('register')
   @Public()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register new user' })
+  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -41,6 +46,10 @@ export class AuthController {
   @Post('login')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login and receive access token' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -53,6 +62,9 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token using cookie' })
+  @ApiResponse({ status: 200, description: 'Token refreshed' })
+  @ApiResponse({ status: 401, description: 'Invalid or missing refresh token' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -67,6 +79,9 @@ export class AuthController {
   @Post('forgot-password')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send password reset email' })
+  @ApiResponse({ status: 200, description: 'Reset email sent if address is registered' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     await this.authService.forgotPassword(dto);
     return { message: 'If that email is registered, a reset link has been sent.' };
@@ -75,6 +90,9 @@ export class AuthController {
   @Post('reset-password')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error or invalid token' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto);
     return { message: 'Password reset successfully.' };
@@ -83,11 +101,15 @@ export class AuthController {
   @Get('github')
   @Public()
   @UseGuards(AuthGuard('github'))
+  @ApiOperation({ summary: 'Redirect to GitHub OAuth' })
+  @ApiResponse({ status: 302, description: 'Redirect to GitHub' })
   github() {}
 
   @Get('github/callback')
   @Public()
   @UseGuards(AuthGuard('github'))
+  @ApiOperation({ summary: 'GitHub OAuth callback' })
+  @ApiResponse({ status: 302, description: 'Redirect to frontend with auth code' })
   async githubCallback(
     @Req() req: Request & { user: GithubProfile },
     @Res() res: Response,
@@ -100,6 +122,10 @@ export class AuthController {
   @Get('exchange')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Exchange OAuth code for tokens' })
+  @ApiQuery({ name: 'code', required: true, description: 'OAuth exchange code' })
+  @ApiResponse({ status: 200, description: 'Tokens issued' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired code' })
   async exchange(
     @Query('code') code: string,
     @Res({ passthrough: true }) res: Response,
@@ -111,6 +137,10 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Logout and clear cookie' })
+  @ApiResponse({ status: 200, description: 'Logged out' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(
     @Req() req: Request & { user: JwtPayload },
     @Res({ passthrough: true }) res: Response,
@@ -121,6 +151,10 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'Current user profile' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@Req() req: Request & { user: JwtPayload }) {
     return this.authService.getProfile(req.user.sub);
   }
