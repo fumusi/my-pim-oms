@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getPimProducts, type PimProduct } from '../api/pim-products'
@@ -24,6 +24,10 @@ export function AddProductModal({ priceListId, existingProductIds, onClose, onAd
   const [customPrice, setCustomPrice] = useState('')
   const [discount, setDiscount] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+
+  useEffect(() => {
+    return () => { if (debounceTimer) clearTimeout(debounceTimer) }
+  }, [debounceTimer])
 
   function handleSearchChange(value: string) {
     setSearch(value)

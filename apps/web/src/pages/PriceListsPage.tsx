@@ -23,16 +23,20 @@ function StatusBadge({
 }
 
 function ActiveNowBadge({
+  status,
+  archivedAt,
   startDate,
   endDate,
 }: {
+  status: PriceListStatus
+  archivedAt: string | null
   startDate: string | null
   endDate: string | null
 }) {
   const today = new Date().toISOString().slice(0, 10)
   const afterStart = !startDate || today >= startDate
   const beforeEnd = !endDate || today <= endDate
-  if (!afterStart || !beforeEnd) return null
+  if (archivedAt || status !== 'active' || !afterStart || !beforeEnd) return null
   return (
     <span
       className="cust-status-badge cust-status-active"
@@ -180,7 +184,6 @@ export function PriceListsPage() {
                   <th>Start date</th>
                   <th>End date</th>
                   <th>Period</th>
-                  <th>Customers</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,9 +210,8 @@ export function PriceListsPage() {
                     <td className="users-td-muted">{pl.startDate ?? '—'}</td>
                     <td className="users-td-muted">{pl.endDate ?? '—'}</td>
                     <td>
-                      <ActiveNowBadge startDate={pl.startDate} endDate={pl.endDate} />
+                      <ActiveNowBadge status={pl.status} archivedAt={pl.archivedAt} startDate={pl.startDate} endDate={pl.endDate} />
                     </td>
-                    <td className="users-td-muted">—</td>
                   </tr>
                 ))}
               </tbody>

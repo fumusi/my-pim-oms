@@ -410,7 +410,7 @@ export class PriceListsService {
   async getAssignedCustomerIds(): Promise<number[]> {
     const rows = await this.cplRepo
       .createQueryBuilder('cpl')
-      .select('cpl.customer_id', 'customerId')
+      .select('cpl.customerId', 'customerId')
       .distinct(true)
       .getRawMany<{ customerId: number }>();
     return rows.map((r) => Number(r.customerId));

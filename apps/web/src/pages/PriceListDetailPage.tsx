@@ -27,11 +27,11 @@ function StatusBadge({ status, archivedAt }: { status: string; archivedAt: strin
   return <span className="cust-status-badge cust-status-inactive">Inactive</span>
 }
 
-function ActiveNowBadge({ startDate, endDate }: { startDate: string | null; endDate: string | null }) {
+function ActiveNowBadge({ status, archivedAt, startDate, endDate }: { status: string; archivedAt: string | null; startDate: string | null; endDate: string | null }) {
   const today = new Date().toISOString().slice(0, 10)
   const afterStart = !startDate || today >= startDate
   const beforeEnd = !endDate || today <= endDate
-  if (!afterStart || !beforeEnd) return null
+  if (archivedAt || status !== 'active' || !afterStart || !beforeEnd) return null
   return <span className="cust-status-badge cust-status-active" style={{ fontSize: '0.7rem' }}>Active now</span>
 }
 
@@ -137,7 +137,7 @@ export function PriceListDetailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h1 className="cust-detail-name">{pl.name}</h1>
             <StatusBadge status={pl.status} archivedAt={pl.archivedAt} />
-            <ActiveNowBadge startDate={pl.startDate} endDate={pl.endDate} />
+            <ActiveNowBadge status={pl.status} archivedAt={pl.archivedAt} startDate={pl.startDate} endDate={pl.endDate} />
           </div>
           {pl.description && <div className="users-td-muted" style={{ marginTop: 4 }}>{pl.description}</div>}
         </div>

@@ -204,7 +204,15 @@ export function OrderFormPage({ orderId, prefillProductId }: { orderId?: number;
   }, [prefillProductId, append, getValues])
 
   const [priceSources, setPriceSources] = useState<Map<number, { source: 'price_list' | 'base_price'; priceListName?: string }>>(new Map())
+  const prevCustomerIdRef = useRef<number | undefined>(undefined)
   const [prefilled, setPrefilled] = useState(false)
+
+  useEffect(() => {
+    if (watchedCustomerId !== prevCustomerIdRef.current) {
+      prevCustomerIdRef.current = watchedCustomerId
+      if (prefilled) setPriceSources(new Map())
+    }
+  }, [watchedCustomerId, prefilled])
 
   useEffect(() => {
     if (!existingOrder || prefilled) return
