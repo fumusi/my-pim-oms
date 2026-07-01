@@ -292,7 +292,7 @@ function BuyerOrdersDashboard() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['orders', 'buyer'],
-    queryFn: () => getOrders({ archived: false }).then((r) => r.data),
+    queryFn: () => getOrders({}).then((r) => r.data),
   })
 
   const orders = data?.data ?? []

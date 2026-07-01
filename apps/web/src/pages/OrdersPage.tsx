@@ -48,10 +48,7 @@ export function OrdersPage() {
         dateTo,
         archived: archived || undefined,
       }).then((r) => r.data),
-    enabled: isAdmin,
   })
-
-  if (!isAdmin) return null
 
   function setFilter(
     updates: Partial<{

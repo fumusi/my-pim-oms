@@ -35,6 +35,7 @@ import { OrderFormPage } from './pages/OrderFormPage'
 import { PriceListsPage } from './pages/PriceListsPage'
 import { PriceListDetailPage } from './pages/PriceListDetailPage'
 import { ActivityLogPage } from './pages/ActivityLogPage'
+import { NotificationsPage } from './pages/NotificationsPage'
 
 function getToken() {
   return store.getState().auth.accessToken
@@ -275,6 +276,13 @@ const priceListsRoute = createRoute({
   component: PriceListsPage,
 })
 
+const notificationsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/notifications',
+  staticData: { title: 'Notifications' },
+  component: NotificationsPage,
+})
+
 const activityLogRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/activity-log',
@@ -334,6 +342,7 @@ const routeTree = rootRoute.addChildren([
     priceListsRoute,
     priceListDetailRoute,
     activityLogRoute,
+    notificationsRoute,
   ]),
 ])
 

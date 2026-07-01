@@ -35,6 +35,7 @@ describe('StockNotificationService', () => {
   let productRepo: { createQueryBuilder: jest.Mock; save: jest.Mock };
   let userRepo: { findBy: jest.Mock };
   let mailService: { sendLowStockAlert: jest.Mock; sendOutOfStockAlert: jest.Mock };
+  let notificationsService: { notifyAdmins: jest.Mock };
   let qb: ReturnType<typeof makeQbMock>;
 
   beforeEach(() => {
@@ -48,10 +49,12 @@ describe('StockNotificationService', () => {
       sendLowStockAlert: jest.fn().mockResolvedValue(undefined),
       sendOutOfStockAlert: jest.fn().mockResolvedValue(undefined),
     };
+    notificationsService = { notifyAdmins: jest.fn().mockResolvedValue(undefined) };
     service = new StockNotificationService(
       productRepo as any,
       userRepo as any,
       mailService as any,
+      notificationsService as any,
     );
   });
 

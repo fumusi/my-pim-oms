@@ -8,9 +8,10 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrderCalculationService } from './order-calculation.service';
 import { OrderInvoiceService } from './order-invoice.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [ConfigModule, TypeOrmModule.forFeature([Order, LineItem, Product])],
+  imports: [ConfigModule, TypeOrmModule.forFeature([Order, LineItem, Product]), NotificationsModule],
   controllers: [OrdersController],
   providers: [OrdersService, OrderCalculationService, OrderInvoiceService],
   exports: [TypeOrmModule],

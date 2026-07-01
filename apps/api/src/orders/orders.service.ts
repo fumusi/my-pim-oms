@@ -15,6 +15,8 @@ import { ProductStatus } from '../common/enums/product-status.enum';
 import { Role } from '../common/enums/role.enum';
 import { OrderCalculationService } from './order-calculation.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../common/enums/notification-type.enum';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { UpdateOrderDto } from './dto/update-order.dto';
 import type { FindOrdersQueryDto } from './dto/find-orders-query.dto';
@@ -54,6 +56,7 @@ export class OrdersService {
     private readonly dataSource: DataSource,
     private readonly calc: OrderCalculationService,
     private readonly auditLogService: AuditLogService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(query: FindOrdersQueryDto): Promise<PaginatedOrders> {
@@ -247,6 +250,13 @@ export class OrdersService {
     });
 
     void this.auditLogService.log('Order', result.id, 'create', null, createdBy, { snapshot: { ...result } });
+    void this.notificationsService.notifyAdmins(
+      NotificationType.NewOrder,
+      'New Order',
+      `Order ${result.orderNumber} was placed`,
+      'Order',
+      result.id,
+    );
     return result;
   }
 
@@ -523,6 +533,15 @@ export class OrdersService {
     });
 
     void this.auditLogService.log('Order', id, 'status_change', null, updatedBy, { from: result.oldStatus, to: newStatus });
+    if (newStatus === OrderStatus.Cancelled) {
+      void this.notificationsService.notifyAdmins(
+        NotificationType.OrderStatusChange,
+        'Order Cancelled',
+        `Order ${result.order.orderNumber} was cancelled`,
+        'Order',
+        result.order.id,
+      );
+    }
     return result.order;
   }
 

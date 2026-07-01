@@ -8,11 +8,13 @@ import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { User } from '../users/entities/user.entity';
 import { MailModule } from '../mail/mail.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Product, Category, User]),
     MailModule,
+    NotificationsModule,
   ],
   controllers: [ProductsController],
   providers: [ProductsService, StockNotificationService, ProductsScheduleService],

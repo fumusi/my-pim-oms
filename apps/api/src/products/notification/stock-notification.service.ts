@@ -5,7 +5,9 @@ import { Product } from '../entities/product.entity';
 import { User } from '../../users/entities/user.entity';
 import { Role } from '../../common/enums/role.enum';
 import { ProductStatus } from '../../common/enums/product-status.enum';
+import { NotificationType } from '../../common/enums/notification-type.enum';
 import { MailService } from '../../mail/mail.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 const NOTIFICATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -17,6 +19,7 @@ export class StockNotificationService {
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly mailService: MailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async checkAndNotify(): Promise<void> {
@@ -36,6 +39,12 @@ export class StockNotificationService {
       await this.mailService.sendLowStockAlert(adminEmails, lowStock);
       const now = new Date();
       await this.productRepo.save(lowStock.map((p) => ({ ...p, lastLowStockNotifiedAt: now })));
+      await this.notificationsService.notifyAdmins(
+        NotificationType.LowStock,
+        'Low Stock Alert',
+        `${lowStock.length} product(s) have low stock`,
+        'Product',
+      );
       this.logger.log(`Low-stock notification sent for ${lowStock.length} product(s)`);
     }
 
@@ -43,6 +52,12 @@ export class StockNotificationService {
       await this.mailService.sendOutOfStockAlert(adminEmails, outOfStock);
       const now = new Date();
       await this.productRepo.save(outOfStock.map((p) => ({ ...p, lastOutOfStockNotifiedAt: now })));
+      await this.notificationsService.notifyAdmins(
+        NotificationType.OutOfStock,
+        'Out of Stock Alert',
+        `${outOfStock.length} product(s) are out of stock`,
+        'Product',
+      );
       this.logger.log(`Out-of-stock notification sent for ${outOfStock.length} product(s)`);
     }
   }
@@ -77,5 +92,4 @@ export class StockNotificationService {
       )
       .getMany();
   }
-
 }

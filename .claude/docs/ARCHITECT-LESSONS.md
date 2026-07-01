@@ -28,3 +28,12 @@ Updated by the architect agent after each planning session.
 - Do not inject `Request` into services — keep services framework-agnostic.
 - Do not let audit failures throw to callers — logging is a side-effect and must never break the primary operation.
 - Do not add `AuditLogModule` to the `imports` array of individual feature modules when it is already `@Global()` — only `AppModule` needs to import it.
+
+### NotificationsModule (2026-07-01)
+- Used `@Global()` for the same reason as `AuditLogModule`: multiple unrelated modules (`OrdersModule`, `ProductsModule`) need `NotificationsService`. Without `@Global()` every consumer module would need to add `NotificationsModule` to its `imports` array, creating churn whenever a new trigger is added.
+- `notifyAdmins()` swallows errors (try/catch + Logger.error) — same contract as `AuditLogService.log()`. Notification failures must never break the primary operation (order creation, status change, stock check).
+- Fire-and-forget pattern for notification calls in service methods: `void this.notificationsService.notifyAdmins(...)`. Matches the existing `void this.auditLogService.log(...)` pattern already in `OrdersService`.
+- `AuthRequest.user.id` (number) is required for the controller to scope queries per user. Confirm it is present in the JWT payload type before implementation; the orders controller only uses `.email` and `.role` so it may be absent.
+- Route declaration order in the controller: `@Get('unread-count')` must be declared before any future `@Get(':id')` to avoid NestJS matching the literal string as a param. `@Patch('read-all')` vs `@Patch(':id/read')` are unambiguous because the suffix differs.
+- Frontend bell component is self-contained (`NotificationBell.tsx`) — `AppLayout` only adds one import and one JSX element. Keeps layout file lean.
+- Two separate queries in the bell component: the 30s polling query for count only (`/unread-count`, cheap), and an `enabled: isOpen` query for the dropdown list (fires on first open only until invalidated). Do not poll the full list — it returns 15 rows and would be wasteful at 30s intervals.
