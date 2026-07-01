@@ -8,16 +8,15 @@ import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { User } from '../users/entities/user.entity';
 import { MailModule } from '../mail/mail.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Product, Category, User]),
-    MailModule,
-    NotificationsModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Product, Category, User]), MailModule],
   controllers: [ProductsController],
-  providers: [ProductsService, StockNotificationService, ProductsScheduleService],
+  providers: [
+    ProductsService,
+    StockNotificationService,
+    ProductsScheduleService,
+  ],
   exports: [StockNotificationService, ProductsService],
 })
 export class ProductsModule {}

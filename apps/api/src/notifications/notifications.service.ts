@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
@@ -16,8 +16,11 @@ export interface PaginatedNotifications {
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
-    @InjectRepository(Notification) private readonly repo: Repository<Notification>,
+    @InjectRepository(Notification)
+    private readonly repo: Repository<Notification>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
 
@@ -28,39 +31,47 @@ export class NotificationsService {
     relatedEntityType?: string,
     relatedEntityId?: number,
   ): Promise<void> {
-    const admins = await this.userRepo.findBy({ role: Role.Admin, isActive: true });
-    if (admins.length === 0) return;
+    try {
+      const admins = await this.userRepo.findBy({
+        role: Role.Admin,
+        isActive: true,
+      });
+      if (admins.length === 0) return;
 
-    const notifications = admins.map((admin) =>
-      this.repo.create({
-        type,
-        title,
-        message,
-        relatedEntityType: relatedEntityType ?? null,
-        relatedEntityId: relatedEntityId ?? null,
-        recipientId: admin.id,
-        isRead: false,
-      }),
-    );
-    await this.repo.save(notifications);
+      const notifications = admins.map((admin) =>
+        this.repo.create({
+          type,
+          title,
+          message,
+          relatedEntityType: relatedEntityType ?? null,
+          relatedEntityId: relatedEntityId ?? null,
+          recipientId: admin.id,
+          isRead: false,
+        }),
+      );
+      await this.repo.save(notifications);
+    } catch (err) {
+      this.logger.error(
+        `Failed to notify admins [${type}]: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async findAll(
     recipientId: number,
     query: FindNotificationsQueryDto,
   ): Promise<PaginatedNotifications> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 15;
+    const { page, limit } = query;
 
     const qb = this.repo
       .createQueryBuilder('n')
-      .where('n.recipient_id = :recipientId', { recipientId })
-      .orderBy('n.created_at', 'DESC')
+      .where('n.recipientId = :recipientId', { recipientId })
+      .orderBy('n.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (query.isRead !== undefined) {
-      qb.andWhere('n.is_read = :isRead', { isRead: query.isRead });
+      qb.andWhere('n.isRead = :isRead', { isRead: query.isRead });
     }
 
     if (query.type) {
@@ -77,7 +88,8 @@ export class NotificationsService {
 
   async markRead(id: number, recipientId: number): Promise<void> {
     const notification = await this.repo.findOneBy({ id, recipientId });
-    if (!notification) throw new NotFoundException(`Notification ${id} not found`);
+    if (!notification)
+      throw new NotFoundException(`Notification ${id} not found`);
     notification.isRead = true;
     await this.repo.save(notification);
   }
