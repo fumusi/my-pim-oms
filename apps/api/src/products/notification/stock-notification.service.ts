@@ -45,7 +45,7 @@ export class StockNotificationService {
       await this.productRepo.save(
         lowStock.map((p) => ({ ...p, lastLowStockNotifiedAt: now })),
       );
-      await this.notificationsService.notifyAdmins(
+      void this.notificationsService.notifyAdmins(
         NotificationType.LowStock,
         'Low Stock Alert',
         `${lowStock.length} product(s) have low stock`,
@@ -62,7 +62,7 @@ export class StockNotificationService {
       await this.productRepo.save(
         outOfStock.map((p) => ({ ...p, lastOutOfStockNotifiedAt: now })),
       );
-      await this.notificationsService.notifyAdmins(
+      void this.notificationsService.notifyAdmins(
         NotificationType.OutOfStock,
         'Out of Stock Alert',
         `${outOfStock.length} product(s) are out of stock`,

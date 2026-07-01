@@ -16,5 +16,11 @@ export const TYPE_ICONS: Record<Notification['type'], string> = {
   out_of_stock: '🔴',
   new_order: '🛒',
   order_status_change: '📋',
-  customer_archived: '👤',
+}
+
+export function entityRoute(n: Notification): '/orders/$id' | '/products/$id' | null {
+  if (!n.relatedEntityType || !n.relatedEntityId) return null
+  if (n.relatedEntityType === 'Order') return '/orders/$id'
+  if (n.relatedEntityType === 'Product') return '/products/$id'
+  return null
 }

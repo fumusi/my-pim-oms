@@ -3,7 +3,7 @@ import { api } from './client'
 export interface Notification {
   id: number
   // keep in sync with NotificationType in apps/api/src/common/enums/notification-type.enum.ts
-  type: 'low_stock' | 'out_of_stock' | 'new_order' | 'order_status_change' | 'customer_archived'
+  type: 'low_stock' | 'out_of_stock' | 'new_order' | 'order_status_change'
   title: string
   message: string
   relatedEntityType: string | null

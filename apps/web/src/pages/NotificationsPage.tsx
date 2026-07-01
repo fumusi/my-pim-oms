@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import {
   getNotifications,
   markAllRead,
   markRead,
   type Notification,
 } from '../api/notifications'
-import { relativeTime, TYPE_ICONS } from '../utils/notifications'
+import { relativeTime, TYPE_ICONS, entityRoute } from '../utils/notifications'
 
 export function NotificationsPage() {
   const [page, setPage] = useState(1)
   const [isReadFilter, setIsReadFilter] = useState<boolean | undefined>(undefined)
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const limit = 15
 
@@ -29,6 +31,10 @@ export function NotificationsPage() {
     if (n.isRead) return
     await markRead(n.id)
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    const route = entityRoute(n)
+    if (route) {
+      void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
+    }
   }
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1

@@ -87,11 +87,10 @@ export class NotificationsService {
   }
 
   async markRead(id: number, recipientId: number): Promise<void> {
-    const notification = await this.repo.findOneBy({ id, recipientId });
-    if (!notification)
+    const result = await this.repo.update({ id, recipientId }, { isRead: true });
+    if (!result.affected) {
       throw new NotFoundException(`Notification ${id} not found`);
-    notification.isRead = true;
-    await this.repo.save(notification);
+    }
   }
 
   async markAllRead(recipientId: number): Promise<void> {

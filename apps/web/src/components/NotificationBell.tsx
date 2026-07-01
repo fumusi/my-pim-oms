@@ -8,14 +8,7 @@ import {
   markAllRead,
   type Notification,
 } from '../api/notifications'
-import { relativeTime, TYPE_ICONS } from '../utils/notifications'
-
-function entityRoute(n: Notification): '/orders/$id' | '/products/$id' | null {
-  if (!n.relatedEntityType || !n.relatedEntityId) return null
-  if (n.relatedEntityType === 'Order') return '/orders/$id'
-  if (n.relatedEntityType === 'Product') return '/products/$id'
-  return null
-}
+import { relativeTime, TYPE_ICONS, entityRoute } from '../utils/notifications'
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false)
