@@ -56,9 +56,9 @@ export class AuditLogService {
 
     if (entityType) qb.andWhere('al.entityType = :entityType', { entityType });
     if (entityId) qb.andWhere('al.entityId = :entityId', { entityId });
-    if (performedBy) qb.andWhere('al.performedBy = :performedBy', { performedBy });
+    if (performedBy) qb.andWhere('al.performedBy ILIKE :performedBy', { performedBy: `%${performedBy}%` });
     if (dateFrom) qb.andWhere('al.performedAt >= :dateFrom', { dateFrom });
-    if (dateTo) qb.andWhere('al.performedAt <= :dateTo', { dateTo });
+    if (dateTo) qb.andWhere('al.performedAt < :dateTo', { dateTo: new Date(new Date(dateTo).getTime() + 86400000) });
 
     const [data, total] = await qb.getManyAndCount();
     return { data, total, page, limit };

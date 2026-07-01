@@ -329,7 +329,7 @@ export class OrdersService {
     dto: BulkEditOrderDto,
     updatedBy: string,
   ): Promise<Order> {
-    return this.dataSource.transaction(async (em) => {
+    const order = await this.dataSource.transaction(async (em) => {
       const order = await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true, customer: true, shippingAddress: true },
@@ -464,6 +464,9 @@ export class OrdersService {
       if (!result) throw new NotFoundException(`Order ${id} not found`);
       return result;
     });
+
+    void this.auditLogService.log('Order', id, 'update', null, updatedBy);
+    return order;
   }
 
   async updateStatus(
