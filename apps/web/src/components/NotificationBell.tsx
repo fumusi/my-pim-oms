@@ -10,10 +10,10 @@ import {
 } from '../api/notifications'
 import { relativeTime, TYPE_ICONS } from '../utils/notifications'
 
-function entityPath(n: Notification): string | null {
+function entityRoute(n: Notification): '/orders/$id' | '/products/$id' | null {
   if (!n.relatedEntityType || !n.relatedEntityId) return null
-  if (n.relatedEntityType === 'Order') return `/orders/${n.relatedEntityId}`
-  if (n.relatedEntityType === 'Product') return `/products/${n.relatedEntityId}`
+  if (n.relatedEntityType === 'Order') return '/orders/$id'
+  if (n.relatedEntityType === 'Product') return '/products/$id'
   return null
 }
 
@@ -57,9 +57,10 @@ export function NotificationBell() {
     await markRead(n.id)
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
     setOpen(false)
-    const path = entityPath(n)
-    if (path) {
-      void navigate({ to: path as '/orders/$id' | '/products/$id', params: { id: String(n.relatedEntityId) } })
+    const route = entityRoute(n)
+    if (route) {
+      // relatedEntityType is limited to 'Order' | 'Product' today; extend entityRoute if more types are added
+      void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
     }
   }
 

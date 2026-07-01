@@ -7,7 +7,9 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 const mockJson = jest.fn();
 const mockStatus = jest.fn().mockReturnValue({ json: mockJson });
 const mockGetResponse = jest.fn().mockReturnValue({ status: mockStatus });
-const mockGetRequest = jest.fn().mockReturnValue({ path: '/api/test', method: 'GET' });
+const mockGetRequest = jest
+  .fn()
+  .mockReturnValue({ path: '/api/test', method: 'GET' });
 const mockSwitchToHttp = jest.fn().mockReturnValue({
   getResponse: mockGetResponse,
   getRequest: mockGetRequest,
@@ -27,11 +29,12 @@ describe('AllExceptionsFilter', () => {
       getResponse: mockGetResponse,
       getRequest: mockGetRequest,
     });
-
   });
 
   it('handles ZodValidationException with 400 and populated errors array', () => {
-    const zodError = z.object({ email: z.string().email() }).safeParse({ email: 'bad' }).error!;
+    const zodError = z
+      .object({ email: z.string().email() })
+      .safeParse({ email: 'bad' }).error!;
     const ex = new ZodValidationException(zodError);
 
     filter.catch(ex, host);
@@ -59,7 +62,10 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('handles HttpException with object response containing message', () => {
-    const ex = new HttpException({ message: 'foo', error: 'Bad Request' }, HttpStatus.BAD_REQUEST);
+    const ex = new HttpException(
+      { message: 'foo', error: 'Bad Request' },
+      HttpStatus.BAD_REQUEST,
+    );
 
     filter.catch(ex, host);
 
@@ -91,7 +97,9 @@ describe('AllExceptionsFilter', () => {
     expect(mockStatus).toHaveBeenCalledWith(409);
     const payload = mockJson.mock.calls[0][0];
     expect(payload.statusCode).toBe(409);
-    expect(payload.message).toBe('Operation not permitted — referenced record not found');
+    expect(payload.message).toBe(
+      'Operation not permitted — referenced record not found',
+    );
     expect(payload.errors).toEqual([]);
   });
 
@@ -131,7 +139,9 @@ describe('AllExceptionsFilter', () => {
     expect(mockStatus).toHaveBeenCalledWith(400);
     const payload = mockJson.mock.calls[0][0];
     expect(payload.statusCode).toBe(400);
-    expect(payload.message).toBe('email must be an email, name must not be empty');
+    expect(payload.message).toBe(
+      'email must be an email, name must not be empty',
+    );
     expect(payload.errors).toEqual([]);
   });
 });

@@ -13,7 +13,11 @@ export class Notification {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'enum', enum: NotificationType, enumName: 'notification_type' })
+  @Column({
+    type: 'enum',
+    enum: NotificationType,
+    enumName: 'notification_type',
+  })
   type!: NotificationType;
 
   @Column()

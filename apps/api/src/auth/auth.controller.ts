@@ -1,8 +1,22 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus,
-  Post, Query, Req, Res, UseGuards,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response, CookieOptions } from 'express';
@@ -80,11 +94,16 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send password reset email' })
-  @ApiResponse({ status: 200, description: 'Reset email sent if address is registered' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reset email sent if address is registered',
+  })
   @ApiResponse({ status: 400, description: 'Validation error' })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     await this.authService.forgotPassword(dto);
-    return { message: 'If that email is registered, a reset link has been sent.' };
+    return {
+      message: 'If that email is registered, a reset link has been sent.',
+    };
   }
 
   @Post('reset-password')
@@ -92,7 +111,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
-  @ApiResponse({ status: 400, description: 'Validation error or invalid token' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error or invalid token',
+  })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto);
     return { message: 'Password reset successfully.' };
@@ -109,28 +131,38 @@ export class AuthController {
   @Public()
   @UseGuards(AuthGuard('github'))
   @ApiOperation({ summary: 'GitHub OAuth callback' })
-  @ApiResponse({ status: 302, description: 'Redirect to frontend with auth code' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to frontend with auth code',
+  })
   async githubCallback(
     @Req() req: Request & { user: GithubProfile },
     @Res() res: Response,
   ) {
     const tokens = await this.authService.findOrCreateGithubUser(req.user);
     const code = await this.authService.createOAuthExchangeCode(tokens);
-    res.redirect(`${this.config.getOrThrow('APP_URL')}/auth/callback?code=${code}`);
+    res.redirect(
+      `${this.config.getOrThrow('APP_URL')}/auth/callback?code=${code}`,
+    );
   }
 
   @Get('exchange')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Exchange OAuth code for tokens' })
-  @ApiQuery({ name: 'code', required: true, description: 'OAuth exchange code' })
+  @ApiQuery({
+    name: 'code',
+    required: true,
+    description: 'OAuth exchange code',
+  })
   @ApiResponse({ status: 200, description: 'Tokens issued' })
   @ApiResponse({ status: 400, description: 'Invalid or expired code' })
   async exchange(
     @Query('code') code: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { accessToken, refreshToken } = await this.authService.exchangeOAuthCode(code);
+    const { accessToken, refreshToken } =
+      await this.authService.exchangeOAuthCode(code);
     res.cookie(REFRESH_COOKIE, refreshToken, cookieOptions());
     return { accessToken };
   }

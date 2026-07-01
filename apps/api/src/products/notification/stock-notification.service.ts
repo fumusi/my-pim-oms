@@ -16,14 +16,18 @@ export class StockNotificationService {
   private readonly logger = new Logger(StockNotificationService.name);
 
   constructor(
-    @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly mailService: MailService,
     private readonly notificationsService: NotificationsService,
   ) {}
 
   async checkAndNotify(): Promise<void> {
-    const admins = await this.userRepo.findBy({ role: Role.Admin, isActive: true });
+    const admins = await this.userRepo.findBy({
+      role: Role.Admin,
+      isActive: true,
+    });
     const adminEmails = admins.map((u) => u.email);
     if (adminEmails.length === 0) {
       this.logger.warn('No active admins found — skipping stock notifications');
@@ -38,27 +42,35 @@ export class StockNotificationService {
     if (lowStock.length > 0) {
       await this.mailService.sendLowStockAlert(adminEmails, lowStock);
       const now = new Date();
-      await this.productRepo.save(lowStock.map((p) => ({ ...p, lastLowStockNotifiedAt: now })));
+      await this.productRepo.save(
+        lowStock.map((p) => ({ ...p, lastLowStockNotifiedAt: now })),
+      );
       await this.notificationsService.notifyAdmins(
         NotificationType.LowStock,
         'Low Stock Alert',
         `${lowStock.length} product(s) have low stock`,
         'Product',
       );
-      this.logger.log(`Low-stock notification sent for ${lowStock.length} product(s)`);
+      this.logger.log(
+        `Low-stock notification sent for ${lowStock.length} product(s)`,
+      );
     }
 
     if (outOfStock.length > 0) {
       await this.mailService.sendOutOfStockAlert(adminEmails, outOfStock);
       const now = new Date();
-      await this.productRepo.save(outOfStock.map((p) => ({ ...p, lastOutOfStockNotifiedAt: now })));
+      await this.productRepo.save(
+        outOfStock.map((p) => ({ ...p, lastOutOfStockNotifiedAt: now })),
+      );
       await this.notificationsService.notifyAdmins(
         NotificationType.OutOfStock,
         'Out of Stock Alert',
         `${outOfStock.length} product(s) are out of stock`,
         'Product',
       );
-      this.logger.log(`Out-of-stock notification sent for ${outOfStock.length} product(s)`);
+      this.logger.log(
+        `Out-of-stock notification sent for ${outOfStock.length} product(s)`,
+      );
     }
   }
 

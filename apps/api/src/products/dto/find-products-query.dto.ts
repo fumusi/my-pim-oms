@@ -11,4 +11,6 @@ const FindProductsQuerySchema = z.object({
   lang: z.enum(['nl', 'en', 'de']).optional(),
 });
 
-export class FindProductsQueryDto extends createZodDto(FindProductsQuerySchema) {}
+export class FindProductsQueryDto extends createZodDto(
+  FindProductsQuerySchema,
+) {}

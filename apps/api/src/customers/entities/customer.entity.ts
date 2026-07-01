@@ -15,7 +15,12 @@ export class Customer {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'varchar', unique: true, name: 'customer_number', update: false })
+  @Column({
+    type: 'varchar',
+    unique: true,
+    name: 'customer_number',
+    update: false,
+  })
   customerNumber!: string;
 
   @Column({ type: 'varchar' })
@@ -36,7 +41,12 @@ export class Customer {
   @Column({ type: 'varchar', nullable: true, name: 'vat_number' })
   vatNumber!: string | null;
 
-  @Column({ type: 'enum', enum: CustomerStatus, enumName: 'customer_status', default: CustomerStatus.Active })
+  @Column({
+    type: 'enum',
+    enum: CustomerStatus,
+    enumName: 'customer_status',
+    default: CustomerStatus.Active,
+  })
   status!: CustomerStatus;
 
   @Column({

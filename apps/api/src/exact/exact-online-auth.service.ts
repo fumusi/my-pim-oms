@@ -36,17 +36,26 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
     private readonly tokenRepository: Repository<ExactOnlineToken>,
   ) {
     this.clientId = this.configService.getOrThrow<string>('EXACT_CLIENT_ID');
-    this.clientSecret = this.configService.getOrThrow<string>('EXACT_CLIENT_SECRET');
-    this.redirectUri = this.configService.getOrThrow<string>('EXACT_REDIRECT_URI');
-    this.encryptionKey = this.configService.getOrThrow<string>('EXACT_TOKEN_SECRET');
+    this.clientSecret = this.configService.getOrThrow<string>(
+      'EXACT_CLIENT_SECRET',
+    );
+    this.redirectUri =
+      this.configService.getOrThrow<string>('EXACT_REDIRECT_URI');
+    this.encryptionKey =
+      this.configService.getOrThrow<string>('EXACT_TOKEN_SECRET');
 
     if (!/^[0-9a-f]{64}$/i.test(this.encryptionKey)) {
-      throw new Error('EXACT_TOKEN_SECRET must be a 64-character hex string (32 bytes). Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+      throw new Error(
+        "EXACT_TOKEN_SECRET must be a 64-character hex string (32 bytes). Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+      );
     }
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    const stored = await this.tokenRepository.findOne({ where: {}, order: { id: 'ASC' } });
+    const stored = await this.tokenRepository.findOne({
+      where: {},
+      order: { id: 'ASC' },
+    });
     if (!stored) return;
     try {
       this.tokenSet = {
@@ -57,7 +66,7 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
     } catch {
       this.logger.warn(
         'Stored Exact Online token could not be decrypted (possibly pre-encryption plaintext). ' +
-        'Clearing stored token — re-authorize via the dashboard.',
+          'Clearing stored token — re-authorize via the dashboard.',
       );
       await this.tokenRepository.delete({ id: stored.id });
     }
@@ -66,7 +75,9 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
   markDisconnected(): void {
     if (this.connectionBroken) return;
     this.connectionBroken = true;
-    this.logger.warn('Exact Online credentials revoked — marked as disconnected');
+    this.logger.warn(
+      'Exact Online credentials revoked — marked as disconnected',
+    );
   }
 
   getConnectionStatus(): ConnectionStatus {
@@ -116,11 +127,15 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
 
   async getAccessToken(): Promise<string> {
     if (this.connectionBroken) {
-      throw new UnauthorizedException('Exact Online credentials have been revoked.');
+      throw new UnauthorizedException(
+        'Exact Online credentials have been revoked.',
+      );
     }
 
     if (!this.tokenSet) {
-      throw new UnauthorizedException('Not connected to Exact Online. Visit /exact/authorize first.');
+      throw new UnauthorizedException(
+        'Not connected to Exact Online. Visit /exact/authorize first.',
+      );
     }
 
     if (Date.now() >= this.tokenSet.expires_at - 30_000) {
@@ -134,7 +149,10 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
         await this.refreshInFlight;
       } catch (err) {
         if (this.connectionBroken) {
-          throw new UnauthorizedException('Exact Online credentials have been revoked.', { cause: err });
+          throw new UnauthorizedException(
+            'Exact Online credentials have been revoked.',
+            { cause: err },
+          );
         }
         throw err;
       }
@@ -169,7 +187,11 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
     }
   }
 
-  private async setTokens({ access_token, refresh_token, expires_in }: TokenResponse): Promise<void> {
+  private async setTokens({
+    access_token,
+    refresh_token,
+    expires_in,
+  }: TokenResponse): Promise<void> {
     this.connectionBroken = false;
     const expires_at = Date.now() + (Number(expires_in) || 600) * 1000;
     this.tokenSet = { access_token, refresh_token, expires_at };
@@ -177,7 +199,10 @@ export class ExactOnlineAuthService implements OnApplicationBootstrap {
     const encAccessToken = encrypt(access_token, this.encryptionKey);
     const encRefreshToken = encrypt(refresh_token, this.encryptionKey);
 
-    const existing = await this.tokenRepository.findOne({ where: {}, order: { id: 'ASC' } });
+    const existing = await this.tokenRepository.findOne({
+      where: {},
+      order: { id: 'ASC' },
+    });
     if (existing) {
       await this.tokenRepository.save({
         ...existing,

@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -23,18 +27,44 @@ const loginDto: LoginDto = {
   password: 'Password1',
 };
 
-const savedUser = { id: 1, email: 'test@example.com', role: Role.User, isActive: true } as User;
+const savedUser = {
+  id: 1,
+  email: 'test@example.com',
+  role: Role.User,
+  isActive: true,
+} as User;
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersRepo: { findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock };
-  let mailService: { sendConfirmationEmail: jest.Mock; sendPasswordResetEmail: jest.Mock };
+  let usersRepo: {
+    findOneBy: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+  };
+  let mailService: {
+    sendConfirmationEmail: jest.Mock;
+    sendPasswordResetEmail: jest.Mock;
+  };
   let jwtService: { signAsync: jest.Mock };
-  let redisService: { get: jest.Mock; set: jest.Mock; del: jest.Mock; exists: jest.Mock };
+  let redisService: {
+    get: jest.Mock;
+    set: jest.Mock;
+    del: jest.Mock;
+    exists: jest.Mock;
+  };
 
   beforeEach(async () => {
-    usersRepo = { findOneBy: jest.fn(), create: jest.fn(), save: jest.fn(), update: jest.fn() };
-    mailService = { sendConfirmationEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };
+    usersRepo = {
+      findOneBy: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+    };
+    mailService = {
+      sendConfirmationEmail: jest.fn(),
+      sendPasswordResetEmail: jest.fn(),
+    };
     jwtService = { signAsync: jest.fn().mockResolvedValue('signed-token') };
     redisService = {
       get: jest.fn(),
@@ -69,7 +99,9 @@ describe('AuthService', () => {
 
     it('throws 409 when email already exists', async () => {
       usersRepo.findOneBy.mockResolvedValue(savedUser);
-      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.register(registerDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('hashes the password before saving', async () => {
@@ -81,7 +113,9 @@ describe('AuthService', () => {
 
       const created: Partial<User> = usersRepo.create.mock.calls[0][0];
       expect(created.password).not.toBe(registerDto.password);
-      await expect(bcrypt.compare(registerDto.password, created.password!)).resolves.toBe(true);
+      await expect(
+        bcrypt.compare(registerDto.password, created.password!),
+      ).resolves.toBe(true);
     });
 
     it('assigns Role.User by default', async () => {
@@ -102,7 +136,10 @@ describe('AuthService', () => {
 
       await service.register(registerDto);
 
-      expect(mailService.sendConfirmationEmail).toHaveBeenCalledWith(registerDto.email, expect.stringMatching(/^[0-9a-f]{64}$/));
+      expect(mailService.sendConfirmationEmail).toHaveBeenCalledWith(
+        registerDto.email,
+        expect.stringMatching(/^[0-9a-f]{64}$/),
+      );
     });
   });
 
@@ -110,7 +147,10 @@ describe('AuthService', () => {
     let userWithHash: User;
 
     beforeEach(async () => {
-      userWithHash = { ...savedUser, password: await bcrypt.hash('Password1', 10) } as User;
+      userWithHash = {
+        ...savedUser,
+        password: await bcrypt.hash('Password1', 10),
+      };
       redisService.set.mockResolvedValue(undefined);
     });
 
@@ -126,14 +166,16 @@ describe('AuthService', () => {
 
     it('throws 401 when email not found', async () => {
       usersRepo.findOneBy.mockResolvedValue(null);
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws 401 when password is wrong', async () => {
       usersRepo.findOneBy.mockResolvedValue(userWithHash);
-      await expect(service.login({ ...loginDto, password: 'WrongPass1' })).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.login({ ...loginDto, password: 'WrongPass1' }),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('signs JWT with userId, email, role and jti', async () => {
@@ -142,7 +184,11 @@ describe('AuthService', () => {
       await service.login(loginDto);
 
       const payload = jwtService.signAsync.mock.calls[0][0];
-      expect(payload).toMatchObject({ sub: savedUser.id, email: savedUser.email, role: savedUser.role });
+      expect(payload).toMatchObject({
+        sub: savedUser.id,
+        email: savedUser.email,
+        role: savedUser.role,
+      });
       expect(typeof payload.jti).toBe('string');
     });
 
@@ -174,7 +220,10 @@ describe('AuthService', () => {
       usersRepo.findOneBy.mockResolvedValue(savedUser);
       redisService.set.mockResolvedValue(undefined);
 
-      const result = await service.findOrCreateGithubUser({ ...githubProfile, email: savedUser.email });
+      const result = await service.findOrCreateGithubUser({
+        ...githubProfile,
+        email: savedUser.email,
+      });
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
@@ -184,7 +233,10 @@ describe('AuthService', () => {
       usersRepo.findOneBy.mockResolvedValue({ ...savedUser, isActive: false });
 
       await expect(
-        service.findOrCreateGithubUser({ ...githubProfile, email: savedUser.email }),
+        service.findOrCreateGithubUser({
+          ...githubProfile,
+          email: savedUser.email,
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -204,21 +256,30 @@ describe('AuthService', () => {
 
   describe('refresh', () => {
     it('throws 401 when no refresh token provided', async () => {
-      await expect(service.refresh(undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh(undefined)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws 401 when refresh token not found in Redis', async () => {
       redisService.get.mockResolvedValue(null);
-      await expect(service.refresh('1:abc')).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('1:abc')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws 401 when refresh token hash does not match', async () => {
       redisService.get.mockResolvedValue('wrong-hash');
-      await expect(service.refresh('1:abc')).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('1:abc')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('rotates refresh token and returns new accessToken', async () => {
-      const userWithHash = { ...savedUser, password: await bcrypt.hash('Password1', 10) } as User;
+      const userWithHash = {
+        ...savedUser,
+        password: await bcrypt.hash('Password1', 10),
+      } as User;
       // Simulate a valid refresh token by going through login first
       redisService.set.mockResolvedValue(undefined);
       usersRepo.findOneBy.mockResolvedValue(userWithHash);
@@ -240,17 +301,35 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('blacklists the access token jti in Redis', async () => {
-      const user = { sub: 1, email: 'test@example.com', role: Role.User, customerId: null, jti: 'abc-123', exp: Math.floor(Date.now() / 1000) + 3600 };
+      const user = {
+        sub: 1,
+        email: 'test@example.com',
+        role: Role.User,
+        customerId: null,
+        jti: 'abc-123',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
       redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 
       await service.logout(user, undefined);
 
-      expect(redisService.set).toHaveBeenCalledWith('bl:abc-123', '1', expect.any(Number));
+      expect(redisService.set).toHaveBeenCalledWith(
+        'bl:abc-123',
+        '1',
+        expect.any(Number),
+      );
     });
 
     it('deletes refresh token from Redis on logout', async () => {
-      const user = { sub: 1, email: 'test@example.com', role: Role.User, customerId: null, jti: 'abc-123', exp: Math.floor(Date.now() / 1000) + 3600 };
+      const user = {
+        sub: 1,
+        email: 'test@example.com',
+        role: Role.User,
+        customerId: null,
+        jti: 'abc-123',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
       redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 
@@ -263,7 +342,9 @@ describe('AuthService', () => {
   describe('forgotPassword', () => {
     it('returns without error when email is not found (no enumeration)', async () => {
       usersRepo.findOneBy.mockResolvedValue(null);
-      await expect(service.forgotPassword({ email: 'nobody@example.com' })).resolves.toBeUndefined();
+      await expect(
+        service.forgotPassword({ email: 'nobody@example.com' }),
+      ).resolves.toBeUndefined();
       expect(usersRepo.update).not.toHaveBeenCalled();
       expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
@@ -280,11 +361,14 @@ describe('AuthService', () => {
       expect(patch.resetTokenExpiresAt).toBeInstanceOf(Date);
       expect(patch.resetTokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
 
-      const [emailTo, rawToken] = mailService.sendPasswordResetEmail.mock.calls[0];
+      const [emailTo, rawToken] =
+        mailService.sendPasswordResetEmail.mock.calls[0];
       expect(emailTo).toBe(savedUser.email);
       expect(rawToken).toHaveLength(64); // 32 bytes hex
       expect(patch.resetToken).not.toBe(rawToken); // DB stores hash, not raw
-      expect(patch.resetToken).toBe(createHash('sha256').update(rawToken).digest('hex'));
+      expect(patch.resetToken).toBe(
+        createHash('sha256').update(rawToken).digest('hex'),
+      );
     });
 
     it('token expires in ~15 minutes', async () => {
@@ -306,11 +390,17 @@ describe('AuthService', () => {
   describe('resetPassword', () => {
     const rawToken = 'valid-token-abc123';
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const dto = { token: rawToken, newPassword: 'NewPass1', confirmPassword: 'NewPass1' };
+    const dto = {
+      token: rawToken,
+      newPassword: 'NewPass1',
+      confirmPassword: 'NewPass1',
+    };
 
     it('throws 400 when token not found', async () => {
       usersRepo.findOneBy.mockResolvedValue(null);
-      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.resetPassword(dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws 400 when token is expired', async () => {
@@ -320,7 +410,9 @@ describe('AuthService', () => {
         resetTokenExpiresAt: new Date(Date.now() - 1000),
       } as User;
       usersRepo.findOneBy.mockResolvedValue(expiredUser);
-      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.resetPassword(dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('hashes new password, clears reset token, and invalidates refresh token', async () => {
@@ -338,7 +430,9 @@ describe('AuthService', () => {
       const [id, patch] = usersRepo.update.mock.calls[0];
       expect(id).toBe(savedUser.id);
       expect(patch.password).not.toBe(dto.newPassword);
-      await expect(bcrypt.compare(dto.newPassword, patch.password)).resolves.toBe(true);
+      await expect(
+        bcrypt.compare(dto.newPassword, patch.password),
+      ).resolves.toBe(true);
       expect(patch.resetToken).toBeNull();
       expect(patch.resetTokenExpiresAt).toBeNull();
       expect(redisService.del).toHaveBeenCalledWith(`rt:${savedUser.id}`);

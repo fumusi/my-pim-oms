@@ -14,7 +14,13 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
@@ -45,7 +51,8 @@ export class PriceListsController {
     if (req.user.role !== Role.Admin && req.user.customerId == null) {
       throw new ForbiddenException('No customer account linked to this user');
     }
-    const scopedCustomerId = req.user.role === Role.Admin ? undefined : req.user.customerId!;
+    const scopedCustomerId =
+      req.user.role === Role.Admin ? undefined : req.user.customerId!;
     return this.service.findAll(query, scopedCustomerId);
   }
 
@@ -106,7 +113,8 @@ export class PriceListsController {
     if (req.user.role !== Role.Admin && req.user.customerId == null) {
       throw new ForbiddenException('No customer account linked to this user');
     }
-    const scopedCustomerId = req.user.role === Role.Admin ? undefined : req.user.customerId!;
+    const scopedCustomerId =
+      req.user.role === Role.Admin ? undefined : req.user.customerId!;
     return this.service.findById(id, scopedCustomerId);
   }
 

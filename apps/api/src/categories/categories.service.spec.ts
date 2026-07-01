@@ -11,21 +11,20 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { ProductsService } from '../products/products.service';
 
-const makeCategory = (overrides: Partial<Category> = {}): Category =>
-  ({
-    id: 1,
-    name: { nl: 'Categorie', en: 'Category', de: 'Kategorie' },
-    description: null,
-    image: null,
-    icon: null,
-    status: CategoryStatus.Active,
-    template: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    updatedBy: null,
-    archivedAt: null,
-    ...overrides,
-  }) as Category;
+const makeCategory = (overrides: Partial<Category> = {}): Category => ({
+  id: 1,
+  name: { nl: 'Categorie', en: 'Category', de: 'Kategorie' },
+  description: null,
+  image: null,
+  icon: null,
+  status: CategoryStatus.Active,
+  template: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  updatedBy: null,
+  archivedAt: null,
+  ...overrides,
+});
 
 describe('CategoriesService', () => {
   let service: CategoriesService;
@@ -84,7 +83,12 @@ describe('CategoriesService', () => {
     it('returns categories merged with product counts', async () => {
       const cats = [makeCategory({ id: 1 }), makeCategory({ id: 2 })];
       categoryRepo.find.mockResolvedValue(cats);
-      itemsService.countsByCategoryIds.mockResolvedValue(new Map([[1, 3], [2, 0]]));
+      itemsService.countsByCategoryIds.mockResolvedValue(
+        new Map([
+          [1, 3],
+          [2, 0],
+        ]),
+      );
 
       const result = await service.findAll();
 
@@ -107,7 +111,9 @@ describe('CategoriesService', () => {
       await service.findAll(CategoryStatus.Inactive);
 
       expect(categoryRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ status: CategoryStatus.Inactive }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ status: CategoryStatus.Inactive }),
+        }),
       );
     });
   });
@@ -144,14 +150,19 @@ describe('CategoriesService', () => {
 
   describe('create', () => {
     it('creates a category and wires updatedBy', async () => {
-      const dto: CreateCategoryDto = { name: { nl: 'Test', en: 'Test', de: 'Test' } };
+      const dto: CreateCategoryDto = {
+        name: { nl: 'Test', en: 'Test', de: 'Test' },
+      };
       const built = makeCategory(dto);
       categoryRepo.create.mockReturnValue(built);
       categoryRepo.save.mockResolvedValue(built);
 
       const result = await service.create(dto, 'admin@test.com');
 
-      expect(categoryRepo.create).toHaveBeenCalledWith({ ...dto, updatedBy: 'admin@test.com' });
+      expect(categoryRepo.create).toHaveBeenCalledWith({
+        ...dto,
+        updatedBy: 'admin@test.com',
+      });
       expect(result).toBe(built);
     });
   });
@@ -226,9 +237,13 @@ describe('CategoriesService', () => {
 
   describe('delete', () => {
     it('throws EntityNotFoundError for a non-existent category', async () => {
-      categoryRepo.findOneOrFail.mockRejectedValue(new EntityNotFoundError(Category, { id: 999 }));
+      categoryRepo.findOneOrFail.mockRejectedValue(
+        new EntityNotFoundError(Category, { id: 999 }),
+      );
 
-      await expect(service.delete(999, 'admin@test.com')).rejects.toBeInstanceOf(EntityNotFoundError);
+      await expect(
+        service.delete(999, 'admin@test.com'),
+      ).rejects.toBeInstanceOf(EntityNotFoundError);
       expect(itemsService.countByCategory).not.toHaveBeenCalled();
     });
 
@@ -236,7 +251,9 @@ describe('CategoriesService', () => {
       categoryRepo.findOneOrFail.mockResolvedValue(makeCategory());
       itemsService.countByCategory.mockResolvedValue(3);
 
-      await expect(service.delete(1, 'admin@test.com')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.delete(1, 'admin@test.com')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       await expect(service.delete(1, 'admin@test.com')).rejects.toMatchObject({
         message: 'Cannot delete category: 3 products still assigned',
       });
@@ -276,7 +293,9 @@ describe('CategoriesService', () => {
       await service.archive(1, 'admin@test.com');
 
       expect(cat.archivedAt).toBeInstanceOf(Date);
-      expect(cat.archivedAt!.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(cat.archivedAt!.getTime()).toBeGreaterThanOrEqual(
+        before.getTime(),
+      );
       expect(cat.updatedBy).toBe('admin@test.com');
     });
 
@@ -296,7 +315,9 @@ describe('CategoriesService', () => {
       categoryRepo.findOneOrFail.mockResolvedValue(cat);
       itemsService.countByCategory.mockResolvedValue(2);
 
-      await expect(service.archive(1)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.archive(1)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       await expect(service.archive(1)).rejects.toMatchObject({
         message: 'Cannot archive category: 2 products still assigned',
       });
@@ -308,9 +329,13 @@ describe('CategoriesService', () => {
 
   describe('assignProducts', () => {
     it('throws EntityNotFoundError for a non-existent category', async () => {
-      categoryRepo.findOneOrFail.mockRejectedValue(new EntityNotFoundError(Category, { id: 99 }));
+      categoryRepo.findOneOrFail.mockRejectedValue(
+        new EntityNotFoundError(Category, { id: 99 }),
+      );
 
-      await expect(service.assignProducts(99, ['uuid-1'])).rejects.toBeInstanceOf(EntityNotFoundError);
+      await expect(
+        service.assignProducts(99, ['uuid-1']),
+      ).rejects.toBeInstanceOf(EntityNotFoundError);
       expect(itemsService.assignToCategory).not.toHaveBeenCalled();
     });
 
@@ -322,17 +347,30 @@ describe('CategoriesService', () => {
 
       const result = await service.assignProducts(1, ['uuid-1', 'uuid-2']);
 
-      expect(itemsService.assignToCategory).toHaveBeenCalledWith(['uuid-1', 'uuid-2'], 1, template);
+      expect(itemsService.assignToCategory).toHaveBeenCalledWith(
+        ['uuid-1', 'uuid-2'],
+        1,
+        template,
+      );
       expect(result).toBe(assignResult);
     });
 
     it('passes null template when category has no template', async () => {
-      categoryRepo.findOneOrFail.mockResolvedValue(makeCategory({ template: null }));
-      itemsService.assignToCategory.mockResolvedValue({ assigned: 1, skipped: [] });
+      categoryRepo.findOneOrFail.mockResolvedValue(
+        makeCategory({ template: null }),
+      );
+      itemsService.assignToCategory.mockResolvedValue({
+        assigned: 1,
+        skipped: [],
+      });
 
       await service.assignProducts(1, ['uuid-1']);
 
-      expect(itemsService.assignToCategory).toHaveBeenCalledWith(['uuid-1'], 1, null);
+      expect(itemsService.assignToCategory).toHaveBeenCalledWith(
+        ['uuid-1'],
+        1,
+        null,
+      );
     });
   });
 
@@ -340,9 +378,13 @@ describe('CategoriesService', () => {
 
   describe('unassignProducts', () => {
     it('throws EntityNotFoundError for a non-existent category', async () => {
-      categoryRepo.findOneOrFail.mockRejectedValue(new EntityNotFoundError(Category, { id: 99 }));
+      categoryRepo.findOneOrFail.mockRejectedValue(
+        new EntityNotFoundError(Category, { id: 99 }),
+      );
 
-      await expect(service.unassignProducts(99, ['uuid-1'])).rejects.toBeInstanceOf(EntityNotFoundError);
+      await expect(
+        service.unassignProducts(99, ['uuid-1']),
+      ).rejects.toBeInstanceOf(EntityNotFoundError);
       expect(itemsService.unassignFromCategory).not.toHaveBeenCalled();
     });
 
@@ -352,7 +394,10 @@ describe('CategoriesService', () => {
 
       const result = await service.unassignProducts(1, ['uuid-1']);
 
-      expect(itemsService.unassignFromCategory).toHaveBeenCalledWith(['uuid-1'], 1);
+      expect(itemsService.unassignFromCategory).toHaveBeenCalledWith(
+        ['uuid-1'],
+        1,
+      );
       expect(result).toEqual({ unassigned: 1 });
     });
   });

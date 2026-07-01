@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 @Entity('audit_logs')
 @Index('IDX_audit_logs_entity_type_entity_id', ['entityType', 'entityId'])
@@ -13,7 +19,11 @@ export class AuditLog {
   @Column({ type: 'int', nullable: false, name: 'entity_id' })
   entityId: number;
 
-  @Column({ type: 'enum', enum: ['create', 'update', 'delete', 'archive', 'status_change'], enumName: 'audit_log_action_enum' })
+  @Column({
+    type: 'enum',
+    enum: ['create', 'update', 'delete', 'archive', 'status_change'],
+    enumName: 'audit_log_action_enum',
+  })
   action: 'create' | 'update' | 'delete' | 'archive' | 'status_change';
 
   @Column({ type: 'jsonb', nullable: true, name: 'changed_fields' })

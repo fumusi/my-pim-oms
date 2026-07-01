@@ -13,7 +13,13 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { z } from 'zod';
 import { createZodDto } from 'nestjs-zod';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -21,7 +27,11 @@ import { Role } from '../common/enums/role.enum';
 import { CategoryStatus } from '../common/enums/category-status.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
 import type { LocalizedText } from '../common/types/localized-text.interface';
-import { CategoriesService, CategoryWithCount, CategoryDetail } from './categories.service';
+import {
+  CategoriesService,
+  CategoryWithCount,
+  CategoryDetail,
+} from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { StatusDto } from './dto/status.dto';
@@ -43,14 +53,13 @@ const DetailQuerySchema = z.object({
 });
 class DetailQueryDto extends createZodDto(DetailQuerySchema) {}
 
-
 function flattenLang(
   item: CategoryWithCount | CategoryDetail,
   lang: 'nl' | 'en' | 'de',
 ) {
   const { name, description, ...rest } = item;
-  const n = name as LocalizedText;
-  const d = description as LocalizedText | null;
+  const n = name;
+  const d = description;
   return {
     ...rest,
     name: n[lang] ?? n.nl ?? n.en ?? n.de ?? '',
@@ -58,9 +67,11 @@ function flattenLang(
   };
 }
 
-function stripTemplate<T extends { template?: unknown }>(item: T): Omit<T, 'template'> {
+function stripTemplate<T extends { template?: unknown }>(
+  item: T,
+): Omit<T, 'template'> {
   const { template: _, ...rest } = item;
-  return rest as Omit<T, 'template'>;
+  return rest;
 }
 
 @ApiTags('Categories')
@@ -81,10 +92,12 @@ export class CategoriesController {
     const statusFilter = isAdmin ? query.status : CategoryStatus.Active;
     const categories = await this.categoriesService.findAll(statusFilter);
 
-    const result: unknown[] = isAdmin ? categories : categories.map(stripTemplate);
+    const result: unknown[] = isAdmin
+      ? categories
+      : categories.map(stripTemplate);
 
     if (query.lang) {
-      const lang = query.lang as 'nl' | 'en' | 'de';
+      const lang = query.lang;
       return (result as CategoryWithCount[]).map((c) => flattenLang(c, lang));
     }
 
@@ -105,7 +118,12 @@ export class CategoriesController {
     @Query() query: DetailQueryDto,
     @Req() req: AuthRequest,
   ) {
-    const detail = await this.categoriesService.findOneDetail(id, query.page, query.limit, query.search);
+    const detail = await this.categoriesService.findOneDetail(
+      id,
+      query.page,
+      query.limit,
+      query.search,
+    );
     if (!detail) throw new NotFoundException(`Category ${id} not found`);
 
     const isAdmin = req.user.role === Role.Admin;
@@ -216,7 +234,10 @@ export class CategoriesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  assignProducts(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignProductsDto) {
+  assignProducts(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignProductsDto,
+  ) {
     return this.categoriesService.assignProducts(id, dto.productIds);
   }
 
@@ -233,7 +254,10 @@ export class CategoriesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  unassignProducts(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignProductsDto) {
+  unassignProducts(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignProductsDto,
+  ) {
     return this.categoriesService.unassignProducts(id, dto.productIds);
   }
 }

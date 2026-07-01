@@ -18,7 +18,10 @@ import { MailService } from './mail.service';
           },
         },
         defaults: {
-          from: config.get<string>('MAIL_FROM', '"PIM OMS" <noreply@pim-oms.com>'),
+          from: config.get<string>(
+            'MAIL_FROM',
+            '"PIM OMS" <noreply@pim-oms.com>',
+          ),
         },
       }),
     }),

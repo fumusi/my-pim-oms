@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import * as XLSX from 'xlsx';
@@ -59,7 +64,10 @@ export class ProductsService {
     return { data, total, page, limit };
   }
 
-  private applyFilters(qb: SelectQueryBuilder<Product>, query: FindProductsQueryDto): void {
+  private applyFilters(
+    qb: SelectQueryBuilder<Product>,
+    query: FindProductsQueryDto,
+  ): void {
     if (!query.status) {
       qb.andWhere('p.archivedAt IS NULL');
     } else if (query.status === 'archived') {
@@ -103,22 +111,40 @@ export class ProductsService {
   }
 
   async findById(id: number): Promise<Product> {
-    const product = await this.repo.findOne({ where: { id }, relations: { category: true } });
+    const product = await this.repo.findOne({
+      where: { id },
+      relations: { category: true },
+    });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     return product;
   }
 
   async create(dto: CreateProductDto, updatedBy: string): Promise<Product> {
     const { categoryId, ...fields } = dto;
-    const category = categoryId != null ? await this.resolveCategory(categoryId) : null;
+    const category =
+      categoryId != null ? await this.resolveCategory(categoryId) : null;
     const product = this.repo.create({ ...fields, category, updatedBy });
     const saved = await this.repo.save(product);
-    void this.auditLogService.log('Product', saved.id, 'create', null, updatedBy, { snapshot: { ...saved } });
+    void this.auditLogService.log(
+      'Product',
+      saved.id,
+      'create',
+      null,
+      updatedBy,
+      { snapshot: { ...saved } },
+    );
     return saved;
   }
 
-  async update(id: number, dto: UpdateProductDto, updatedBy: string): Promise<Product> {
-    const product = await this.repo.findOne({ where: { id }, relations: { category: true } });
+  async update(
+    id: number,
+    dto: UpdateProductDto,
+    updatedBy: string,
+  ): Promise<Product> {
+    const product = await this.repo.findOne({
+      where: { id },
+      relations: { category: true },
+    });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
     const { categoryId, ...fields } = dto;
@@ -133,7 +159,8 @@ export class ProductsService {
     }
 
     if (categoryId !== undefined) {
-      const newCategory = categoryId != null ? await this.resolveCategory(categoryId) : null;
+      const newCategory =
+        categoryId != null ? await this.resolveCategory(categoryId) : null;
       const oldCatId = product.category?.id ?? null;
       const newCatId = newCategory?.id ?? null;
       if (oldCatId !== newCatId) {
@@ -144,7 +171,13 @@ export class ProductsService {
 
     Object.assign(product, fields, { updatedBy });
     const saved = await this.repo.save(product);
-    void this.auditLogService.log('Product', id, 'update', changedFields, updatedBy);
+    void this.auditLogService.log(
+      'Product',
+      id,
+      'update',
+      changedFields,
+      updatedBy,
+    );
     return saved;
   }
 
@@ -155,12 +188,16 @@ export class ProductsService {
     // Placeholder: replace with real query once the orders module is implemented
     const orderCount = await this.countOrderReferences(id, false);
     if (orderCount > 0) {
-      throw new BadRequestException('Cannot delete product referenced in an order');
+      throw new BadRequestException(
+        'Cannot delete product referenced in an order',
+      );
     }
 
     const snapshot = { ...product };
     await this.repo.remove(product);
-    void this.auditLogService.log('Product', id, 'delete', null, performedBy, { snapshot });
+    void this.auditLogService.log('Product', id, 'delete', null, performedBy, {
+      snapshot,
+    });
   }
 
   async archive(id: number, performedBy: string): Promise<Product> {
@@ -170,27 +207,45 @@ export class ProductsService {
     // Placeholder: replace with real query once the orders module is implemented
     const openOrderCount = await this.countOrderReferences(id, true);
     if (openOrderCount > 0) {
-      throw new BadRequestException('Cannot archive product referenced in open or partial orders');
+      throw new BadRequestException(
+        'Cannot archive product referenced in open or partial orders',
+      );
     }
 
     product.archivedAt = new Date();
     const saved = await this.repo.save(product);
-    void this.auditLogService.log('Product', id, 'archive', null, performedBy, { snapshot: { ...saved } });
+    void this.auditLogService.log('Product', id, 'archive', null, performedBy, {
+      snapshot: { ...saved },
+    });
     return saved;
   }
 
-  async updateStatus(id: number, status: ProductStatus, performedBy: string): Promise<Product> {
+  async updateStatus(
+    id: number,
+    status: ProductStatus,
+    performedBy: string,
+  ): Promise<Product> {
     const product = await this.repo.findOneBy({ id });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
     const oldStatus = product.status;
     product.status = status;
     product.statusLocked = true;
     const saved = await this.repo.save(product);
-    void this.auditLogService.log('Product', id, 'status_change', null, performedBy, { from: oldStatus, to: status });
+    void this.auditLogService.log(
+      'Product',
+      id,
+      'status_change',
+      null,
+      performedBy,
+      { from: oldStatus, to: status },
+    );
     return saved;
   }
 
-  async bulkArchive(ids: number[], performedBy: string): Promise<BulkActionResult> {
+  async bulkArchive(
+    ids: number[],
+    performedBy: string,
+  ): Promise<BulkActionResult> {
     const products = await this.repo.findBy({ id: In(ids) });
     const foundIds = new Set(products.map((p) => p.id));
     const success: number[] = [];
@@ -204,7 +259,14 @@ export class ProductsService {
       }
       product.archivedAt = new Date();
       const saved = await this.repo.save(product);
-      void this.auditLogService.log('Product', product.id, 'archive', null, performedBy, { snapshot: { ...saved } });
+      void this.auditLogService.log(
+        'Product',
+        product.id,
+        'archive',
+        null,
+        performedBy,
+        { snapshot: { ...saved } },
+      );
       success.push(product.id);
     }
 
@@ -215,7 +277,11 @@ export class ProductsService {
     return { success, skipped };
   }
 
-  async bulkUpdateStatus(ids: number[], status: ProductStatus, performedBy: string): Promise<BulkActionResult> {
+  async bulkUpdateStatus(
+    ids: number[],
+    status: ProductStatus,
+    performedBy: string,
+  ): Promise<BulkActionResult> {
     const products = await this.repo.findBy({ id: In(ids) });
     const foundIds = new Set(products.map((p) => p.id));
     const success: number[] = [];
@@ -223,11 +289,21 @@ export class ProductsService {
 
     const productIds = products.map((p) => p.id);
     if (productIds.length > 0) {
-      await this.repo.update({ id: In(productIds) }, { status, statusLocked: true });
+      await this.repo.update(
+        { id: In(productIds) },
+        { status, statusLocked: true },
+      );
     }
 
     for (const product of products) {
-      void this.auditLogService.log('Product', product.id, 'status_change', null, performedBy, { from: product.status, to: status });
+      void this.auditLogService.log(
+        'Product',
+        product.id,
+        'status_change',
+        null,
+        performedBy,
+        { from: product.status, to: status },
+      );
     }
 
     success.push(...productIds);
@@ -239,7 +315,10 @@ export class ProductsService {
     return { success, skipped };
   }
 
-  async bulkRemove(ids: number[], performedBy: string): Promise<BulkActionResult> {
+  async bulkRemove(
+    ids: number[],
+    performedBy: string,
+  ): Promise<BulkActionResult> {
     const products = await this.repo.findBy({ id: In(ids) });
     const foundIds = new Set(products.map((p) => p.id));
     const success: number[] = [];
@@ -254,7 +333,14 @@ export class ProductsService {
       const snapshot = { ...product };
       const productId = product.id;
       await this.repo.remove(product);
-      void this.auditLogService.log('Product', productId, 'delete', null, performedBy, { snapshot });
+      void this.auditLogService.log(
+        'Product',
+        productId,
+        'delete',
+        null,
+        performedBy,
+        { snapshot },
+      );
       success.push(productId);
     }
 
@@ -265,15 +351,23 @@ export class ProductsService {
     return { success, skipped };
   }
 
-  async importProducts(buffer: Buffer, _mimetype: string, updatedBy: string): Promise<ImportSummary> {
+  async importProducts(
+    buffer: Buffer,
+    _mimetype: string,
+    updatedBy: string,
+  ): Promise<ImportSummary> {
     let workbook: XLSX.WorkBook;
     try {
       workbook = XLSX.read(buffer, { type: 'buffer' });
     } catch {
-      throw new BadRequestException('Invalid file — upload a valid .xlsx or .csv file');
+      throw new BadRequestException(
+        'Invalid file — upload a valid .xlsx or .csv file',
+      );
     }
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: null,
+    });
 
     let imported = 0;
     let updated = 0;
@@ -293,12 +387,21 @@ export class ProductsService {
         let existing: Product | null = null;
 
         if (exactId) {
-          existing = await this.repo.findOne({ where: { exactId }, relations: { category: true } });
+          existing = await this.repo.findOne({
+            where: { exactId },
+            relations: { category: true },
+          });
         } else if (barcode) {
-          existing = await this.repo.findOne({ where: { barcode }, relations: { category: true } });
+          existing = await this.repo.findOne({
+            where: { barcode },
+            relations: { category: true },
+          });
         }
 
-        const category = categoryId != null ? await this.resolveCategory(categoryId) : undefined;
+        const category =
+          categoryId != null
+            ? await this.resolveCategory(categoryId)
+            : undefined;
 
         if (existing) {
           Object.assign(existing, fields, { updatedBy });
@@ -307,7 +410,11 @@ export class ProductsService {
           updated++;
         } else {
           if (!fields.name?.nl && !fields.name?.en && !fields.name?.de) {
-            errors.push({ row: rowNum, reason: 'name is required for new products (provide name_nl, name_en, or name_de)' });
+            errors.push({
+              row: rowNum,
+              reason:
+                'name is required for new products (provide name_nl, name_en, or name_de)',
+            });
             continue;
           }
           const product = this.repo.create({
@@ -321,15 +428,24 @@ export class ProductsService {
           imported++;
         }
       } catch (err) {
-        errors.push({ row: rowNum, reason: err instanceof Error ? err.message : 'Unexpected error' });
+        errors.push({
+          row: rowNum,
+          reason: err instanceof Error ? err.message : 'Unexpected error',
+        });
       }
     }
 
     return { imported, updated, errors };
   }
 
-  async exportProducts(query: FindProductsQueryDto, isAdmin: boolean): Promise<Buffer> {
-    const qb = this.repo.createQueryBuilder('p').leftJoinAndSelect('p.category', 'c').orderBy('p.createdAt', 'DESC');
+  async exportProducts(
+    query: FindProductsQueryDto,
+    isAdmin: boolean,
+  ): Promise<Buffer> {
+    const qb = this.repo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.category', 'c')
+      .orderBy('p.createdAt', 'DESC');
     this.applyFilters(qb, query);
     const products = await qb.getMany();
 
@@ -393,7 +509,9 @@ export class ProductsService {
   }
 
   getImportTemplate(): Buffer {
-    const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS as unknown as string[]]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      TEMPLATE_HEADERS as unknown as string[],
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Import Template');
     return XLSX.write(wb, { type: 'buffer', bookType: 'csv' }) as Buffer;
@@ -414,23 +532,37 @@ export class ProductsService {
     for (const p of products) {
       const oldStatus = p.status;
       p.status = ProductStatus.Inactive;
-      void this.auditLogService.log('Product', p.id, 'status_change', null, 'system', { from: oldStatus, to: ProductStatus.Inactive });
+      void this.auditLogService.log(
+        'Product',
+        p.id,
+        'status_change',
+        null,
+        'system',
+        { from: oldStatus, to: ProductStatus.Inactive },
+      );
     }
     await this.repo.save(products);
 
-    Logger.log(`Deactivated ${products.length} expired product(s)`, 'ProductsScheduleService');
+    Logger.log(
+      `Deactivated ${products.length} expired product(s)`,
+      'ProductsScheduleService',
+    );
     return { deactivated: products.length };
   }
 
   private async resolveCategory(categoryId: number): Promise<Category> {
     const category = await this.categoryRepo.findOneBy({ id: categoryId });
-    if (!category) throw new NotFoundException(`Category ${categoryId} not found`);
+    if (!category)
+      throw new NotFoundException(`Category ${categoryId} not found`);
     return category;
   }
 
   // openOnly=true → open/partial orders only (archive check); false → all orders (delete check)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected async countOrderReferences(_productId: number, _openOnly: boolean): Promise<number> {
+
+  protected async countOrderReferences(
+    _productId: number,
+    _openOnly: boolean,
+  ): Promise<number> {
     return 0;
   }
 }

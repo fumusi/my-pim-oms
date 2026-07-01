@@ -56,17 +56,30 @@ export class ExactOnlineClientService {
 
           await onPage(response.data.d?.results ?? []);
 
-          const headers = response.headers as unknown as Record<string, string | undefined>;
-          const remaining = parseInt(String(headers['x-ratelimit-remaining'] ?? '60'));
+          const headers = response.headers as unknown as Record<
+            string,
+            string | undefined
+          >;
+          const remaining = parseInt(
+            String(headers['x-ratelimit-remaining'] ?? '60'),
+          );
 
           nextUrl = response.data.d?.__next;
-          this.logger.debug(`forEachPage page ${page}: got ${response.data.d?.results?.length ?? 0} items, __next = ${nextUrl ?? 'none'}`);
+          this.logger.debug(
+            `forEachPage page ${page}: got ${response.data.d?.results?.length ?? 0} items, __next = ${nextUrl ?? 'none'}`,
+          );
 
           if (nextUrl) {
             if (remaining <= 2) {
-              const reset = parseInt(String(headers['x-ratelimit-reset'] ?? '0'));
-              const waitMs = reset ? Math.max(reset * 1000 - Date.now(), 0) + 1000 : 60_000;
-              this.logger.log(`Rate limit low (${remaining} remaining), waiting ${Math.ceil(waitMs / 1000)}s`);
+              const reset = parseInt(
+                String(headers['x-ratelimit-reset'] ?? '0'),
+              );
+              const waitMs = reset
+                ? Math.max(reset * 1000 - Date.now(), 0) + 1000
+                : 60_000;
+              this.logger.log(
+                `Rate limit low (${remaining} remaining), waiting ${Math.ceil(waitMs / 1000)}s`,
+              );
               await new Promise((resolve) => setTimeout(resolve, waitMs));
             } else if (delayMs > 0) {
               await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -77,11 +90,18 @@ export class ExactOnlineClientService {
           if (!(err instanceof AxiosError)) throw err;
           const status = err.response?.status;
           if (status !== 429) throw err;
-          if (attempt === 5) throw new Error(`Rate limit retries exhausted for ${resolvedUrl}`);
+          if (attempt === 5)
+            throw new Error(`Rate limit retries exhausted for ${resolvedUrl}`);
 
-          const retryAfter = parseInt(String(err.response?.headers?.['retry-after'] ?? '60'));
-          this.logger.warn(`429 rate limited, retrying after ${retryAfter}s (attempt ${attempt}/5)`);
-          await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+          const retryAfter = parseInt(
+            String(err.response?.headers?.['retry-after'] ?? '60'),
+          );
+          this.logger.warn(
+            `429 rate limited, retrying after ${retryAfter}s (attempt ${attempt}/5)`,
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryAfter * 1000),
+          );
         }
       }
     }
@@ -106,13 +126,17 @@ export class ExactOnlineClientService {
     return this.request(async () => {
       const token = await this.authService.getAccessToken();
       const response = await firstValueFrom(
-        this.httpService.post<T>(`${this.baseUrl}/${this.division}/${path}`, body, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+        this.httpService.post<T>(
+          `${this.baseUrl}/${this.division}/${path}`,
+          body,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
           },
-        }),
+        ),
       );
       return response.data;
     });

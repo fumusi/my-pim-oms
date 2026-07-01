@@ -9,4 +9,6 @@ const FindNotificationsQuerySchema = z.object({
   type: z.nativeEnum(NotificationType).optional(),
 });
 
-export class FindNotificationsQueryDto extends createZodDto(FindNotificationsQuerySchema) {}
+export class FindNotificationsQueryDto extends createZodDto(
+  FindNotificationsQuerySchema,
+) {}

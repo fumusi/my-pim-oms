@@ -12,6 +12,8 @@ export class AddAuditLogIndexes1782760000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "IDX_audit_logs_performed_at"`);
-    await queryRunner.query(`DROP INDEX "IDX_audit_logs_entity_type_entity_id"`);
+    await queryRunner.query(
+      `DROP INDEX "IDX_audit_logs_entity_type_entity_id"`,
+    );
   }
 }

@@ -9,6 +9,8 @@ export class AddPimTemplateToExactItems1781780000000 implements MigrationInterfa
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "exact_items" DROP COLUMN "pim_template"`);
+    await queryRunner.query(
+      `ALTER TABLE "exact_items" DROP COLUMN "pim_template"`,
+    );
   }
 }

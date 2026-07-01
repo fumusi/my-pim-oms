@@ -6,7 +6,12 @@ import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
 import { Product } from '../products/entities/product.entity';
 import { mapItem, mapItemGroup, mapProduct } from './mappers/item.mapper';
-import { ExactItemResponse, ExactItemGroupResponse, SyncError, SyncSummary } from './types';
+import {
+  ExactItemResponse,
+  ExactItemGroupResponse,
+  SyncError,
+  SyncSummary,
+} from './types';
 
 const PAGE_SIZE = 100;
 const MAX_ITEM_PAGES = 3;
@@ -15,7 +20,14 @@ const CHUNK_SIZE = 50;
 // DB column names updated on conflict — name/weight are seeded on INSERT only; stock is live data from Exact
 // status and end_date are intentionally excluded — they are updated separately
 // via a conditional UPDATE that skips rows where status_locked = true.
-const EXACT_UPDATE_COLUMNS = ['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock'];
+const EXACT_UPDATE_COLUMNS = [
+  'barcode',
+  'currency',
+  'base_price',
+  'purchase_price',
+  'sales_vat_code',
+  'stock',
+];
 
 @Injectable()
 export class ExactSyncService {
@@ -40,7 +52,9 @@ export class ExactSyncService {
       `logistics/ItemGroups?$top=${PAGE_SIZE}`,
       async (groups) => {
         if (groups.length === 0) return;
-        const entities = groups.map((g) => this.itemGroupRepo.create(mapItemGroup(g) as ExactItemGroup));
+        const entities = groups.map((g) =>
+          this.itemGroupRepo.create(mapItemGroup(g) as ExactItemGroup),
+        );
         await this.itemGroupRepo.save(entities, { chunk: 50 });
       },
     );
@@ -67,7 +81,9 @@ export class ExactSyncService {
           else created++;
         }
 
-        const entities = items.map((i) => this.itemRepo.create(mapItem(i) as ExactItem));
+        const entities = items.map((i) =>
+          this.itemRepo.create(mapItem(i) as ExactItem),
+        );
         await this.itemRepo.save(entities, { chunk: 50 });
 
         for (let i = 0; i < items.length; i += CHUNK_SIZE) {
@@ -101,8 +117,11 @@ export class ExactSyncService {
             });
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
-            this.logger.error(`Product upsert chunk [${i}..${i + chunk.length - 1}] failed: ${message}`);
-            for (const item of chunk) errors.push({ exactId: item.ID, message });
+            this.logger.error(
+              `Product upsert chunk [${i}..${i + chunk.length - 1}] failed: ${message}`,
+            );
+            for (const item of chunk)
+              errors.push({ exactId: item.ID, message });
           }
         }
       },

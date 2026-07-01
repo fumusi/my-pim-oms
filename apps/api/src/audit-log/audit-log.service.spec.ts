@@ -10,7 +10,9 @@ describe('AuditLogService', () => {
   beforeEach(async () => {
     repo = {
       create: jest.fn().mockImplementation((data) => ({ ...data })),
-      save: jest.fn().mockImplementation((entity) => Promise.resolve({ id: 1, ...entity })),
+      save: jest
+        .fn()
+        .mockImplementation((entity) => Promise.resolve({ id: 1, ...entity })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -27,7 +29,9 @@ describe('AuditLogService', () => {
     it('saves a create action with metadata snapshot', async () => {
       const snapshot = { id: 1, name: { en: 'Test' } };
 
-      await service.log('Product', 1, 'create', null, 'admin@test.com', { snapshot });
+      await service.log('Product', 1, 'create', null, 'admin@test.com', {
+        snapshot,
+      });
 
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -48,7 +52,13 @@ describe('AuditLogService', () => {
         status: { old: 'active', new: 'inactive' },
       };
 
-      await service.log('Product', 2, 'update', changedFields, 'editor@test.com');
+      await service.log(
+        'Product',
+        2,
+        'update',
+        changedFields,
+        'editor@test.com',
+      );
 
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -66,7 +76,9 @@ describe('AuditLogService', () => {
     it('saves a delete action with metadata snapshot', async () => {
       const snapshot = { id: 5, email: 'gone@example.com' };
 
-      await service.log('Customer', 5, 'delete', null, 'admin@test.com', { snapshot });
+      await service.log('Customer', 5, 'delete', null, 'admin@test.com', {
+        snapshot,
+      });
 
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({

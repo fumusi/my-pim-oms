@@ -21,7 +21,7 @@ import { GithubStrategy } from './strategies/github.strategy';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: config.get('JWT_EXPIRES_IN', '1h') as StringValue,
+          expiresIn: config.get('JWT_EXPIRES_IN', '1h'),
         },
       }),
     }),

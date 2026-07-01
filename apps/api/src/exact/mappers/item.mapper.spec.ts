@@ -2,7 +2,9 @@ import { mapItem, mapItemGroup, mapProduct } from './item.mapper';
 import { parseDate } from '../utils/parse-date';
 import type { ExactItemResponse, ExactItemGroupResponse } from '../types';
 
-const makeItemResponse = (overrides: Partial<ExactItemResponse> = {}): ExactItemResponse => ({
+const makeItemResponse = (
+  overrides: Partial<ExactItemResponse> = {},
+): ExactItemResponse => ({
   ID: 'item-uuid-1',
   Code: 'PROD-001',
   Description: 'Test Product',
@@ -51,7 +53,9 @@ const makeItemResponse = (overrides: Partial<ExactItemResponse> = {}): ExactItem
   ...overrides,
 });
 
-const makeGroupResponse = (overrides: Partial<ExactItemGroupResponse> = {}): ExactItemGroupResponse => ({
+const makeGroupResponse = (
+  overrides: Partial<ExactItemGroupResponse> = {},
+): ExactItemGroupResponse => ({
   ID: 'group-uuid-1',
   Code: 'GRP',
   Description: 'Group A',
@@ -123,38 +127,65 @@ describe('mapItem', () => {
   });
 
   it('parses OData StartDate', () => {
-    const result = mapItem(makeItemResponse({ StartDate: '/Date(1672531200000)/' }));
+    const result = mapItem(
+      makeItemResponse({ StartDate: '/Date(1672531200000)/' }),
+    );
     expect(result.startDate).toBeInstanceOf(Date);
     expect(result.startDate!.getTime()).toBe(1672531200000);
   });
 
   it('sets startDate/endDate to null when null input', () => {
-    const result = mapItem(makeItemResponse({ StartDate: null, EndDate: null }));
+    const result = mapItem(
+      makeItemResponse({ StartDate: null, EndDate: null }),
+    );
     expect(result.startDate).toBeNull();
     expect(result.endDate).toBeNull();
   });
 
   it('maps null fields to null', () => {
-    const result = mapItem(makeItemResponse({ Notes: null, Barcode: null, PictureUrl: null }));
+    const result = mapItem(
+      makeItemResponse({ Notes: null, Barcode: null, PictureUrl: null }),
+    );
     expect(result.notes).toBeNull();
     expect(result.barcode).toBeNull();
     expect(result.pictureUrl).toBeNull();
   });
 
   it('normalises smallint flags: 0 → false, 1 → true, null → null', () => {
-    const falsy = mapItem(makeItemResponse({ IsBatchItem: 0, IsBatchNumberItem: 0, IsWebshopItem: 0, IsSerialNumberItem: 0 }));
+    const falsy = mapItem(
+      makeItemResponse({
+        IsBatchItem: 0,
+        IsBatchNumberItem: 0,
+        IsWebshopItem: 0,
+        IsSerialNumberItem: 0,
+      }),
+    );
     expect(falsy.isBatchItem).toBe(false);
     expect(falsy.isBatchNumberItem).toBe(false);
     expect(falsy.isWebshopItem).toBe(false);
     expect(falsy.isSerialNumberItem).toBe(false);
 
-    const truthy = mapItem(makeItemResponse({ IsBatchItem: 1, IsBatchNumberItem: 1, IsWebshopItem: 1, IsSerialNumberItem: 1 }));
+    const truthy = mapItem(
+      makeItemResponse({
+        IsBatchItem: 1,
+        IsBatchNumberItem: 1,
+        IsWebshopItem: 1,
+        IsSerialNumberItem: 1,
+      }),
+    );
     expect(truthy.isBatchItem).toBe(true);
     expect(truthy.isBatchNumberItem).toBe(true);
     expect(truthy.isWebshopItem).toBe(true);
     expect(truthy.isSerialNumberItem).toBe(true);
 
-    const nullish = mapItem(makeItemResponse({ IsBatchItem: null, IsBatchNumberItem: null, IsWebshopItem: null, IsSerialNumberItem: null }));
+    const nullish = mapItem(
+      makeItemResponse({
+        IsBatchItem: null,
+        IsBatchNumberItem: null,
+        IsWebshopItem: null,
+        IsSerialNumberItem: null,
+      }),
+    );
     expect(nullish.isBatchItem).toBeNull();
     expect(nullish.isBatchNumberItem).toBeNull();
     expect(nullish.isWebshopItem).toBeNull();
@@ -175,7 +206,9 @@ describe('mapProduct', () => {
   });
 
   it('seeds name.en from Description for initial insert', () => {
-    const result = mapProduct(makeItemResponse({ Description: 'Ceramic Vase' }));
+    const result = mapProduct(
+      makeItemResponse({ Description: 'Ceramic Vase' }),
+    );
     expect(result.name).toEqual({ en: 'Ceramic Vase' });
   });
 
@@ -201,13 +234,15 @@ describe('mapProduct', () => {
   });
 
   it('maps null Exact fields to null', () => {
-    const result = mapProduct(makeItemResponse({
-      Barcode: null,
-      CostPriceCurrency: null,
-      StandardSalesPrice: null,
-      CostPriceStandard: null,
-      SalesVatCode: null,
-    }));
+    const result = mapProduct(
+      makeItemResponse({
+        Barcode: null,
+        CostPriceCurrency: null,
+        StandardSalesPrice: null,
+        CostPriceStandard: null,
+        SalesVatCode: null,
+      }),
+    );
 
     expect(result.barcode).toBeNull();
     expect(result.currency).toBeNull();
@@ -243,7 +278,9 @@ describe('mapItemGroup', () => {
   });
 
   it('parses OData Created date', () => {
-    const result = mapItemGroup(makeGroupResponse({ Created: '/Date(1672531200000)/' }));
+    const result = mapItemGroup(
+      makeGroupResponse({ Created: '/Date(1672531200000)/' }),
+    );
     expect(result.created).toBeInstanceOf(Date);
     expect(result.created!.getTime()).toBe(1672531200000);
   });

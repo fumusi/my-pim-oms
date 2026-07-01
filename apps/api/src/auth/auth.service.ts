@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
@@ -46,12 +51,17 @@ export class AuthService {
 
     const saved = await this.usersRepository.save(user);
 
-    await this.mailService.sendConfirmationEmail(saved.email, rawConfirmationToken);
+    await this.mailService.sendConfirmationEmail(
+      saved.email,
+      rawConfirmationToken,
+    );
 
     return { id: saved.id, email: saved.email };
   }
 
-  async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
+  async login(
+    dto: LoginDto,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersRepository.findOneBy({ email: dto.email });
     const hashToCompare = user?.password ?? AuthService.DUMMY_HASH;
     const passwordValid = await bcrypt.compare(dto.password, hashToCompare);
@@ -65,7 +75,9 @@ export class AuthService {
 
   private static readonly DUMMY_HASH = bcrypt.hashSync('dummy', 10);
 
-  async findOrCreateGithubUser(profile: GithubProfile): Promise<{ accessToken: string; refreshToken: string }> {
+  async findOrCreateGithubUser(
+    profile: GithubProfile,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     // Trusts GitHub's email verification as proof of ownership. If a user registered
     // with the same email via password, GitHub login grants access to that account.
     // Explicit account-linking confirmation is deferred to a future story.
@@ -93,25 +105,34 @@ export class AuthService {
       }
     }
 
-    if (!user.isActive) throw new UnauthorizedException('Account is deactivated');
+    if (!user.isActive)
+      throw new UnauthorizedException('Account is deactivated');
 
     return this.issueTokens(user);
   }
 
-  async createOAuthExchangeCode(tokens: { accessToken: string; refreshToken: string }): Promise<string> {
+  async createOAuthExchangeCode(tokens: {
+    accessToken: string;
+    refreshToken: string;
+  }): Promise<string> {
     const code = randomBytes(16).toString('hex');
     await this.redisService.set(`oauth:${code}`, JSON.stringify(tokens), 60);
     return code;
   }
 
-  async exchangeOAuthCode(code: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async exchangeOAuthCode(
+    code: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const data = await this.redisService.get(`oauth:${code}`);
-    if (!data) throw new UnauthorizedException('Invalid or expired exchange code');
+    if (!data)
+      throw new UnauthorizedException('Invalid or expired exchange code');
     await this.redisService.del(`oauth:${code}`);
     return JSON.parse(data) as { accessToken: string; refreshToken: string };
   }
 
-  async refresh(refreshToken: string | undefined): Promise<{ accessToken: string; refreshToken: string }> {
+  async refresh(
+    refreshToken: string | undefined,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     if (!refreshToken) {
       throw new UnauthorizedException();
     }
@@ -132,7 +153,10 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
-  async logout(user: JwtPayload, refreshToken: string | undefined): Promise<void> {
+  async logout(
+    user: JwtPayload,
+    refreshToken: string | undefined,
+  ): Promise<void> {
     if (user.exp) {
       const ttl = user.exp - Math.floor(Date.now() / 1000);
       if (ttl > 0) {
@@ -148,9 +172,15 @@ export class AuthService {
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
     const tokenHash = this.hashToken(dto.token);
-    const user = await this.usersRepository.findOneBy({ resetToken: tokenHash });
+    const user = await this.usersRepository.findOneBy({
+      resetToken: tokenHash,
+    });
 
-    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+    if (
+      !user ||
+      !user.resetTokenExpiresAt ||
+      user.resetTokenExpiresAt < new Date()
+    ) {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
@@ -194,7 +224,9 @@ export class AuthService {
     };
   }
 
-  private async issueTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
+  private async issueTokens(
+    user: User,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const jti = randomUUID();
 
     const accessToken = await this.jwtService.signAsync({
@@ -206,7 +238,11 @@ export class AuthService {
     });
 
     const refreshToken = this.generateRefreshToken(user.id);
-    await this.redisService.set(`rt:${user.id}`, this.hashToken(refreshToken), REFRESH_TOKEN_TTL);
+    await this.redisService.set(
+      `rt:${user.id}`,
+      this.hashToken(refreshToken),
+      REFRESH_TOKEN_TTL,
+    );
 
     return { accessToken, refreshToken };
   }

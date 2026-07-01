@@ -8,6 +8,8 @@ export class AddStatusLockedToProducts1781850000000 implements MigrationInterfac
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE products DROP COLUMN IF EXISTS status_locked`);
+    await queryRunner.query(
+      `ALTER TABLE products DROP COLUMN IF EXISTS status_locked`,
+    );
   }
 }

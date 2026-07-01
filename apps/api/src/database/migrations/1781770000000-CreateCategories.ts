@@ -30,7 +30,9 @@ export class CreateCategories1781770000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "exact_items" DROP COLUMN "category_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "exact_items" DROP COLUMN "category_id"`,
+    );
     await queryRunner.query(`DROP TABLE "categories"`);
     await queryRunner.query(`DROP TYPE "categories_status_enum"`);
   }

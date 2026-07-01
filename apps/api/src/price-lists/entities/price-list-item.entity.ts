@@ -32,10 +32,22 @@ export class PriceListItem {
   @Column({ name: 'product_id' })
   productId!: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, name: 'custom_price', transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    name: 'custom_price',
+    transformer: decimalTransformer,
+  })
   customPrice!: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   discount!: number | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

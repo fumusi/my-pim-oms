@@ -37,7 +37,10 @@ describe('AuthController', () => {
       controllers: [AuthController],
       providers: [
         { provide: AuthService, useValue: authService },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('1h') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('1h') },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -51,7 +54,11 @@ describe('AuthController', () => {
     it('returns id and email from authService.register', async () => {
       authService.register.mockResolvedValue({ id: 1, email: 'a@b.com' });
       await expect(
-        controller.register({ email: 'a@b.com', password: 'Password1', confirmPassword: 'Password1' }),
+        controller.register({
+          email: 'a@b.com',
+          password: 'Password1',
+          confirmPassword: 'Password1',
+        }),
       ).resolves.toEqual({ id: 1, email: 'a@b.com' });
     });
   });
@@ -89,7 +96,9 @@ describe('AuthController', () => {
         refreshToken: '1:new-refresh-opaque',
       });
       const res = mockResponse() as unknown as Response;
-      const req = { cookies: { refreshToken: '1:old-refresh-opaque' } } as unknown as Request;
+      const req = {
+        cookies: { refreshToken: '1:old-refresh-opaque' },
+      } as unknown as Request;
 
       const result = await controller.refresh(req, res);
 
@@ -116,7 +125,9 @@ describe('AuthController', () => {
       };
       const profile = { id: 1, email: 'a@b.com', role: Role.User };
       authService.getProfile.mockResolvedValue(profile);
-      const req = { user: jwtPayload } as unknown as Request & { user: typeof jwtPayload };
+      const req = { user: jwtPayload } as unknown as Request & {
+        user: typeof jwtPayload;
+      };
       await expect(controller.me(req)).resolves.toEqual(profile);
     });
   });
@@ -153,7 +164,10 @@ describe('AuthController', () => {
 
       const result = await controller.logout(req, res);
 
-      expect(authService.logout).toHaveBeenCalledWith(jwtPayload, '1:refresh-opaque');
+      expect(authService.logout).toHaveBeenCalledWith(
+        jwtPayload,
+        '1:refresh-opaque',
+      );
       expect(res.clearCookie).toHaveBeenCalledWith(
         'refreshToken',
         expect.objectContaining({ path: '/api/auth', maxAge: 0 }),

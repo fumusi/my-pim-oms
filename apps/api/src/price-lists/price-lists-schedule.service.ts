@@ -12,6 +12,8 @@ export class PriceListsScheduleService {
   async deactivateExpiredPriceLists(): Promise<void> {
     this.logger.log('Running price list expiry check...');
     const { deactivated } = await this.service.deactivateExpiredPriceLists();
-    this.logger.log(`Price list expiry check done — deactivated ${deactivated}`);
+    this.logger.log(
+      `Price list expiry check done — deactivated ${deactivated}`,
+    );
   }
 }

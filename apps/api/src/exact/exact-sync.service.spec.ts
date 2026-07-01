@@ -7,7 +7,10 @@ import { ExactItem } from './entities/exact-item.entity';
 import { ExactItemGroup } from './entities/exact-item-group.entity';
 import type { ExactItemResponse, ExactItemGroupResponse } from './types';
 
-const makeItemResponse = (id: string, overrides: Partial<ExactItemResponse> = {}): ExactItemResponse => ({
+const makeItemResponse = (
+  id: string,
+  overrides: Partial<ExactItemResponse> = {},
+): ExactItemResponse => ({
   ID: id,
   Code: `CODE-${id}`,
   Description: `Item ${id}`,
@@ -132,7 +135,10 @@ describe('ExactSyncService', () => {
         ExactSyncService,
         { provide: ExactOnlineClientService, useValue: client },
         { provide: getRepositoryToken(ExactItem), useValue: itemRepo },
-        { provide: getRepositoryToken(ExactItemGroup), useValue: itemGroupRepo },
+        {
+          provide: getRepositoryToken(ExactItemGroup),
+          useValue: itemGroupRepo,
+        },
         { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
@@ -210,7 +216,14 @@ describe('ExactSyncService', () => {
       await service.syncProducts();
 
       expect(qb.orUpdate).toHaveBeenCalledWith(
-        expect.arrayContaining(['barcode', 'currency', 'base_price', 'purchase_price', 'sales_vat_code', 'stock']),
+        expect.arrayContaining([
+          'barcode',
+          'currency',
+          'base_price',
+          'purchase_price',
+          'sales_vat_code',
+          'stock',
+        ]),
         ['exact_id'],
       );
       const [updatedCols] = qb.orUpdate.mock.calls[0];
@@ -220,17 +233,20 @@ describe('ExactSyncService', () => {
 
     it('inserts name and weight (seeded from Exact for initial INSERT)', async () => {
       client.forEachPage.mockImplementation(
-        makeForEachPageMock([], [
-          makeItemResponse('item-x', {
-            Description: 'Ceramic Vase',
-            NetWeight: 0.5,
-            Barcode: 'BAR-1',
-            CostPriceCurrency: 'EUR',
-            StandardSalesPrice: 9.99,
-            CostPriceStandard: 5.0,
-            SalesVatCode: 'V21',
-          }),
-        ]),
+        makeForEachPageMock(
+          [],
+          [
+            makeItemResponse('item-x', {
+              Description: 'Ceramic Vase',
+              NetWeight: 0.5,
+              Barcode: 'BAR-1',
+              CostPriceCurrency: 'EUR',
+              StandardSalesPrice: 9.99,
+              CostPriceStandard: 5.0,
+              SalesVatCode: 'V21',
+            }),
+          ],
+        ),
       );
 
       await service.syncProducts();
@@ -251,7 +267,10 @@ describe('ExactSyncService', () => {
 
     it('captures per-product errors without stopping the sync', async () => {
       client.forEachPage.mockImplementation(
-        makeForEachPageMock([], [makeItemResponse('ok-item'), makeItemResponse('bad-item')]),
+        makeForEachPageMock(
+          [],
+          [makeItemResponse('ok-item'), makeItemResponse('bad-item')],
+        ),
       );
       qb.execute
         .mockResolvedValueOnce({})
@@ -276,7 +295,10 @@ describe('ExactSyncService', () => {
     it('returns all-created summary when no prior items exist', async () => {
       itemRepo.find.mockResolvedValue([]);
       client.forEachPage.mockImplementation(
-        makeForEachPageMock([], [makeItemResponse('a'), makeItemResponse('b'), makeItemResponse('c')]),
+        makeForEachPageMock(
+          [],
+          [makeItemResponse('a'), makeItemResponse('b'), makeItemResponse('c')],
+        ),
       );
 
       const result = await service.syncProducts();

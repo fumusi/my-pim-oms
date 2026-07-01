@@ -10,7 +10,15 @@ import { CustomersService } from './customers.service';
 import { CustomersScheduleService } from './customers-schedule.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Customer, Contact, Address, User, CustomerPriceList])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Customer,
+      Contact,
+      Address,
+      User,
+      CustomerPriceList,
+    ]),
+  ],
   controllers: [CustomersController],
   providers: [CustomersService, CustomersScheduleService],
   exports: [CustomersService],

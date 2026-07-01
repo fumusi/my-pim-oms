@@ -6,4 +6,6 @@ const UpdateProductStatusSchema = z.object({
   status: z.enum(ProductStatus),
 });
 
-export class UpdateProductStatusDto extends createZodDto(UpdateProductStatusSchema) {}
+export class UpdateProductStatusDto extends createZodDto(
+  UpdateProductStatusSchema,
+) {}

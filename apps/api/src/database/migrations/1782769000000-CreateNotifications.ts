@@ -4,7 +4,9 @@ export class CreateNotifications1782769000000 implements MigrationInterface {
   name = 'CreateNotifications1782769000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`CREATE TYPE "public"."notification_type" AS ENUM('low_stock','out_of_stock','new_order','order_status_change','customer_archived')`);
+    await queryRunner.query(
+      `CREATE TYPE "public"."notification_type" AS ENUM('low_stock','out_of_stock','new_order','order_status_change','customer_archived')`,
+    );
     await queryRunner.query(`
       CREATE TABLE "notifications" (
         "id" SERIAL PRIMARY KEY,
@@ -19,8 +21,12 @@ export class CreateNotifications1782769000000 implements MigrationInterface {
         CONSTRAINT "fk_notifications_recipient" FOREIGN KEY ("recipient_id") REFERENCES "users"("id") ON DELETE CASCADE
       )
     `);
-    await queryRunner.query(`CREATE INDEX "idx_notifications_recipient_id" ON "notifications"("recipient_id")`);
-    await queryRunner.query(`CREATE INDEX "idx_notifications_is_read" ON "notifications"("is_read")`);
+    await queryRunner.query(
+      `CREATE INDEX "idx_notifications_recipient_id" ON "notifications"("recipient_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "idx_notifications_is_read" ON "notifications"("is_read")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

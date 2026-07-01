@@ -17,7 +17,10 @@ export class Address {
   @Column({ name: 'customer_id', nullable: true })
   customerId!: number | null;
 
-  @ManyToOne(() => Customer, (c) => c.addresses, { onDelete: 'CASCADE', nullable: true })
+  @ManyToOne(() => Customer, (c) => c.addresses, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
   @JoinColumn({ name: 'customer_id' })
   customer!: Customer | null;
 

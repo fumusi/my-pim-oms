@@ -49,11 +49,15 @@ export interface DeactivateResult {
 @Injectable()
 export class CustomersService {
   constructor(
-    @InjectRepository(Customer) private readonly customerRepo: Repository<Customer>,
-    @InjectRepository(Contact) private readonly contactRepo: Repository<Contact>,
-    @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
+    @InjectRepository(Contact)
+    private readonly contactRepo: Repository<Contact>,
+    @InjectRepository(Address)
+    private readonly addressRepo: Repository<Address>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(CustomerPriceList) private readonly cplRepo: Repository<CustomerPriceList>,
+    @InjectRepository(CustomerPriceList)
+    private readonly cplRepo: Repository<CustomerPriceList>,
     private readonly dataSource: DataSource,
     private readonly auditLogService: AuditLogService,
   ) {}
@@ -86,7 +90,9 @@ export class CustomersService {
     }
 
     if (query.country) {
-      qb.andWhere('c.country ILIKE :country', { country: `%${query.country}%` });
+      qb.andWhere('c.country ILIKE :country', {
+        country: `%${query.country}%`,
+      });
     }
 
     const [data, total] = await qb.getManyAndCount();
@@ -162,24 +168,44 @@ export class CustomersService {
         return saved;
       });
 
-      void this.auditLogService.log('Customer', savedCustomer.id, 'create', null, createdBy, { snapshot: { ...savedCustomer } });
+      void this.auditLogService.log(
+        'Customer',
+        savedCustomer.id,
+        'create',
+        null,
+        createdBy,
+        { snapshot: { ...savedCustomer } },
+      );
       return savedCustomer;
     } catch (err: unknown) {
       const pgErr = err as { code?: string; constraint?: string };
       if (pgErr.code === '23505') {
         if (pgErr.constraint?.includes('customer_number')) {
-          throw new ConflictException('Customer number collision — please retry');
+          throw new ConflictException(
+            'Customer number collision — please retry',
+          );
         }
-        throw new ConflictException('A customer with this email already exists');
+        throw new ConflictException(
+          'A customer with this email already exists',
+        );
       }
       throw err;
     }
   }
 
-  async update(id: number, dto: UpdateCustomerDto, updatedBy: string): Promise<Customer> {
+  async update(
+    id: number,
+    dto: UpdateCustomerDto,
+    updatedBy: string,
+  ): Promise<Customer> {
     const customer = await this.customerRepo.findOne({ where: { id } });
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
-    const { customerNumber: _cn, status, endDate, ...rest } = dto as Record<string, unknown>;
+    const {
+      customerNumber: _cn,
+      status,
+      endDate,
+      ...rest
+    } = dto as Record<string, unknown>;
 
     const changedFields: Record<string, { old: unknown; new: unknown }> = {};
     for (const key of Object.keys(rest)) {
@@ -205,7 +231,9 @@ export class CustomersService {
         const todayUTC = new Date();
         todayUTC.setUTCHours(0, 0, 0, 0);
         if (new Date(customer.endDate) < todayUTC) {
-          throw new BadRequestException('Cannot activate customer with a past end date');
+          throw new BadRequestException(
+            'Cannot activate customer with a past end date',
+          );
         }
       }
       if (customer.status !== (status as CustomerStatus)) {
@@ -216,11 +244,21 @@ export class CustomersService {
 
     customer.updatedBy = updatedBy;
     const saved = await this.customerRepo.save(customer);
-    void this.auditLogService.log('Customer', id, 'update', changedFields, updatedBy);
+    void this.auditLogService.log(
+      'Customer',
+      id,
+      'update',
+      changedFields,
+      updatedBy,
+    );
     return saved;
   }
 
-  async updateStatus(id: number, status: CustomerStatus, updatedBy: string): Promise<Customer> {
+  async updateStatus(
+    id: number,
+    status: CustomerStatus,
+    updatedBy: string,
+  ): Promise<Customer> {
     const customer = await this.customerRepo.findOne({ where: { id } });
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
 
@@ -228,7 +266,9 @@ export class CustomersService {
       const todayUTC = new Date();
       todayUTC.setUTCHours(0, 0, 0, 0);
       if (new Date(customer.endDate) < todayUTC) {
-        throw new BadRequestException('Cannot activate customer with a past end date');
+        throw new BadRequestException(
+          'Cannot activate customer with a past end date',
+        );
       }
     }
 
@@ -236,21 +276,35 @@ export class CustomersService {
     customer.status = status;
     customer.updatedBy = updatedBy;
     const saved = await this.customerRepo.save(customer);
-    void this.auditLogService.log('Customer', id, 'status_change', null, updatedBy, { from: oldStatus, to: status });
+    void this.auditLogService.log(
+      'Customer',
+      id,
+      'status_change',
+      null,
+      updatedBy,
+      { from: oldStatus, to: status },
+    );
     return saved;
   }
 
   async remove(id: number, performedBy?: string): Promise<void> {
     // TODO: block if customer has any orders (orders module not yet implemented)
-    throw new NotImplementedException('Delete is blocked until order integration is complete');
+    throw new NotImplementedException(
+      'Delete is blocked until order integration is complete',
+    );
   }
 
   async archive(id: number, performedBy?: string): Promise<Customer> {
     // TODO: block if customer has active orders (orders module not yet implemented)
-    throw new NotImplementedException('Archive is blocked until order integration is complete');
+    throw new NotImplementedException(
+      'Archive is blocked until order integration is complete',
+    );
   }
 
-  async createContact(customerId: number, dto: CreateContactDto): Promise<Contact> {
+  async createContact(
+    customerId: number,
+    dto: CreateContactDto,
+  ): Promise<Contact> {
     await this.findById(customerId);
     return this.dataSource.transaction(async (em) => {
       const count = await em.count(Contact, { where: { customerId } });
@@ -258,7 +312,8 @@ export class CustomersService {
         throw new BadRequestException('Cannot add more than 10 contacts');
       }
       if (dto.isPrimary) {
-        await em.createQueryBuilder()
+        await em
+          .createQueryBuilder()
           .update(Contact)
           .set({ isPrimary: false })
           .where('customer_id = :customerId', { customerId })
@@ -276,10 +331,18 @@ export class CustomersService {
     });
   }
 
-  async updateContact(customerId: number, contactId: number, dto: UpdateContactDto): Promise<Contact> {
-    const contact = await this.contactRepo.findOne({ where: { id: contactId } });
+  async updateContact(
+    customerId: number,
+    contactId: number,
+    dto: UpdateContactDto,
+  ): Promise<Contact> {
+    const contact = await this.contactRepo.findOne({
+      where: { id: contactId },
+    });
     if (!contact || contact.customerId !== customerId) {
-      throw new NotFoundException(`Contact ${contactId} not found for customer ${customerId}`);
+      throw new NotFoundException(
+        `Contact ${contactId} not found for customer ${customerId}`,
+      );
     }
     const { isPrimary: _ignored, ...fields } = dto as Record<string, unknown>;
     Object.assign(contact, fields);
@@ -287,27 +350,40 @@ export class CustomersService {
   }
 
   async removeContact(customerId: number, contactId: number): Promise<void> {
-    const contact = await this.contactRepo.findOne({ where: { id: contactId } });
+    const contact = await this.contactRepo.findOne({
+      where: { id: contactId },
+    });
     if (!contact || contact.customerId !== customerId) {
-      throw new NotFoundException(`Contact ${contactId} not found for customer ${customerId}`);
+      throw new NotFoundException(
+        `Contact ${contactId} not found for customer ${customerId}`,
+      );
     }
     await this.contactRepo.remove(contact);
   }
 
-  async setPrimaryContact(customerId: number, contactId: number): Promise<Contact> {
+  async setPrimaryContact(
+    customerId: number,
+    contactId: number,
+  ): Promise<Contact> {
     await this.findById(customerId);
-    const contact = await this.contactRepo.findOne({ where: { id: contactId } });
+    const contact = await this.contactRepo.findOne({
+      where: { id: contactId },
+    });
     if (!contact || contact.customerId !== customerId) {
-      throw new NotFoundException(`Contact ${contactId} not found for customer ${customerId}`);
+      throw new NotFoundException(
+        `Contact ${contactId} not found for customer ${customerId}`,
+      );
     }
 
     await this.dataSource.transaction(async (em) => {
-      await em.createQueryBuilder()
+      await em
+        .createQueryBuilder()
         .update(Contact)
         .set({ isPrimary: false })
         .where('customer_id = :customerId', { customerId })
         .execute();
-      await em.createQueryBuilder()
+      await em
+        .createQueryBuilder()
         .update(Contact)
         .set({ isPrimary: true })
         .where('id = :id', { id: contactId })
@@ -318,7 +394,10 @@ export class CustomersService {
     return contact;
   }
 
-  async createAddress(customerId: number, dto: CreateAddressDto): Promise<Address> {
+  async createAddress(
+    customerId: number,
+    dto: CreateAddressDto,
+  ): Promise<Address> {
     await this.findById(customerId);
     return this.dataSource.transaction(async (em) => {
       const count = await em.count(Address, { where: { customerId } });
@@ -326,7 +405,8 @@ export class CustomersService {
         throw new BadRequestException('Cannot add more than 10 addresses');
       }
       if (dto.isPrimary) {
-        await em.createQueryBuilder()
+        await em
+          .createQueryBuilder()
           .update(Address)
           .set({ isPrimary: false })
           .where('customer_id = :customerId', { customerId })
@@ -346,10 +426,18 @@ export class CustomersService {
     });
   }
 
-  async updateAddress(customerId: number, addressId: number, dto: UpdateAddressDto): Promise<Address> {
-    const address = await this.addressRepo.findOne({ where: { id: addressId } });
+  async updateAddress(
+    customerId: number,
+    addressId: number,
+    dto: UpdateAddressDto,
+  ): Promise<Address> {
+    const address = await this.addressRepo.findOne({
+      where: { id: addressId },
+    });
     if (!address || address.customerId !== customerId) {
-      throw new NotFoundException(`Address ${addressId} not found for customer ${customerId}`);
+      throw new NotFoundException(
+        `Address ${addressId} not found for customer ${customerId}`,
+      );
     }
     const { isPrimary: _ignored, ...fields } = dto as Record<string, unknown>;
     Object.assign(address, fields);
@@ -360,7 +448,9 @@ export class CustomersService {
     const addresses = await this.addressRepo.find({ where: { customerId } });
     const target = addresses.find((a) => a.id === addressId);
     if (!target) {
-      throw new NotFoundException(`Address ${addressId} not found for customer ${customerId}`);
+      throw new NotFoundException(
+        `Address ${addressId} not found for customer ${customerId}`,
+      );
     }
     if (addresses.length === 1) {
       throw new BadRequestException('Cannot delete the only address');
@@ -373,20 +463,29 @@ export class CustomersService {
     await this.addressRepo.remove(target);
   }
 
-  async setPrimaryAddress(customerId: number, addressId: number): Promise<Address> {
+  async setPrimaryAddress(
+    customerId: number,
+    addressId: number,
+  ): Promise<Address> {
     await this.findById(customerId);
-    const address = await this.addressRepo.findOne({ where: { id: addressId } });
+    const address = await this.addressRepo.findOne({
+      where: { id: addressId },
+    });
     if (!address || address.customerId !== customerId) {
-      throw new NotFoundException(`Address ${addressId} not found for customer ${customerId}`);
+      throw new NotFoundException(
+        `Address ${addressId} not found for customer ${customerId}`,
+      );
     }
 
     await this.dataSource.transaction(async (em) => {
-      await em.createQueryBuilder()
+      await em
+        .createQueryBuilder()
         .update(Address)
         .set({ isPrimary: false })
         .where('customer_id = :customerId', { customerId })
         .execute();
-      await em.createQueryBuilder()
+      await em
+        .createQueryBuilder()
         .update(Address)
         .set({ isPrimary: true })
         .where('id = :id', { id: addressId })
@@ -424,7 +523,9 @@ export class CustomersService {
         discount: item.discount,
         effectivePrice:
           item.discount != null
-            ? parseFloat((item.customPrice * (1 - item.discount / 100)).toFixed(4))
+            ? parseFloat(
+                (item.customPrice * (1 - item.discount / 100)).toFixed(4),
+              )
             : item.customPrice,
         product: item.product
           ? {
@@ -451,7 +552,9 @@ export class CustomersService {
   }
 
   private async generateCustomerNumber(em: EntityManager): Promise<string> {
-    const result = await em.query(`SELECT nextval('customer_number_seq') AS next`);
+    const result = await em.query(
+      `SELECT nextval('customer_number_seq') AS next`,
+    );
     const next: number = result[0].next;
     return `CUST-${String(next).padStart(4, '0')}`;
   }
