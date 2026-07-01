@@ -4,6 +4,7 @@ import { createZodDto } from 'nestjs-zod';
 const FindAuditLogsQuerySchema = z.object({
   entityType: z.string().optional(),
   entityId: z.coerce.number().int().positive().optional(),
+  action: z.enum(['create', 'update', 'delete', 'archive', 'status_change']).optional(),
   performedBy: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),

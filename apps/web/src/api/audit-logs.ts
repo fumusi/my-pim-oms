@@ -23,6 +23,7 @@ export interface AuditLogsResponse {
 export interface AuditLogsQuery {
   entityType?: string
   entityId?: number
+  action?: AuditAction
   performedBy?: string
   dateFrom?: string
   dateTo?: string

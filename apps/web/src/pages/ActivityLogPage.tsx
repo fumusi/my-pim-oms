@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getAuditLogs, type AuditLog, type AuditAction } from '../api/audit-logs'
 import { ActionBadge } from '../components/ActionBadge'
 import { AuditDiff, AuditSnapshot } from '../components/AuditDiff'
+import { formatTimestamp } from '../utils/format'
 
 const ENTITY_TYPES = ['Product', 'Category', 'Customer', 'Order', 'PriceList', 'User']
 const ACTIONS: AuditAction[] = ['create', 'update', 'delete', 'archive', 'status_change']
@@ -15,16 +16,6 @@ const ENTITY_ROUTE_MAP: Record<string, string | null> = {
   Order: '/orders',
   PriceList: '/price-lists',
   User: '/users',
-}
-
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`
 }
 
 function EntityLink({ entityType, entityId }: { entityType: string; entityId: number }) {
@@ -196,7 +187,7 @@ export function ActivityLogPage() {
         >
           <option value="">All actions</option>
           {ACTIONS.map((a) => (
-            <option key={a} value={a}>{a.replace('_', ' ')}</option>
+            <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>
           ))}
         </select>
 

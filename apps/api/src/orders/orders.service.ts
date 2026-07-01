@@ -465,7 +465,16 @@ export class OrdersService {
       return result;
     });
 
-    void this.auditLogService.log('Order', id, 'update', null, updatedBy);
+    void this.auditLogService.log('Order', id, 'update', null, updatedBy, {
+      snapshot: order.lineItems.map((li) => ({
+        id: li.id,
+        productId: li.productId,
+        sku: li.sku,
+        quantity: li.quantity,
+        discount: li.discount,
+        lineTotalExclVat: li.lineTotalExclVat,
+      })),
+    });
     return order;
   }
 
