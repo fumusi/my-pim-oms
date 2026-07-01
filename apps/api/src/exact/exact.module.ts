@@ -15,10 +15,20 @@ import { ItemsController } from './items.controller';
 @Module({
   imports: [
     HttpModule.register({ timeout: 30_000 }),
-    TypeOrmModule.forFeature([ExactOnlineToken, ExactItem, ExactItemGroup, Category]),
+    TypeOrmModule.forFeature([
+      ExactOnlineToken,
+      ExactItem,
+      ExactItemGroup,
+      Category,
+    ]),
   ],
   controllers: [ExactController, ItemsController],
-  providers: [ExactOnlineAuthService, ExactOnlineClientService, ExactSyncService, ItemsService],
+  providers: [
+    ExactOnlineAuthService,
+    ExactOnlineClientService,
+    ExactSyncService,
+    ItemsService,
+  ],
   exports: [ExactOnlineAuthService, ExactSyncService, ItemsService],
 })
 export class ExactModule {}

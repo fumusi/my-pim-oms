@@ -11,15 +11,27 @@ const baseRow = () => ({
 describe('mapImportRow', () => {
   describe('localized name', () => {
     it('maps name_nl/en/de into a localized object', () => {
-      const result = mapImportRow({ name_nl: 'Vaas', name_en: 'Vase', name_de: 'Vase DE' });
+      const result = mapImportRow({
+        name_nl: 'Vaas',
+        name_en: 'Vase',
+        name_de: 'Vase DE',
+      });
       expect(result).toMatchObject({ ok: true });
       if (result.ok) {
-        expect(result.data.name).toEqual({ nl: 'Vaas', en: 'Vase', de: 'Vase DE' });
+        expect(result.data.name).toEqual({
+          nl: 'Vaas',
+          en: 'Vase',
+          de: 'Vase DE',
+        });
       }
     });
 
     it('omits language keys that are empty', () => {
-      const result = mapImportRow({ name_en: 'Vase', name_nl: '', name_de: null });
+      const result = mapImportRow({
+        name_en: 'Vase',
+        name_nl: '',
+        name_de: null,
+      });
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.data.name).toEqual({ en: 'Vase' });
     });
@@ -35,7 +47,8 @@ describe('mapImportRow', () => {
     it('maps description_nl/en/de into a localized object', () => {
       const result = mapImportRow({ description_en: 'A beautiful vase' });
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.data.description).toEqual({ en: 'A beautiful vase' });
+      if (result.ok)
+        expect(result.data.description).toEqual({ en: 'A beautiful vase' });
     });
 
     it('leaves description undefined when all columns absent', () => {
@@ -89,7 +102,10 @@ describe('mapImportRow', () => {
 
   describe('suitableFor enum', () => {
     it('accepts valid suitableFor values', () => {
-      const result = mapImportRow({ ...baseRow(), suitableFor: SuitableFor.Indoor });
+      const result = mapImportRow({
+        ...baseRow(),
+        suitableFor: SuitableFor.Indoor,
+      });
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.data.suitableFor).toBe(SuitableFor.Indoor);
     });
@@ -154,7 +170,16 @@ describe('mapImportRow', () => {
     });
 
     it('parses all measurement fields', () => {
-      const row = { ...baseRow(), weight: 1.2, height: 10, width: 5, depth: 3, length: 8, thickness: 0.5, capacity: 2 };
+      const row = {
+        ...baseRow(),
+        weight: 1.2,
+        height: 10,
+        width: 5,
+        depth: 3,
+        length: 8,
+        thickness: 0.5,
+        capacity: 2,
+      };
       const result = mapImportRow(row);
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -196,7 +221,11 @@ describe('mapImportRow', () => {
 
   describe('boolean fields', () => {
     it('accepts string "true" and "false"', () => {
-      const result = mapImportRow({ ...baseRow(), backorder: 'true', handmade: 'false' });
+      const result = mapImportRow({
+        ...baseRow(),
+        backorder: 'true',
+        handmade: 'false',
+      });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.backorder).toBe(true);
@@ -205,7 +234,11 @@ describe('mapImportRow', () => {
     });
 
     it('accepts native boolean values', () => {
-      const result = mapImportRow({ ...baseRow(), biodegradable: true, scratchProne: false });
+      const result = mapImportRow({
+        ...baseRow(),
+        biodegradable: true,
+        scratchProne: false,
+      });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.biodegradable).toBe(true);
@@ -214,7 +247,11 @@ describe('mapImportRow', () => {
     });
 
     it('accepts "1"/"0" as truthy/falsy', () => {
-      const result = mapImportRow({ ...baseRow(), douProduct: '1', backorder: '0' });
+      const result = mapImportRow({
+        ...baseRow(),
+        douProduct: '1',
+        backorder: '0',
+      });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.douProduct).toBe(true);

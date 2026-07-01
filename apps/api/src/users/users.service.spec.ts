@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -76,7 +80,10 @@ describe('UsersService', () => {
         UsersService,
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: RedisService, useValue: redis },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('1h') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('1h') },
+        },
         { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
@@ -110,8 +117,8 @@ describe('UsersService', () => {
     it('updates email when new email is available', async () => {
       const user = makeUser();
       repo.findOneBy
-        .mockResolvedValueOnce(user)       // find current user
-        .mockResolvedValueOnce(null);      // no conflict
+        .mockResolvedValueOnce(user) // find current user
+        .mockResolvedValueOnce(null); // no conflict
       repo.save.mockResolvedValue({ ...user, email: 'new@example.com' });
 
       const result = await service.updateMe(1, { email: 'new@example.com' });
@@ -144,7 +151,9 @@ describe('UsersService', () => {
 
     it('throws NotFoundException when user missing', async () => {
       repo.findOneBy.mockResolvedValue(null);
-      await expect(service.updateMe(99, { email: 'x@x.com' })).rejects.toThrow(NotFoundException);
+      await expect(service.updateMe(99, { email: 'x@x.com' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -171,7 +180,9 @@ describe('UsersService', () => {
 
     it('throws NotFoundException when user missing', async () => {
       repo.findOneBy.mockResolvedValue(null);
-      await expect(service.deleteMe(99, makeJwt())).rejects.toThrow(NotFoundException);
+      await expect(service.deleteMe(99, makeJwt())).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -182,21 +193,26 @@ describe('UsersService', () => {
       const users = [makeUser(), makeUser({ id: 2, email: 'b@example.com' })];
       qb.getManyAndCount.mockResolvedValue([users, 2]);
 
-      const result = await service.findAll({ page: 1, limit: 20 } as any);
+      const result = await service.findAll({ page: 1, limit: 20 });
 
       expect(result.data).toHaveLength(2);
-      expect(result.meta).toEqual({ total: 2, page: 1, limit: 20, totalPages: 1 });
+      expect(result.meta).toEqual({
+        total: 2,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      });
     });
 
     it('calculates totalPages correctly', async () => {
       qb.getManyAndCount.mockResolvedValue([[], 45]);
-      const result = await service.findAll({ page: 1, limit: 20 } as any);
+      const result = await service.findAll({ page: 1, limit: 20 });
       expect(result.meta.totalPages).toBe(3);
     });
 
     it('applies skip/take for page 2', async () => {
       qb.getManyAndCount.mockResolvedValue([[], 0]);
-      await service.findAll({ page: 2, limit: 10 } as any);
+      await service.findAll({ page: 2, limit: 10 });
       expect(qb.skip).toHaveBeenCalledWith(10);
       expect(qb.take).toHaveBeenCalledWith(10);
     });
@@ -208,12 +224,17 @@ describe('UsersService', () => {
     it('updates role and returns updated profile', async () => {
       const user = makeUser();
       repo.findOneBy
-        .mockResolvedValueOnce(user)                        // target lookup
+        .mockResolvedValueOnce(user) // target lookup
         .mockResolvedValueOnce({ ...user, role: Role.Admin }); // after update
       repo.update.mockResolvedValue({});
       redis.del.mockResolvedValue(undefined);
 
-      const result = await service.adminUpdateUser(2, 1, { role: Role.Admin }, 'admin@test.com');
+      const result = await service.adminUpdateUser(
+        2,
+        1,
+        { role: Role.Admin },
+        'admin@test.com',
+      );
 
       expect(repo.update).toHaveBeenCalledWith(
         1,
@@ -251,12 +272,16 @@ describe('UsersService', () => {
     });
 
     it('throws BadRequestException when admin updates themselves', async () => {
-      await expect(service.adminUpdateUser(1, 1, { role: Role.User })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.adminUpdateUser(1, 1, { role: Role.User }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when target missing', async () => {
       repo.findOneBy.mockResolvedValue(null);
-      await expect(service.adminUpdateUser(2, 99, {})).rejects.toThrow(NotFoundException);
+      await expect(service.adminUpdateUser(2, 99, {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ConflictException on duplicate email', async () => {
@@ -287,12 +312,16 @@ describe('UsersService', () => {
     });
 
     it('throws BadRequestException when admin tries to self-delete', async () => {
-      await expect(service.adminDeleteUser(1, 1)).rejects.toThrow(BadRequestException);
+      await expect(service.adminDeleteUser(1, 1)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws NotFoundException when target missing', async () => {
       repo.findOneBy.mockResolvedValue(null);
-      await expect(service.adminDeleteUser(2, 99)).rejects.toThrow(NotFoundException);
+      await expect(service.adminDeleteUser(2, 99)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

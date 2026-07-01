@@ -34,7 +34,11 @@ describe('StockNotificationService', () => {
   let service: StockNotificationService;
   let productRepo: { createQueryBuilder: jest.Mock; save: jest.Mock };
   let userRepo: { findBy: jest.Mock };
-  let mailService: { sendLowStockAlert: jest.Mock; sendOutOfStockAlert: jest.Mock };
+  let mailService: {
+    sendLowStockAlert: jest.Mock;
+    sendOutOfStockAlert: jest.Mock;
+  };
+  let notificationsService: { notifyAdmins: jest.Mock };
   let qb: ReturnType<typeof makeQbMock>;
 
   beforeEach(() => {
@@ -48,10 +52,14 @@ describe('StockNotificationService', () => {
       sendLowStockAlert: jest.fn().mockResolvedValue(undefined),
       sendOutOfStockAlert: jest.fn().mockResolvedValue(undefined),
     };
+    notificationsService = {
+      notifyAdmins: jest.fn().mockResolvedValue(undefined),
+    };
     service = new StockNotificationService(
       productRepo as any,
       userRepo as any,
       mailService as any,
+      notificationsService as any,
     );
   });
 
@@ -70,7 +78,7 @@ describe('StockNotificationService', () => {
       const lowProduct = makeProduct({ id: 1, stock: 2, lowStockThreshold: 5 });
       qb.getMany
         .mockResolvedValueOnce([lowProduct]) // findLowStockCandidates
-        .mockResolvedValueOnce([]);           // findOutOfStockCandidates
+        .mockResolvedValueOnce([]); // findOutOfStockCandidates
 
       await service.checkAndNotify();
 
@@ -84,7 +92,7 @@ describe('StockNotificationService', () => {
       userRepo.findBy.mockResolvedValue([makeAdmin('admin@test.com')]);
       const outProduct = makeProduct({ id: 2, stock: 0 });
       qb.getMany
-        .mockResolvedValueOnce([])            // findLowStockCandidates
+        .mockResolvedValueOnce([]) // findLowStockCandidates
         .mockResolvedValueOnce([outProduct]); // findOutOfStockCandidates
 
       await service.checkAndNotify();
@@ -115,10 +123,12 @@ describe('StockNotificationService', () => {
 
     it('updates lastLowStockNotifiedAt after sending low-stock alert', async () => {
       userRepo.findBy.mockResolvedValue([makeAdmin('admin@test.com')]);
-      const lowProduct = makeProduct({ id: 1, stock: 2, lowStockThreshold: 10 });
-      qb.getMany
-        .mockResolvedValueOnce([lowProduct])
-        .mockResolvedValueOnce([]);
+      const lowProduct = makeProduct({
+        id: 1,
+        stock: 2,
+        lowStockThreshold: 10,
+      });
+      qb.getMany.mockResolvedValueOnce([lowProduct]).mockResolvedValueOnce([]);
 
       const before = new Date();
       await service.checkAndNotify();
@@ -126,16 +136,18 @@ describe('StockNotificationService', () => {
 
       const [saved] = productRepo.save.mock.calls[0];
       expect(saved[0].lastLowStockNotifiedAt).toBeInstanceOf(Date);
-      expect(saved[0].lastLowStockNotifiedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
-      expect(saved[0].lastLowStockNotifiedAt.getTime()).toBeLessThanOrEqual(after.getTime());
+      expect(saved[0].lastLowStockNotifiedAt.getTime()).toBeGreaterThanOrEqual(
+        before.getTime(),
+      );
+      expect(saved[0].lastLowStockNotifiedAt.getTime()).toBeLessThanOrEqual(
+        after.getTime(),
+      );
     });
 
     it('updates lastOutOfStockNotifiedAt after sending out-of-stock alert', async () => {
       userRepo.findBy.mockResolvedValue([makeAdmin('admin@test.com')]);
       const outProduct = makeProduct({ id: 2, stock: 0 });
-      qb.getMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([outProduct]);
+      qb.getMany.mockResolvedValueOnce([]).mockResolvedValueOnce([outProduct]);
 
       await service.checkAndNotify();
 
@@ -166,9 +178,15 @@ describe('StockNotificationService', () => {
       await service.checkAndNotify();
 
       const allCalls = qb.andWhere.mock.calls.map(([expr]: [string]) => expr);
-      expect(allCalls.some((c) => c.includes('lowStockThreshold IS NOT NULL'))).toBe(true);
-      expect(allCalls.some((c) => c.includes('stock < p.lowStockThreshold'))).toBe(true);
-      expect(allCalls.some((c) => c.includes('lastLowStockNotifiedAt'))).toBe(true);
+      expect(
+        allCalls.some((c) => c.includes('lowStockThreshold IS NOT NULL')),
+      ).toBe(true);
+      expect(
+        allCalls.some((c) => c.includes('stock < p.lowStockThreshold')),
+      ).toBe(true);
+      expect(allCalls.some((c) => c.includes('lastLowStockNotifiedAt'))).toBe(
+        true,
+      );
     });
 
     it('builds out-of-stock QB with cooldown condition', async () => {
@@ -178,7 +196,9 @@ describe('StockNotificationService', () => {
       await service.checkAndNotify();
 
       const allCalls = qb.andWhere.mock.calls.map(([expr]: [string]) => expr);
-      expect(allCalls.some((c) => c.includes('lastOutOfStockNotifiedAt'))).toBe(true);
+      expect(allCalls.some((c) => c.includes('lastOutOfStockNotifiedAt'))).toBe(
+        true,
+      );
     });
   });
 });

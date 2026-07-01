@@ -44,7 +44,11 @@ export class User {
   @Column({ type: 'varchar', nullable: true, name: 'reset_token' })
   resetToken!: string | null;
 
-  @Column({ type: 'timestamptz', nullable: true, name: 'reset_token_expires_at' })
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    name: 'reset_token_expires_at',
+  })
   resetTokenExpiresAt!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

@@ -26,7 +26,12 @@ export class PriceList {
   @Column({ type: 'date', nullable: true, name: 'end_date' })
   endDate!: string | null;
 
-  @Column({ type: 'enum', enum: PriceListStatus, enumName: 'price_list_status', default: PriceListStatus.Active })
+  @Column({
+    type: 'enum',
+    enum: PriceListStatus,
+    enumName: 'price_list_status',
+    default: PriceListStatus.Active,
+  })
   status!: PriceListStatus;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

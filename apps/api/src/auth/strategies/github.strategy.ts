@@ -21,9 +21,19 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     });
   }
 
-  validate(_accessToken: string, _refreshToken: string, profile: Profile, done: (err: Error | null, user?: GithubProfile) => void): void {
+  validate(
+    _accessToken: string,
+    _refreshToken: string,
+    profile: Profile,
+    done: (err: Error | null, user?: GithubProfile) => void,
+  ): void {
     const email = profile.emails?.[0]?.value ?? null;
-    if (!email) return done(new Error('No email on this GitHub account — make sure your email is public'));
+    if (!email)
+      return done(
+        new Error(
+          'No email on this GitHub account — make sure your email is public',
+        ),
+      );
 
     const [firstName = null, ...rest] = (profile.displayName ?? '').split(' ');
     const lastName = rest.length ? rest.join(' ') : null;

@@ -45,18 +45,31 @@ export class CategoriesService {
     const where: FindOptionsWhere<Category> = { archivedAt: IsNull() };
     if (statusFilter) where.status = statusFilter;
 
-    const categories = await this.categoryRepo.find({ where, order: { id: 'ASC' } });
+    const categories = await this.categoryRepo.find({
+      where,
+      order: { id: 'ASC' },
+    });
     if (categories.length === 0) return [];
 
-    const counts = await this.itemsService.countsByCategoryIds(categories.map((c) => c.id));
-    return categories.map((c) => ({ ...c, productCount: counts.get(c.id) ?? 0 }));
+    const counts = await this.itemsService.countsByCategoryIds(
+      categories.map((c) => c.id),
+    );
+    return categories.map((c) => ({
+      ...c,
+      productCount: counts.get(c.id) ?? 0,
+    }));
   }
 
   findOne(id: number): Promise<Category | null> {
     return this.categoryRepo.findOne({ where: { id } });
   }
 
-  async findOneDetail(id: number, page = 1, limit = 20, search?: string): Promise<CategoryDetail | null> {
+  async findOneDetail(
+    id: number,
+    page = 1,
+    limit = 20,
+    search?: string,
+  ): Promise<CategoryDetail | null> {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) return null;
 
@@ -64,7 +77,12 @@ export class CategoriesService {
 
     const [unfilteredResult, pagedResult] = await Promise.all([
       this.productsService.findAll({ categoryId: id, page: 1, limit: 1 }),
-      this.productsService.findAll({ categoryId: id, search, page, limit: safeLimit }),
+      this.productsService.findAll({
+        categoryId: id,
+        search,
+        page,
+        limit: safeLimit,
+      }),
     ]);
 
     const products: PaginatedPimProducts = {
@@ -88,13 +106,27 @@ export class CategoriesService {
   }
 
   async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {
-    const category = this.categoryRepo.create({ ...data, updatedBy: updatedBy ?? null });
+    const category = this.categoryRepo.create({
+      ...data,
+      updatedBy: updatedBy ?? null,
+    });
     const saved = await this.categoryRepo.save(category);
-    void this.auditLogService.log('Category', saved.id, 'create', null, updatedBy ?? 'system', { snapshot: { ...saved } });
+    void this.auditLogService.log(
+      'Category',
+      saved.id,
+      'create',
+      null,
+      updatedBy ?? 'system',
+      { snapshot: { ...saved } },
+    );
     return saved;
   }
 
-  async update(id: number, data: UpdateCategoryDto, updatedBy?: string): Promise<Category> {
+  async update(
+    id: number,
+    data: UpdateCategoryDto,
+    updatedBy?: string,
+  ): Promise<Category> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
 
     const changedFields: Record<string, { old: unknown; new: unknown }> = {};
@@ -108,11 +140,21 @@ export class CategoriesService {
 
     Object.assign(category, data, { updatedBy: updatedBy ?? null });
     const saved = await this.categoryRepo.save(category);
-    void this.auditLogService.log('Category', id, 'update', changedFields, updatedBy ?? 'system');
+    void this.auditLogService.log(
+      'Category',
+      id,
+      'update',
+      changedFields,
+      updatedBy ?? 'system',
+    );
     return saved;
   }
 
-  async setStatus(id: number, status: CategoryStatus, updatedBy?: string): Promise<Category> {
+  async setStatus(
+    id: number,
+    status: CategoryStatus,
+    updatedBy?: string,
+  ): Promise<Category> {
     // Category save and item deactivation run in one transaction so they can't diverge.
     // NOTE: re-activation does NOT restore products — any product deactivated here stays
     // inactive until manually re-enabled. This is intentional until a pim_status column lands.
@@ -127,7 +169,14 @@ export class CategoriesService {
         await this.itemsService.deactivateByCategoryId(id, em);
       }
 
-      void this.auditLogService.log('Category', id, 'status_change', null, updatedBy ?? 'system', { from: oldStatus, to: status });
+      void this.auditLogService.log(
+        'Category',
+        id,
+        'status_change',
+        null,
+        updatedBy ?? 'system',
+        { from: oldStatus, to: status },
+      );
       return result;
     });
 
@@ -146,7 +195,14 @@ export class CategoriesService {
     category.archivedAt = new Date();
     category.updatedBy = updatedBy ?? null;
     const saved = await this.categoryRepo.save(category);
-    void this.auditLogService.log('Category', id, 'archive', null, updatedBy ?? 'system', { snapshot: { ...saved } });
+    void this.auditLogService.log(
+      'Category',
+      id,
+      'archive',
+      null,
+      updatedBy ?? 'system',
+      { snapshot: { ...saved } },
+    );
     return saved;
   }
 
@@ -160,17 +216,37 @@ export class CategoriesService {
     }
     const snapshot = { ...category };
     await this.categoryRepo.delete(id);
-    void this.auditLogService.log('Category', id, 'delete', null, performedBy ?? 'system', { snapshot });
+    void this.auditLogService.log(
+      'Category',
+      id,
+      'delete',
+      null,
+      performedBy ?? 'system',
+      { snapshot },
+    );
   }
 
-  async assignProducts(id: number, productIds: string[]): Promise<AssignResult> {
+  async assignProducts(
+    id: number,
+    productIds: string[],
+  ): Promise<AssignResult> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
-    return this.itemsService.assignToCategory(productIds, id, category.template);
+    return this.itemsService.assignToCategory(
+      productIds,
+      id,
+      category.template,
+    );
   }
 
-  async unassignProducts(id: number, productIds: string[]): Promise<{ unassigned: number }> {
+  async unassignProducts(
+    id: number,
+    productIds: string[],
+  ): Promise<{ unassigned: number }> {
     await this.categoryRepo.findOneOrFail({ where: { id } });
-    const unassigned = await this.itemsService.unassignFromCategory(productIds, id);
+    const unassigned = await this.itemsService.unassignFromCategory(
+      productIds,
+      id,
+    );
     return { unassigned };
   }
 

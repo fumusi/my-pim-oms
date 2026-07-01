@@ -15,6 +15,8 @@ import { ProductStatus } from '../common/enums/product-status.enum';
 import { Role } from '../common/enums/role.enum';
 import { OrderCalculationService } from './order-calculation.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../common/enums/notification-type.enum';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { UpdateOrderDto } from './dto/update-order.dto';
 import type { FindOrdersQueryDto } from './dto/find-orders-query.dto';
@@ -54,6 +56,7 @@ export class OrdersService {
     private readonly dataSource: DataSource,
     private readonly calc: OrderCalculationService,
     private readonly auditLogService: AuditLogService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(query: FindOrdersQueryDto): Promise<PaginatedOrders> {
@@ -121,7 +124,11 @@ export class OrdersService {
     return order;
   }
 
-  async create(dto: CreateOrderDto, createdBy: string, callerRole: Role = Role.Admin): Promise<Order> {
+  async create(
+    dto: CreateOrderDto,
+    createdBy: string,
+    callerRole: Role = Role.Admin,
+  ): Promise<Order> {
     const result = await this.dataSource.transaction(async (em) => {
       const effectiveDto =
         callerRole === Role.User
@@ -134,7 +141,10 @@ export class OrdersService {
             }
           : dto;
 
-      if (effectiveDto.shippingAddressId != null && effectiveDto.customerId != null) {
+      if (
+        effectiveDto.shippingAddressId != null &&
+        effectiveDto.customerId != null
+      ) {
         const address = await em.findOne(Address, {
           where: { id: effectiveDto.shippingAddressId },
         });
@@ -147,12 +157,18 @@ export class OrdersService {
 
       const orderNumber = await this.generateOrderNumber(em);
 
-      const createdByUser = await em.findOne(User, { where: { email: createdBy } });
+      const createdByUser = await em.findOne(User, {
+        where: { email: createdBy },
+      });
       if (!createdByUser && effectiveDto.onBehalfOf) {
-        throw new BadRequestException(`User ${effectiveDto.onBehalfOf} not found`);
+        throw new BadRequestException(
+          `User ${effectiveDto.onBehalfOf} not found`,
+        );
       }
       const createdByName = createdByUser
-        ? [createdByUser.firstName, createdByUser.lastName].filter(Boolean).join(' ') || createdBy
+        ? [createdByUser.firstName, createdByUser.lastName]
+            .filter(Boolean)
+            .join(' ') || createdBy
         : createdBy;
 
       const nominalShippingCost = effectiveDto.shippingCost ?? 0;
@@ -191,7 +207,9 @@ export class OrdersService {
       const savedOrder = await em.save(Order, order);
 
       const productIds = effectiveDto.lineItems.map((li) => li.productId);
-      const products = await em.find(Product, { where: { id: In(productIds) } });
+      const products = await em.find(Product, {
+        where: { id: In(productIds) },
+      });
       const productMap = new Map(products.map((p) => [p.id, p]));
 
       const lineItems: LineItem[] = [];
@@ -246,7 +264,21 @@ export class OrdersService {
       return savedOrder;
     });
 
-    void this.auditLogService.log('Order', result.id, 'create', null, createdBy, { snapshot: { ...result } });
+    void this.auditLogService.log(
+      'Order',
+      result.id,
+      'create',
+      null,
+      createdBy,
+      { snapshot: { ...result } },
+    );
+    void this.notificationsService.notifyAdmins(
+      NotificationType.NewOrder,
+      'New Order',
+      `Order ${result.orderNumber} was placed`,
+      'Order',
+      result.id,
+    );
     return result;
   }
 
@@ -270,20 +302,35 @@ export class OrdersService {
 
       const changedFields: Record<string, { old: unknown; new: unknown }> = {};
       if (dto.description !== undefined) {
-        if (JSON.stringify(order.description) !== JSON.stringify(dto.description ?? null)) {
-          changedFields['description'] = { old: order.description, new: dto.description ?? null };
+        if (
+          JSON.stringify(order.description) !==
+          JSON.stringify(dto.description ?? null)
+        ) {
+          changedFields['description'] = {
+            old: order.description,
+            new: dto.description ?? null,
+          };
         }
         order.description = dto.description ?? null;
       }
       if (dto.deliveryOption !== undefined) {
         if (order.deliveryOption !== dto.deliveryOption) {
-          changedFields['deliveryOption'] = { old: order.deliveryOption, new: dto.deliveryOption };
+          changedFields['deliveryOption'] = {
+            old: order.deliveryOption,
+            new: dto.deliveryOption,
+          };
         }
         order.deliveryOption = dto.deliveryOption;
       }
       if (dto.trackingUrl !== undefined) {
-        if (JSON.stringify(order.trackingUrl) !== JSON.stringify(dto.trackingUrl ?? null)) {
-          changedFields['trackingUrl'] = { old: order.trackingUrl, new: dto.trackingUrl ?? null };
+        if (
+          JSON.stringify(order.trackingUrl) !==
+          JSON.stringify(dto.trackingUrl ?? null)
+        ) {
+          changedFields['trackingUrl'] = {
+            old: order.trackingUrl,
+            new: dto.trackingUrl ?? null,
+          };
         }
         order.trackingUrl = dto.trackingUrl ?? null;
       }
@@ -297,13 +344,19 @@ export class OrdersService {
           );
         }
         if (order.shippingAddressId !== dto.shippingAddressId) {
-          changedFields['shippingAddressId'] = { old: order.shippingAddressId, new: dto.shippingAddressId };
+          changedFields['shippingAddressId'] = {
+            old: order.shippingAddressId,
+            new: dto.shippingAddressId,
+          };
         }
         order.shippingAddressId = dto.shippingAddressId;
       }
       if (dto.shippingCost !== undefined) {
         if (order.nominalShippingCost !== dto.shippingCost) {
-          changedFields['shippingCost'] = { old: order.nominalShippingCost, new: dto.shippingCost };
+          changedFields['shippingCost'] = {
+            old: order.nominalShippingCost,
+            new: dto.shippingCost,
+          };
         }
         order.nominalShippingCost = dto.shippingCost;
       }
@@ -312,15 +365,21 @@ export class OrdersService {
 
       await this.recalculateAndSaveOrder(order, em);
 
-      const updated = await em.findOne(Order, {
+      const updated = (await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true, customer: true, shippingAddress: true },
-      }) as Order;
+      })) as Order;
 
       return { order: updated, changedFields };
     });
 
-    void this.auditLogService.log('Order', id, 'update', result.changedFields, updatedBy);
+    void this.auditLogService.log(
+      'Order',
+      id,
+      'update',
+      result.changedFields,
+      updatedBy,
+    );
     return result.order;
   }
 
@@ -392,7 +451,9 @@ export class OrdersService {
         const updatedLineItems = order.lineItems.filter((li) =>
           dto.updateItems!.some((upd) => upd.id === li.id),
         );
-        const updateProductIds = [...new Set(updatedLineItems.map((li) => li.productId))];
+        const updateProductIds = [
+          ...new Set(updatedLineItems.map((li) => li.productId)),
+        ];
         const updateProducts = await em.find(Product, {
           where: { id: In(updateProductIds) },
         });
@@ -422,7 +483,9 @@ export class OrdersService {
 
       if (dto.addItems?.length) {
         const productIds = dto.addItems.map((i) => i.productId);
-        const products = await em.find(Product, { where: { id: In(productIds) } });
+        const products = await em.find(Product, {
+          where: { id: In(productIds) },
+        });
         const productMap = new Map(products.map((p) => [p.id, p]));
         for (const item of dto.addItems) {
           const product = productMap.get(item.productId);
@@ -447,7 +510,10 @@ export class OrdersService {
             unitPrice: product.basePrice ?? 0,
             discount: item.discount ?? 0,
             lineTotalExclVat: lineTotal,
-            isFulfillable: this.calc.isFulfillable(product.stock, item.quantity),
+            isFulfillable: this.calc.isFulfillable(
+              product.stock,
+              item.quantity,
+            ),
           });
           const saved = await em.save(LineItem, newItem);
           order.lineItems.push(saved);
@@ -522,7 +588,23 @@ export class OrdersService {
       return { order: saved, oldStatus };
     });
 
-    void this.auditLogService.log('Order', id, 'status_change', null, updatedBy, { from: result.oldStatus, to: newStatus });
+    void this.auditLogService.log(
+      'Order',
+      id,
+      'status_change',
+      null,
+      updatedBy,
+      { from: result.oldStatus, to: newStatus },
+    );
+    if (newStatus === OrderStatus.Cancelled) {
+      void this.notificationsService.notifyAdmins(
+        NotificationType.OrderStatusChange,
+        'Order Cancelled',
+        `Order ${result.order.orderNumber} was cancelled`,
+        'Order',
+        result.order.id,
+      );
+    }
     return result.order;
   }
 
@@ -550,9 +632,7 @@ export class OrdersService {
       if (!product)
         throw new NotFoundException(`Product ${dto.productId} not found`);
       if (product.status !== ProductStatus.Active)
-        throw new BadRequestException(
-          `Product ${dto.productId} is not active`,
-        );
+        throw new BadRequestException(`Product ${dto.productId} is not active`);
 
       const lineTotal = this.calc.calcLineTotal({
         unitPrice: product.basePrice ?? 0,
@@ -728,11 +808,16 @@ export class OrdersService {
     order.archivedAt = new Date();
     order.updatedBy = updatedBy;
     const saved = await this.orderRepo.save(order);
-    void this.auditLogService.log('Order', id, 'archive', null, updatedBy, { snapshot: { ...saved } });
+    void this.auditLogService.log('Order', id, 'archive', null, updatedBy, {
+      snapshot: { ...saved },
+    });
     return saved;
   }
 
-  private async recalculateAndSaveOrder(order: Order, em: EntityManager): Promise<void> {
+  private async recalculateAndSaveOrder(
+    order: Order,
+    em: EntityManager,
+  ): Promise<void> {
     const totals = this.calc.calcTotals(
       order.lineItems.map((li) => ({
         unitPrice: li.unitPrice,

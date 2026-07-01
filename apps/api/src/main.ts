@@ -17,12 +17,19 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('my-pim-oms API')
-      .setDescription('PIM + OMS backend — products, orders, customers, price lists, Exact Online sync')
+      .setDescription(
+        'PIM + OMS backend — products, orders, customers, price lists, Exact Online sync',
+      )
       .setVersion('1.0')
-      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'access-token',
+      )
       .build();
 
-    const document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, config));
+    const document = cleanupOpenApiDoc(
+      SwaggerModule.createDocument(app, config),
+    );
     SwaggerModule.setup('api/docs', app, document, {
       swaggerOptions: { persistAuthorization: true },
     });

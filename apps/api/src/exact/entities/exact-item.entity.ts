@@ -17,10 +17,24 @@ export class ExactItem {
   @Column({ nullable: true, type: 'int' })
   division!: number | null;
 
-  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 4, transformer: decimalTransformer, name: 'standard_sales_price' })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    transformer: decimalTransformer,
+    name: 'standard_sales_price',
+  })
   standardSalesPrice!: number | null;
 
-  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 4, transformer: decimalTransformer, name: 'cost_price_standard' })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    transformer: decimalTransformer,
+    name: 'cost_price_standard',
+  })
   costPriceStandard!: number | null;
 
   @Column({ nullable: true, type: 'varchar', name: 'cost_price_currency' })
@@ -71,13 +85,34 @@ export class ExactItem {
   @Column({ nullable: true, type: 'varchar', name: 'search_code' })
   searchCode!: string | null;
 
-  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 4, transformer: decimalTransformer, name: 'average_cost' })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    transformer: decimalTransformer,
+    name: 'average_cost',
+  })
   averageCost!: number | null;
 
-  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 4, transformer: decimalTransformer, name: 'gross_weight' })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    transformer: decimalTransformer,
+    name: 'gross_weight',
+  })
   grossWeight!: number | null;
 
-  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 4, transformer: decimalTransformer, name: 'net_weight' })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    transformer: decimalTransformer,
+    name: 'net_weight',
+  })
   netWeight!: number | null;
 
   @Column({ nullable: true, type: 'varchar', name: 'net_weight_unit' })
@@ -103,7 +138,11 @@ export class ExactItem {
   @Column({ nullable: true, type: 'varchar', name: 'sales_vat_code' })
   salesVatCode!: string | null;
 
-  @Column({ nullable: true, type: 'varchar', name: 'sales_vat_code_description' })
+  @Column({
+    nullable: true,
+    type: 'varchar',
+    name: 'sales_vat_code_description',
+  })
   salesVatCodeDescription!: string | null;
 
   @Column({ nullable: true, type: 'timestamptz', name: 'start_date' })
@@ -112,7 +151,13 @@ export class ExactItem {
   @Column({ nullable: true, type: 'timestamptz', name: 'end_date' })
   endDate!: Date | null;
 
-  @Column({ nullable: true, type: 'decimal', precision: 10, scale: 4, transformer: decimalTransformer })
+  @Column({
+    nullable: true,
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    transformer: decimalTransformer,
+  })
   stock!: number | null;
 
   @Column({ nullable: true, type: 'varchar' })

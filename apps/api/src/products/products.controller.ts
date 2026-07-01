@@ -16,7 +16,13 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
@@ -29,7 +35,11 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { GetProductQueryDto } from './dto/get-product-query.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
-import { BulkArchiveDto, BulkDeleteDto, BulkStatusDto } from './dto/bulk-action.dto';
+import {
+  BulkArchiveDto,
+  BulkDeleteDto,
+  BulkStatusDto,
+} from './dto/bulk-action.dto';
 import type { Product } from './entities/product.entity';
 import type { LocalizedText } from '../common/types/localized-text.interface';
 
@@ -46,7 +56,10 @@ export class ProductsController {
   async findAll(@Query() query: FindProductsQueryDto) {
     const result = await this.productsService.findAll(query);
     if (query.lang) {
-      return { ...result, data: result.data.map((p) => this.flattenLang(p, query.lang!)) };
+      return {
+        ...result,
+        data: result.data.map((p) => this.flattenLang(p, query.lang!)),
+      };
     }
     return result;
   }
@@ -72,7 +85,8 @@ export class ProductsController {
     const buffer = this.productsService.getImportTemplate();
     res.set({
       'Content-Type': 'text/csv',
-      'Content-Disposition': 'attachment; filename="products-import-template.csv"',
+      'Content-Disposition':
+        'attachment; filename="products-import-template.csv"',
       'Content-Length': buffer.length,
     });
     res.end(buffer);
@@ -83,7 +97,11 @@ export class ProductsController {
   @ApiOperation({ summary: 'Export products as CSV' })
   @ApiResponse({ status: 200, description: 'CSV export file' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async exportProducts(@Query() query: FindProductsQueryDto, @Req() req: AuthRequest, @Res() res: Response) {
+  async exportProducts(
+    @Query() query: FindProductsQueryDto,
+    @Req() req: AuthRequest,
+    @Res() res: Response,
+  ) {
     const isAdmin = req.user.role === Role.Admin;
     const buffer = await this.productsService.exportProducts(query, isAdmin);
     res.set({
@@ -102,10 +120,22 @@ export class ProductsController {
   @ApiResponse({ status: 400, description: 'Invalid file' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
-  importProducts(@UploadedFile() file: Express.Multer.File, @Req() req: AuthRequest) {
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  importProducts(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthRequest,
+  ) {
     if (!file) throw new BadRequestException('File is required');
-    return this.productsService.importProducts(file.buffer, file.mimetype, req.user.email);
+    return this.productsService.importProducts(
+      file.buffer,
+      file.mimetype,
+      req.user.email,
+    );
   }
 
   @Patch('bulk/archive')
@@ -129,7 +159,11 @@ export class ProductsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   bulkUpdateStatus(@Body() dto: BulkStatusDto, @Req() req: AuthRequest) {
-    return this.productsService.bulkUpdateStatus(dto.ids, dto.status, req.user.email);
+    return this.productsService.bulkUpdateStatus(
+      dto.ids,
+      dto.status,
+      req.user.email,
+    );
   }
 
   @Delete('bulk')
@@ -226,6 +260,10 @@ export class ProductsController {
     const pick = (text: LocalizedText | null | undefined): string | null =>
       text ? (text[lang as keyof LocalizedText] ?? null) : null;
 
-    return { ...product, name: pick(product.name), description: pick(product.description) };
+    return {
+      ...product,
+      name: pick(product.name),
+      description: pick(product.description),
+    };
   }
 }

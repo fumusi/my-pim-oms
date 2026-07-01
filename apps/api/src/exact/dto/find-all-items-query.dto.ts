@@ -12,4 +12,6 @@ const FindAllItemsQuerySchema = z.object({
     .transform((v) => v === 'true'),
 });
 
-export class FindAllItemsQueryDto extends createZodDto(FindAllItemsQuerySchema) {}
+export class FindAllItemsQueryDto extends createZodDto(
+  FindAllItemsQuerySchema,
+) {}

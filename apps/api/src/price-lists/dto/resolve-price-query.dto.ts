@@ -6,4 +6,6 @@ const ResolvePriceQuerySchema = z.object({
   customerId: z.coerce.number().int().positive().optional(),
 });
 
-export class ResolvePriceQueryDto extends createZodDto(ResolvePriceQuerySchema) {}
+export class ResolvePriceQueryDto extends createZodDto(
+  ResolvePriceQuerySchema,
+) {}

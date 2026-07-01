@@ -46,7 +46,9 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   } as Product;
 }
 
-function makePriceListItem(overrides: Partial<PriceListItem> = {}): PriceListItem {
+function makePriceListItem(
+  overrides: Partial<PriceListItem> = {},
+): PriceListItem {
   return {
     id: 1,
     priceListId: 1,
@@ -69,7 +71,11 @@ function makeCustomerPriceList(priceList: PriceList): CustomerPriceList {
 
 describe('PriceListsService.resolvePrice', () => {
   let service: PriceListsService;
-  let cplRepo: { createQueryBuilder: jest.Mock; count: jest.Mock; findOneBy: jest.Mock };
+  let cplRepo: {
+    createQueryBuilder: jest.Mock;
+    count: jest.Mock;
+    findOneBy: jest.Mock;
+  };
   let itemRepo: { findOneBy: jest.Mock; createQueryBuilder: jest.Mock };
   let productRepo: { findOneBy: jest.Mock };
   let cplQb: ReturnType<typeof makeCplQbMock>;
@@ -96,7 +102,21 @@ describe('PriceListsService.resolvePrice', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PriceListsService,
-        { provide: getRepositoryToken(PriceList), useValue: { findOneBy: jest.fn(), createQueryBuilder: jest.fn().mockReturnValue({ where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]), getManyAndCount: jest.fn().mockResolvedValue([[], 0]), skip: jest.fn().mockReturnThis(), take: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis() }) } },
+        {
+          provide: getRepositoryToken(PriceList),
+          useValue: {
+            findOneBy: jest.fn(),
+            createQueryBuilder: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getMany: jest.fn().mockResolvedValue([]),
+              getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+              skip: jest.fn().mockReturnThis(),
+              take: jest.fn().mockReturnThis(),
+              orderBy: jest.fn().mockReturnThis(),
+            }),
+          },
+        },
         { provide: getRepositoryToken(PriceListItem), useValue: itemRepo },
         { provide: getRepositoryToken(CustomerPriceList), useValue: cplRepo },
         { provide: getRepositoryToken(Product), useValue: productRepo },
@@ -109,9 +129,17 @@ describe('PriceListsService.resolvePrice', () => {
   });
 
   it('returns source=price_list when customer has active price list and product is in it', async () => {
-    const pl = makePriceList({ id: 1, name: 'VIP List', status: PriceListStatus.Active });
+    const pl = makePriceList({
+      id: 1,
+      name: 'VIP List',
+      status: PriceListStatus.Active,
+    });
     const cpl = makeCustomerPriceList(pl);
-    const item = makePriceListItem({ priceListId: 1, productId: 5, customPrice: 7.5 });
+    const item = makePriceListItem({
+      priceListId: 1,
+      productId: 5,
+      customPrice: 7.5,
+    });
 
     cplQb.getOne.mockResolvedValue(cpl);
     itemRepo.findOneBy.mockResolvedValue(item);
@@ -155,13 +183,24 @@ describe('PriceListsService.resolvePrice', () => {
     cplQb.getOne.mockResolvedValue(null);
     productRepo.findOneBy.mockResolvedValue(null);
 
-    await expect(service.resolvePrice(999, 42)).rejects.toThrow(NotFoundException);
+    await expect(service.resolvePrice(999, 42)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('applies discount when price list item has a discount', async () => {
-    const pl = makePriceList({ id: 1, name: 'Sale List', status: PriceListStatus.Active });
+    const pl = makePriceList({
+      id: 1,
+      name: 'Sale List',
+      status: PriceListStatus.Active,
+    });
     const cpl = makeCustomerPriceList(pl);
-    const item = makePriceListItem({ priceListId: 1, productId: 5, customPrice: 10.0, discount: 10 });
+    const item = makePriceListItem({
+      priceListId: 1,
+      productId: 5,
+      customPrice: 10.0,
+      discount: 10,
+    });
 
     cplQb.getOne.mockResolvedValue(cpl);
     itemRepo.findOneBy.mockResolvedValue(item);
@@ -176,7 +215,11 @@ describe('PriceListsService.resolvePrice', () => {
 
 describe('PriceListsService.assignCustomer', () => {
   let service: PriceListsService;
-  let cplRepo: { createQueryBuilder: jest.Mock; findOneBy: jest.Mock; count: jest.Mock };
+  let cplRepo: {
+    createQueryBuilder: jest.Mock;
+    findOneBy: jest.Mock;
+    count: jest.Mock;
+  };
   let plRepo: { findOneBy: jest.Mock };
   let cplQb: ReturnType<typeof makeCplQbMock>;
   let mockEm: {
@@ -192,7 +235,9 @@ describe('PriceListsService.assignCustomer', () => {
       createQueryBuilder: jest.fn().mockReturnValue(cplQb),
       findOneBy: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockImplementation((_, data) => ({ ...data })),
-      save: jest.fn().mockImplementation((_, entity) => Promise.resolve(entity)),
+      save: jest
+        .fn()
+        .mockImplementation((_, entity) => Promise.resolve(entity)),
     };
     cplRepo = {
       createQueryBuilder: jest.fn().mockReturnValue(cplQb),
@@ -223,12 +268,17 @@ describe('PriceListsService.assignCustomer', () => {
           },
         },
         { provide: getRepositoryToken(CustomerPriceList), useValue: cplRepo },
-        { provide: getRepositoryToken(Product), useValue: { findOneBy: jest.fn() } },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: { findOneBy: jest.fn() },
+        },
         {
           provide: DataSource,
           useValue: {
             transaction: jest.fn().mockImplementation((...args: unknown[]) => {
-              const cb = args[args.length - 1] as (em: typeof mockEm) => Promise<unknown>;
+              const cb = args[args.length - 1] as (
+                em: typeof mockEm,
+              ) => Promise<unknown>;
               return cb(mockEm);
             }),
           },

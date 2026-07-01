@@ -6,4 +6,6 @@ const UpdatePriceListItemSchema = z.object({
   discount: z.number().min(0).max(100).nullable().optional(),
 });
 
-export class UpdatePriceListItemDto extends createZodDto(UpdatePriceListItemSchema) {}
+export class UpdatePriceListItemDto extends createZodDto(
+  UpdatePriceListItemSchema,
+) {}

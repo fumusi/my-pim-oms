@@ -46,7 +46,16 @@ export class AuditLogService {
   }
 
   async findAll(query: FindAuditLogsQueryDto): Promise<PaginatedAuditLogs> {
-    const { page, limit, entityType, entityId, action, performedBy, dateFrom, dateTo } = query;
+    const {
+      page,
+      limit,
+      entityType,
+      entityId,
+      action,
+      performedBy,
+      dateFrom,
+      dateTo,
+    } = query;
 
     const qb = this.repo
       .createQueryBuilder('al')
@@ -57,15 +66,24 @@ export class AuditLogService {
     if (entityType) qb.andWhere('al.entityType = :entityType', { entityType });
     if (entityId) qb.andWhere('al.entityId = :entityId', { entityId });
     if (action) qb.andWhere('al.action = :action', { action });
-    if (performedBy) qb.andWhere('al.performedBy ILIKE :performedBy', { performedBy: `%${performedBy}%` });
+    if (performedBy)
+      qb.andWhere('al.performedBy ILIKE :performedBy', {
+        performedBy: `%${performedBy}%`,
+      });
     if (dateFrom) qb.andWhere('al.performedAt >= :dateFrom', { dateFrom });
-    if (dateTo) qb.andWhere("al.performedAt < (:dateTo::date + interval '1 day')", { dateTo });
+    if (dateTo)
+      qb.andWhere("al.performedAt < (:dateTo::date + interval '1 day')", {
+        dateTo,
+      });
 
     const [data, total] = await qb.getManyAndCount();
     return { data, total, page, limit };
   }
 
-  async findByEntity(entityType: string, entityId: number): Promise<{ data: AuditLog[]; hasMore: boolean }> {
+  async findByEntity(
+    entityType: string,
+    entityId: number,
+  ): Promise<{ data: AuditLog[]; hasMore: boolean }> {
     const limit = 100;
     const data = await this.repo
       .createQueryBuilder('al')

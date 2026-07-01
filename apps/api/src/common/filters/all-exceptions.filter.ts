@@ -23,7 +23,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let statusCode: number;
     let message: string;
-    let errors: Array<{ field: string; message: string }> = [];
+    const errors: Array<{ field: string; message: string }> = [];
 
     if (exception instanceof ZodValidationException) {
       statusCode = 400;
@@ -74,7 +74,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const logLine = `[${method}] ${path} — ${statusCode} ${message}`;
     if (statusCode >= 500) {
-      const stack = exception instanceof Error ? exception.stack : String(exception);
+      const stack =
+        exception instanceof Error ? exception.stack : String(exception);
       this.logger.error(logLine, stack);
     } else {
       this.logger.log(logLine);

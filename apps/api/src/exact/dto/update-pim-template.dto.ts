@@ -5,4 +5,6 @@ const UpdatePimTemplateSchema = z.object({
   pimTemplate: z.record(z.string(), z.unknown()).nullable(),
 });
 
-export class UpdatePimTemplateDto extends createZodDto(UpdatePimTemplateSchema) {}
+export class UpdatePimTemplateDto extends createZodDto(
+  UpdatePimTemplateSchema,
+) {}

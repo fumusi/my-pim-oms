@@ -1,5 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import type { AuthRequest } from '../common/types/auth-request.type';
@@ -19,7 +34,13 @@ export class ItemsController {
   @ApiResponse({ status: 200, description: 'List of items' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   findAll(@Query() query: FindAllItemsQueryDto) {
-    return this.itemsService.findAll(query.page, query.limit, query.excludeCategoryId, query.search, query.withCategory);
+    return this.itemsService.findAll(
+      query.page,
+      query.limit,
+      query.excludeCategoryId,
+      query.search,
+      query.withCategory,
+    );
   }
 
   @Get(':id')
@@ -55,7 +76,11 @@ export class ItemsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Item not found' })
-  updatePimTemplate(@Param('id') id: string, @Body() dto: UpdatePimTemplateDto, @Req() req: AuthRequest) {
+  updatePimTemplate(
+    @Param('id') id: string,
+    @Body() dto: UpdatePimTemplateDto,
+    @Req() req: AuthRequest,
+  ) {
     return this.itemsService.updatePimTemplate(id, dto, req.user.email);
   }
 }

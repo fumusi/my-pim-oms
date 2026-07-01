@@ -37,19 +37,46 @@ export interface ImportRowData {
   gemstoneType?: string;
 }
 
-export type ImportRowResult = { ok: true; data: ImportRowData } | { ok: false; reason: string };
+export type ImportRowResult =
+  | { ok: true; data: ImportRowData }
+  | { ok: false; reason: string };
 
 export const TEMPLATE_HEADERS = [
-  'name_nl', 'name_en', 'name_de',
-  'description_nl', 'description_en', 'description_de',
-  'barcode', 'exactId', 'status', 'categoryId',
-  'stock', 'backorder', 'lowStockThreshold', 'endDate',
-  'weight', 'height', 'width', 'depth', 'length', 'thickness', 'capacity',
-  'color', 'material', 'application', 'countryOfOrigin',
-  'suitableFor', 'finishing',
-  'co2EmissionProduction', 'co2EmissionTransport',
-  'douProduct', 'biodegradable', 'handmade', 'scratchProne',
-  'typeOfClosure', 'gemstoneType',
+  'name_nl',
+  'name_en',
+  'name_de',
+  'description_nl',
+  'description_en',
+  'description_de',
+  'barcode',
+  'exactId',
+  'status',
+  'categoryId',
+  'stock',
+  'backorder',
+  'lowStockThreshold',
+  'endDate',
+  'weight',
+  'height',
+  'width',
+  'depth',
+  'length',
+  'thickness',
+  'capacity',
+  'color',
+  'material',
+  'application',
+  'countryOfOrigin',
+  'suitableFor',
+  'finishing',
+  'co2EmissionProduction',
+  'co2EmissionTransport',
+  'douProduct',
+  'biodegradable',
+  'handmade',
+  'scratchProne',
+  'typeOfClosure',
+  'gemstoneType',
 ] as const;
 
 function str(v: unknown): string | undefined {
@@ -80,7 +107,11 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
   const en = str(row['name_en']);
   const de = str(row['name_de']);
   if (nl || en || de) {
-    data.name = { ...(nl ? { nl } : {}), ...(en ? { en } : {}), ...(de ? { de } : {}) };
+    data.name = {
+      ...(nl ? { nl } : {}),
+      ...(en ? { en } : {}),
+      ...(de ? { de } : {}),
+    };
   }
 
   // Localized description
@@ -88,7 +119,11 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
   const den = str(row['description_en']);
   const dde = str(row['description_de']);
   if (dnl || den || dde) {
-    data.description = { ...(dnl ? { nl: dnl } : {}), ...(den ? { en: den } : {}), ...(dde ? { de: dde } : {}) };
+    data.description = {
+      ...(dnl ? { nl: dnl } : {}),
+      ...(den ? { en: den } : {}),
+      ...(dde ? { de: dde } : {}),
+    };
   }
 
   // String identity fields
@@ -99,9 +134,14 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
 
   // String attribute fields
   const stringFields = [
-    'color', 'material', 'application', 'countryOfOrigin',
-    'co2EmissionProduction', 'co2EmissionTransport',
-    'typeOfClosure', 'gemstoneType',
+    'color',
+    'material',
+    'application',
+    'countryOfOrigin',
+    'co2EmissionProduction',
+    'co2EmissionTransport',
+    'typeOfClosure',
+    'gemstoneType',
   ] as const;
   for (const f of stringFields) {
     const v = str(row[f]);
@@ -112,7 +152,9 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
   const statusRaw = str(row['status']);
   if (statusRaw !== undefined) {
     if (!(Object.values(ProductStatus) as string[]).includes(statusRaw)) {
-      errors.push(`status "${statusRaw}" must be one of: ${Object.values(ProductStatus).join(', ')}`);
+      errors.push(
+        `status "${statusRaw}" must be one of: ${Object.values(ProductStatus).join(', ')}`,
+      );
     } else {
       data.status = statusRaw as ProductStatus;
     }
@@ -122,7 +164,9 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
   const sfRaw = str(row['suitableFor']);
   if (sfRaw !== undefined) {
     if (!(Object.values(SuitableFor) as string[]).includes(sfRaw)) {
-      errors.push(`suitableFor "${sfRaw}" must be one of: ${Object.values(SuitableFor).join(', ')}`);
+      errors.push(
+        `suitableFor "${sfRaw}" must be one of: ${Object.values(SuitableFor).join(', ')}`,
+      );
     } else {
       data.suitableFor = sfRaw as SuitableFor;
     }
@@ -132,7 +176,9 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
   const finRaw = str(row['finishing']);
   if (finRaw !== undefined) {
     if (!(Object.values(Finishing) as string[]).includes(finRaw)) {
-      errors.push(`finishing "${finRaw}" must be one of: ${Object.values(Finishing).join(', ')}`);
+      errors.push(
+        `finishing "${finRaw}" must be one of: ${Object.values(Finishing).join(', ')}`,
+      );
     } else {
       data.finishing = finRaw as Finishing;
     }
@@ -150,7 +196,14 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
 
   // Decimal numeric fields
   const decimalFields = [
-    'stock', 'weight', 'height', 'width', 'depth', 'length', 'thickness', 'capacity',
+    'stock',
+    'weight',
+    'height',
+    'width',
+    'depth',
+    'length',
+    'thickness',
+    'capacity',
   ] as const;
   for (const f of decimalFields) {
     const v = row[f];
@@ -179,7 +232,13 @@ export function mapImportRow(row: Record<string, unknown>): ImportRowResult {
   }
 
   // Boolean fields
-  const boolFields = ['backorder', 'douProduct', 'biodegradable', 'handmade', 'scratchProne'] as const;
+  const boolFields = [
+    'backorder',
+    'douProduct',
+    'biodegradable',
+    'handmade',
+    'scratchProne',
+  ] as const;
   for (const f of boolFields) {
     const v = row[f];
     if (v !== null && v !== undefined && v !== '') {

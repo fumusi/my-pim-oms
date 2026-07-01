@@ -16,7 +16,10 @@ const PdfPrinter = require('pdfmake/js/Printer') as {
   default: new (
     fonts: Record<string, unknown>,
     virtualfs: undefined,
-    urlResolver: { resolve: (url: string, headers: Record<string, string>) => void; resolved: () => Promise<void> },
+    urlResolver: {
+      resolve: (url: string, headers: Record<string, string>) => void;
+      resolved: () => Promise<void>;
+    },
   ) => PrinterInstance;
 };
 
@@ -57,15 +60,21 @@ export class OrderInvoiceService {
 
     const metaRight: Content[] = [
       { text: `Delivery: ${order.deliveryOption}` },
-      ...(order.trackingUrl ? [{ text: `Tracking: ${order.trackingUrl}` } as Content] : []),
-      ...(order.freeShippingApplied ? [{ text: 'Free shipping applied', color: 'green' } as Content] : []),
+      ...(order.trackingUrl
+        ? [{ text: `Tracking: ${order.trackingUrl}` } as Content]
+        : []),
+      ...(order.freeShippingApplied
+        ? [{ text: 'Free shipping applied', color: 'green' } as Content]
+        : []),
     ];
 
     const customerLines: Content[] = order.customer
       ? [
           { text: 'Bill To', style: 'sectionHeader' },
           { text: order.customer.name ?? 'N/A' },
-          ...(order.customer.companyName ? [{ text: order.customer.companyName } as Content] : []),
+          ...(order.customer.companyName
+            ? [{ text: order.customer.companyName } as Content]
+            : []),
           { text: order.customer.email ?? 'N/A' },
         ]
       : [];
@@ -123,10 +132,15 @@ export class OrderInvoiceService {
               widths: ['*', 'auto'],
               body: [
                 ['Subtotal (excl. VAT)', formatMoney(order.totalExclVat ?? 0)],
-                [`VAT (${order.vatPercentage ?? 0}%)`, formatMoney(order.vatAmount ?? 0)],
+                [
+                  `VAT (${order.vatPercentage ?? 0}%)`,
+                  formatMoney(order.vatAmount ?? 0),
+                ],
                 [
                   'Shipping',
-                  order.freeShippingApplied ? 'Free' : formatMoney(order.shippingCost),
+                  order.freeShippingApplied
+                    ? 'Free'
+                    : formatMoney(order.shippingCost),
                 ],
                 [
                   { text: 'Total (incl. VAT)', bold: true },
@@ -147,7 +161,12 @@ export class OrderInvoiceService {
       styles: {
         header: { fontSize: 22, bold: true, marginBottom: 4 },
         subheader: { fontSize: 14, marginBottom: 2 },
-        sectionHeader: { fontSize: 12, bold: true, marginTop: 12, marginBottom: 4 },
+        sectionHeader: {
+          fontSize: 12,
+          bold: true,
+          marginTop: 12,
+          marginBottom: 4,
+        },
         small: { fontSize: 8 },
       },
     };

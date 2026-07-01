@@ -12,6 +12,8 @@ export class CustomersScheduleService {
   async deactivateExpiredCustomers(): Promise<void> {
     this.logger.log('Running customer endDate expiry check...');
     const { deactivated } = await this.service.deactivateExpiredCustomers();
-    this.logger.log(`Customer endDate check complete — deactivated ${deactivated} customer(s)`);
+    this.logger.log(
+      `Customer endDate check complete — deactivated ${deactivated} customer(s)`,
+    );
   }
 }

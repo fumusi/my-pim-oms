@@ -16,7 +16,13 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Request } from 'express';
@@ -112,8 +118,13 @@ export class UsersController {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
-        const ok = file.mimetype === 'text/csv' || file.originalname.toLowerCase().endsWith('.csv');
-        cb(ok ? null : new BadRequestException('Only CSV files are accepted'), ok);
+        const ok =
+          file.mimetype === 'text/csv' ||
+          file.originalname.toLowerCase().endsWith('.csv');
+        cb(
+          ok ? null : new BadRequestException('Only CSV files are accepted'),
+          ok,
+        );
       },
     }),
   )
@@ -144,7 +155,12 @@ export class UsersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AdminUpdateUserDto,
   ) {
-    return this.usersService.adminUpdateUser(req.user.sub, id, dto, req.user.email);
+    return this.usersService.adminUpdateUser(
+      req.user.sub,
+      id,
+      dto,
+      req.user.email,
+    );
   }
 
   @Delete(':id')

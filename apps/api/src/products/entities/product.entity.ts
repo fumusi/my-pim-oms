@@ -38,10 +38,24 @@ export class Product {
   @Column({ type: 'varchar', nullable: true })
   currency!: string | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer, name: 'base_price' })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+    name: 'base_price',
+  })
   basePrice!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer, name: 'purchase_price' })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+    name: 'purchase_price',
+  })
   purchasePrice!: number | null;
 
   @Column({ type: 'varchar', nullable: true, name: 'sales_vat_code' })
@@ -52,13 +66,22 @@ export class Product {
 
   // ── Category ────────────────────────────────────────────────────────────────
 
-  @ManyToOne(() => Category, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @ManyToOne(() => Category, {
+    nullable: true,
+    onDelete: 'SET NULL',
+    eager: false,
+  })
   @JoinColumn({ name: 'category_id' })
   category!: Category | null;
 
   // ── Internal ────────────────────────────────────────────────────────────────
 
-  @Column({ type: 'enum', enum: ProductStatus, enumName: 'product_status', default: ProductStatus.Active })
+  @Column({
+    type: 'enum',
+    enum: ProductStatus,
+    enumName: 'product_status',
+    default: ProductStatus.Active,
+  })
   status!: ProductStatus;
 
   @Column({ type: 'boolean', default: false })
@@ -93,36 +116,92 @@ export class Product {
 
   // ── Stock ───────────────────────────────────────────────────────────────────
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   stock!: number | null;
 
-  @Column({ type: 'timestamptz', nullable: true, name: 'last_low_stock_notified_at' })
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    name: 'last_low_stock_notified_at',
+  })
   lastLowStockNotifiedAt!: Date | null;
 
-  @Column({ type: 'timestamptz', nullable: true, name: 'last_out_of_stock_notified_at' })
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    name: 'last_out_of_stock_notified_at',
+  })
   lastOutOfStockNotifiedAt!: Date | null;
 
   // ── Measurements ────────────────────────────────────────────────────────────
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   capacity!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   height!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   width!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   depth!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   weight!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   length!: number | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true, transformer: decimalTransformer })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
   thickness!: number | null;
 
   // ── Extended attributes ─────────────────────────────────────────────────────
@@ -133,7 +212,13 @@ export class Product {
   @Column({ type: 'varchar', nullable: true, name: 'co2_emission_transport' })
   co2EmissionTransport!: string | null;
 
-  @Column({ type: 'enum', enum: SuitableFor, enumName: 'suitable_for', nullable: true, name: 'suitable_for' })
+  @Column({
+    type: 'enum',
+    enum: SuitableFor,
+    enumName: 'suitable_for',
+    nullable: true,
+    name: 'suitable_for',
+  })
   suitableFor!: SuitableFor | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -148,7 +233,12 @@ export class Product {
   @Column({ type: 'varchar', nullable: true, name: 'country_of_origin' })
   countryOfOrigin!: string | null;
 
-  @Column({ type: 'enum', enum: Finishing, enumName: 'finishing', nullable: true })
+  @Column({
+    type: 'enum',
+    enum: Finishing,
+    enumName: 'finishing',
+    nullable: true,
+  })
   finishing!: Finishing | null;
 
   @Column({ type: 'boolean', nullable: true, name: 'dou_product' })

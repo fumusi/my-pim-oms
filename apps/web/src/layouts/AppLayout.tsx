@@ -6,6 +6,7 @@ import { clearAccessToken } from '../store/authSlice'
 import { setLang, type Lang } from '../store/langSlice'
 import { logout } from '../api/auth'
 import type { AppDispatch, RootState } from '../store'
+import { NotificationBell } from '../components/NotificationBell'
 
 interface NavItem {
   to: string
@@ -203,6 +204,7 @@ export function AppLayout() {
           <h1 className="app-page-title">{pageTitle}</h1>
 
           <div className="header-user">
+            {user?.role === 'admin' && <NotificationBell />}
             <div className="lang-switcher">
               {(['en', 'nl', 'de'] as Lang[]).map((l) => (
                 <button

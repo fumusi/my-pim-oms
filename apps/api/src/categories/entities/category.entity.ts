@@ -25,7 +25,11 @@ export class Category {
   @Column({ type: 'varchar', nullable: true })
   icon!: string | null;
 
-  @Column({ type: 'enum', enum: CategoryStatus, default: CategoryStatus.Active })
+  @Column({
+    type: 'enum',
+    enum: CategoryStatus,
+    default: CategoryStatus.Active,
+  })
   status!: CategoryStatus;
 
   @Column({ type: 'jsonb', nullable: true })

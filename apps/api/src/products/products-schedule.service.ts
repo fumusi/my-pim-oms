@@ -15,8 +15,11 @@ export class ProductsScheduleService {
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async deactivateExpiredProducts(): Promise<void> {
     this.logger.log('Running endDate expiry check...');
-    const { deactivated } = await this.productsService.deactivateExpiredProducts();
-    this.logger.log(`endDate check complete — deactivated ${deactivated} product(s)`);
+    const { deactivated } =
+      await this.productsService.deactivateExpiredProducts();
+    this.logger.log(
+      `endDate check complete — deactivated ${deactivated} product(s)`,
+    );
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)

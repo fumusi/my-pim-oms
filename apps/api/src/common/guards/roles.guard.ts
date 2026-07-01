@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
@@ -17,7 +23,9 @@ export class RolesGuard implements CanActivate {
 
     if (!required || required.length === 0) return true;
 
-    const { user } = context.switchToHttp().getRequest<Request & { user: JwtPayload }>();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<Request & { user: JwtPayload }>();
 
     if (!user) throw new UnauthorizedException();
     if (!required.includes(user.role)) throw new ForbiddenException();

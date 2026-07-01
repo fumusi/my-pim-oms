@@ -5,7 +5,8 @@ import { ProductStatus } from '../../common/enums/product-status.enum';
 import { ExactItemResponse, ExactItemGroupResponse } from '../types';
 import { parseDate } from '../utils/parse-date';
 
-const numToBool = (n: number | null): boolean | null => (n == null ? null : n !== 0);
+const numToBool = (n: number | null): boolean | null =>
+  n == null ? null : n !== 0;
 
 export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
   return {
@@ -59,7 +60,20 @@ export function mapItem(i: ExactItemResponse): Partial<ExactItem> {
 
 export function mapProduct(
   i: ExactItemResponse,
-): Pick<Product, 'exactId' | 'barcode' | 'currency' | 'basePrice' | 'purchasePrice' | 'salesVatCode' | 'name' | 'weight' | 'stock' | 'status' | 'endDate'> {
+): Pick<
+  Product,
+  | 'exactId'
+  | 'barcode'
+  | 'currency'
+  | 'basePrice'
+  | 'purchasePrice'
+  | 'salesVatCode'
+  | 'name'
+  | 'weight'
+  | 'stock'
+  | 'status'
+  | 'endDate'
+> {
   const endDateObj = parseDate(i.EndDate);
   const isExpired = endDateObj !== null && endDateObj < new Date();
   return {
@@ -77,7 +91,9 @@ export function mapProduct(
   };
 }
 
-export function mapItemGroup(g: ExactItemGroupResponse): Partial<ExactItemGroup> {
+export function mapItemGroup(
+  g: ExactItemGroupResponse,
+): Partial<ExactItemGroup> {
   return {
     id: g.ID,
     code: g.Code,

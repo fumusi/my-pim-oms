@@ -6,4 +6,6 @@ const UpdatePriceListStatusSchema = z.object({
   status: z.nativeEnum(PriceListStatus),
 });
 
-export class UpdatePriceListStatusDto extends createZodDto(UpdatePriceListStatusSchema) {}
+export class UpdatePriceListStatusDto extends createZodDto(
+  UpdatePriceListStatusSchema,
+) {}

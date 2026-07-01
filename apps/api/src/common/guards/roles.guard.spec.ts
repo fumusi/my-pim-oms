@@ -23,10 +23,7 @@ describe('RolesGuard', () => {
     reflector = { getAllAndOverride: jest.fn() };
 
     const module = await Test.createTestingModule({
-      providers: [
-        RolesGuard,
-        { provide: Reflector, useValue: reflector },
-      ],
+      providers: [RolesGuard, { provide: Reflector, useValue: reflector }],
     }).compile();
 
     guard = module.get<RolesGuard>(RolesGuard);
@@ -44,11 +41,15 @@ describe('RolesGuard', () => {
 
   it('throws 403 when user role does not match', () => {
     reflector.getAllAndOverride.mockReturnValue([Role.Admin]);
-    expect(() => guard.canActivate(mockContext(Role.User))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(mockContext(Role.User))).toThrow(
+      ForbiddenException,
+    );
   });
 
   it('throws 401 when request has no authenticated user', () => {
     reflector.getAllAndOverride.mockReturnValue([Role.Admin]);
-    expect(() => guard.canActivate(mockContext())).toThrow(UnauthorizedException);
+    expect(() => guard.canActivate(mockContext())).toThrow(
+      UnauthorizedException,
+    );
   });
 });

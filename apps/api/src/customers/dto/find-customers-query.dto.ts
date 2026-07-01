@@ -9,4 +9,6 @@ const FindCustomersQuerySchema = z.object({
   country: z.string().optional(),
 });
 
-export class FindCustomersQueryDto extends createZodDto(FindCustomersQuerySchema) {}
+export class FindCustomersQueryDto extends createZodDto(
+  FindCustomersQuerySchema,
+) {}

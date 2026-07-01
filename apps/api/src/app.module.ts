@@ -16,6 +16,7 @@ import { CustomersModule } from './customers/customers.module';
 import { OrdersModule } from './orders/orders.module';
 import { PriceListsModule } from './price-lists/price-lists.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     OrdersModule,
     PriceListsModule,
     AuditLogModule,
+    NotificationsModule,
     HealthModule,
   ],
   providers: [

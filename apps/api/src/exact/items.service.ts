@@ -37,7 +37,9 @@ export class ItemsService {
   }
 
   // Batch count for multiple categories in one query (GROUP BY category_id).
-  async countsByCategoryIds(categoryIds: number[]): Promise<Map<number, number>> {
+  async countsByCategoryIds(
+    categoryIds: number[],
+  ): Promise<Map<number, number>> {
     if (categoryIds.length === 0) return new Map();
     const rows = await this.repo
       .createQueryBuilder('item')
@@ -50,7 +52,10 @@ export class ItemsService {
   }
 
   // Accepts an optional EntityManager so callers can include this in a transaction.
-  async deactivateByCategoryId(categoryId: number, em?: EntityManager): Promise<void> {
+  async deactivateByCategoryId(
+    categoryId: number,
+    em?: EntityManager,
+  ): Promise<void> {
     const manager = em ?? this.repo.manager;
     await manager
       .createQueryBuilder()
@@ -61,12 +66,20 @@ export class ItemsService {
   }
 
   async findById(id: string): Promise<ExactItem> {
-    const item = await this.repo.findOne({ where: { id }, relations: { itemGroup: true } });
+    const item = await this.repo.findOne({
+      where: { id },
+      relations: { itemGroup: true },
+    });
     if (!item) throw new NotFoundException(`Item ${id} not found`);
     return item;
   }
 
-  async findByCategoryId(categoryId: number, page = 1, limit = 20, search?: string): Promise<PaginatedItems> {
+  async findByCategoryId(
+    categoryId: number,
+    page = 1,
+    limit = 20,
+    search?: string,
+  ): Promise<PaginatedItems> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
     const qb = this.repo
       .createQueryBuilder('item')
@@ -76,17 +89,21 @@ export class ItemsService {
       .skip((page - 1) * safeLimit)
       .take(safeLimit);
     if (search) {
-      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)', { s: `%${search}%` });
+      qb.andWhere(
+        '(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)',
+        { s: `%${search}%` },
+      );
     }
     const [data, total] = await qb.getManyAndCount();
 
     // Override stale Exact stock with live PIM stock when a linked product exists.
     if (data.length > 0) {
       const exactIds = data.map((i) => i.id);
-      const rows = await this.repo.manager.query<{ exact_id: string; stock: string | null }[]>(
-        `SELECT exact_id, stock FROM products WHERE exact_id = ANY($1)`,
-        [exactIds],
-      );
+      const rows = await this.repo.manager.query<
+        { exact_id: string; stock: string | null }[]
+      >(`SELECT exact_id, stock FROM products WHERE exact_id = ANY($1)`, [
+        exactIds,
+      ]);
       const pimStock = new Map(rows.map((r) => [r.exact_id, r.stock]));
       data.forEach((item) => {
         const stock = pimStock.get(item.id);
@@ -94,7 +111,15 @@ export class ItemsService {
       });
     }
 
-    return { data, meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } };
+    return {
+      data,
+      meta: {
+        page,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
+    };
   }
 
   // Override strategy: category template fully replaces the product's existing pim_template.
@@ -126,8 +151,14 @@ export class ItemsService {
           continue;
         }
         const currentCategoryId = found.get(pid);
-        if (currentCategoryId !== null && Number(currentCategoryId) === categoryId) {
-          skipped.push({ id: pid, reason: 'already assigned to this category' });
+        if (
+          currentCategoryId !== null &&
+          Number(currentCategoryId) === categoryId
+        ) {
+          skipped.push({
+            id: pid,
+            reason: 'already assigned to this category',
+          });
           continue;
         }
         toAssign.push(pid);
@@ -136,7 +167,11 @@ export class ItemsService {
       if (toAssign.length > 0) {
         await em.query(
           `UPDATE exact_items SET category_id = $1, pim_template = $2 WHERE id = ANY($3::uuid[])`,
-          [categoryId, categoryTemplate ? JSON.stringify(categoryTemplate) : null, toAssign],
+          [
+            categoryId,
+            categoryTemplate ? JSON.stringify(categoryTemplate) : null,
+            toAssign,
+          ],
         );
         // Mirror to products table so category filter on the PIM products page works.
         await em.query(
@@ -149,7 +184,10 @@ export class ItemsService {
     });
   }
 
-  async unassignFromCategory(productIds: string[], categoryId: number): Promise<number> {
+  async unassignFromCategory(
+    productIds: string[],
+    categoryId: number,
+  ): Promise<number> {
     if (productIds.length === 0) return 0;
 
     return this.repo.manager.transaction(async (em) => {
@@ -181,7 +219,11 @@ export class ItemsService {
     });
   }
 
-  async updatePimTemplate(id: string, dto: UpdatePimTemplateDto, updatedBy?: string): Promise<ExactItem> {
+  async updatePimTemplate(
+    id: string,
+    dto: UpdatePimTemplateDto,
+    updatedBy?: string,
+  ): Promise<ExactItem> {
     const item = await this.repo.findOneOrFail({ where: { id } });
     item.pimTemplate = dto.pimTemplate;
     item.updatedBy = updatedBy ?? null;
@@ -192,8 +234,11 @@ export class ItemsService {
     let category: Category | null = null;
 
     if (dto.categoryId !== undefined) {
-      category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
-      if (!category) throw new NotFoundException(`Category ${dto.categoryId} not found`);
+      category = await this.categoryRepo.findOne({
+        where: { id: dto.categoryId },
+      });
+      if (!category)
+        throw new NotFoundException(`Category ${dto.categoryId} not found`);
     }
 
     const item = this.repo.create({
@@ -228,15 +273,25 @@ export class ItemsService {
       qb.leftJoinAndSelect('item.category', 'category');
     }
     if (excludeCategoryId !== undefined) {
-      qb.andWhere('("category_id" IS NULL OR "category_id" != :cid)', { cid: excludeCategoryId });
+      qb.andWhere('("category_id" IS NULL OR "category_id" != :cid)', {
+        cid: excludeCategoryId,
+      });
     }
     if (search) {
-      qb.andWhere('(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)', { s: `%${search}%` });
+      qb.andWhere(
+        '(item.description ILIKE :s OR item.code ILIKE :s OR item.barcode ILIKE :s)',
+        { s: `%${search}%` },
+      );
     }
     const [data, total] = await qb.getManyAndCount();
     return {
       data,
-      meta: { page, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) },
+      meta: {
+        page,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
     };
   }
 }

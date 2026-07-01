@@ -38,7 +38,12 @@ export class PriceListsService {
   async findAll(
     query: FindPriceListsQueryDto,
     scopedCustomerId?: number,
-  ): Promise<{ data: PriceList[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    data: PriceList[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const qb = this.plRepo.createQueryBuilder('pl');
 
     if (scopedCustomerId != null) {
@@ -65,7 +70,9 @@ export class PriceListsService {
     }
 
     if (query.activeNow) {
-      qb.andWhere('pl.status = :activeStatus', { activeStatus: PriceListStatus.Active });
+      qb.andWhere('pl.status = :activeStatus', {
+        activeStatus: PriceListStatus.Active,
+      });
       qb.andWhere('(pl.start_date IS NULL OR pl.start_date <= CURRENT_DATE)');
       qb.andWhere('(pl.end_date IS NULL OR pl.end_date >= CURRENT_DATE)');
     }
@@ -88,7 +95,10 @@ export class PriceListsService {
     }
 
     if (scopedCustomerId != null) {
-      const access = await this.cplRepo.findOneBy({ priceListId: id, customerId: scopedCustomerId });
+      const access = await this.cplRepo.findOneBy({
+        priceListId: id,
+        customerId: scopedCustomerId,
+      });
       if (!access) throw new ForbiddenException();
     }
 
@@ -98,7 +108,9 @@ export class PriceListsService {
       .where('pli.priceListId = :id', { id })
       .getMany();
 
-    const customerCount = await this.cplRepo.count({ where: { priceListId: id } });
+    const customerCount = await this.cplRepo.count({
+      where: { priceListId: id },
+    });
 
     return { ...priceList, items, customerCount };
   }
@@ -106,7 +118,14 @@ export class PriceListsService {
   async create(dto: CreatePriceListDto, createdBy: string): Promise<PriceList> {
     const priceList = this.plRepo.create({ ...dto, createdBy });
     const saved = await this.plRepo.save(priceList);
-    void this.auditLogService.log('PriceList', saved.id, 'create', null, createdBy, { snapshot: { ...saved } });
+    void this.auditLogService.log(
+      'PriceList',
+      saved.id,
+      'create',
+      null,
+      createdBy,
+      { snapshot: { ...saved } },
+    );
     return saved;
   }
 
@@ -123,31 +142,56 @@ export class PriceListsService {
     const changedFields: Record<string, { old: unknown; new: unknown }> = {};
 
     if (dto.name !== undefined) {
-      if (priceList.name !== dto.name) changedFields['name'] = { old: priceList.name, new: dto.name };
+      if (priceList.name !== dto.name)
+        changedFields['name'] = { old: priceList.name, new: dto.name };
       priceList.name = dto.name;
     }
     if (dto.description !== undefined) {
-      if (JSON.stringify(priceList.description) !== JSON.stringify(dto.description ?? null)) {
-        changedFields['description'] = { old: priceList.description, new: dto.description ?? null };
+      if (
+        JSON.stringify(priceList.description) !==
+        JSON.stringify(dto.description ?? null)
+      ) {
+        changedFields['description'] = {
+          old: priceList.description,
+          new: dto.description ?? null,
+        };
       }
       priceList.description = dto.description ?? null;
     }
     if (dto.startDate !== undefined) {
-      if (JSON.stringify(priceList.startDate) !== JSON.stringify(dto.startDate ?? null)) {
-        changedFields['startDate'] = { old: priceList.startDate, new: dto.startDate ?? null };
+      if (
+        JSON.stringify(priceList.startDate) !==
+        JSON.stringify(dto.startDate ?? null)
+      ) {
+        changedFields['startDate'] = {
+          old: priceList.startDate,
+          new: dto.startDate ?? null,
+        };
       }
       priceList.startDate = dto.startDate ?? null;
     }
     if (dto.endDate !== undefined) {
-      if (JSON.stringify(priceList.endDate) !== JSON.stringify(dto.endDate ?? null)) {
-        changedFields['endDate'] = { old: priceList.endDate, new: dto.endDate ?? null };
+      if (
+        JSON.stringify(priceList.endDate) !==
+        JSON.stringify(dto.endDate ?? null)
+      ) {
+        changedFields['endDate'] = {
+          old: priceList.endDate,
+          new: dto.endDate ?? null,
+        };
       }
       priceList.endDate = dto.endDate ?? null;
     }
 
     priceList.updatedBy = updatedBy;
     const saved = await this.plRepo.save(priceList);
-    void this.auditLogService.log('PriceList', id, 'update', changedFields, updatedBy);
+    void this.auditLogService.log(
+      'PriceList',
+      id,
+      'update',
+      changedFields,
+      updatedBy,
+    );
     return saved;
   }
 
@@ -164,7 +208,14 @@ export class PriceListsService {
     priceList.status = status;
     priceList.updatedBy = updatedBy;
     const saved = await this.plRepo.save(priceList);
-    void this.auditLogService.log('PriceList', id, 'status_change', null, updatedBy, { from: oldStatus, to: status });
+    void this.auditLogService.log(
+      'PriceList',
+      id,
+      'status_change',
+      null,
+      updatedBy,
+      { from: oldStatus, to: status },
+    );
     return saved;
   }
 
@@ -174,11 +225,15 @@ export class PriceListsService {
       throw new NotFoundException(`Price list ${id} not found`);
     }
     if (!priceList.archivedAt) {
-      throw new BadRequestException('Price list must be archived before it can be deleted');
+      throw new BadRequestException(
+        'Price list must be archived before it can be deleted',
+      );
     }
     const snapshot = { ...priceList };
     await this.dataSource.transaction(async (em) => {
-      const count = await em.count(CustomerPriceList, { where: { priceListId: id } });
+      const count = await em.count(CustomerPriceList, {
+        where: { priceListId: id },
+      });
       if (count > 0) {
         throw new BadRequestException(
           `Cannot delete price list assigned to ${count} customer(s)`,
@@ -186,7 +241,14 @@ export class PriceListsService {
       }
       await em.remove(PriceList, priceList);
     });
-    void this.auditLogService.log('PriceList', id, 'delete', null, performedBy ?? 'system', { snapshot });
+    void this.auditLogService.log(
+      'PriceList',
+      id,
+      'delete',
+      null,
+      performedBy ?? 'system',
+      { snapshot },
+    );
   }
 
   async archive(id: number, updatedBy: string): Promise<void> {
@@ -195,7 +257,9 @@ export class PriceListsService {
       throw new NotFoundException(`Price list ${id} not found`);
     }
     await this.dataSource.transaction(async (em) => {
-      const count = await em.count(CustomerPriceList, { where: { priceListId: id } });
+      const count = await em.count(CustomerPriceList, {
+        where: { priceListId: id },
+      });
       if (count > 0) {
         throw new BadRequestException(
           `Cannot archive price list assigned to ${count} customer(s)`,
@@ -205,7 +269,9 @@ export class PriceListsService {
       priceList.updatedBy = updatedBy;
       await em.save(PriceList, priceList);
     });
-    void this.auditLogService.log('PriceList', id, 'archive', null, updatedBy, { snapshot: { ...priceList } });
+    void this.auditLogService.log('PriceList', id, 'archive', null, updatedBy, {
+      snapshot: { ...priceList },
+    });
   }
 
   async addItem(
@@ -253,7 +319,9 @@ export class PriceListsService {
   ): Promise<PriceListItem> {
     const item = await this.itemRepo.findOneBy({ id: itemId, priceListId });
     if (!item) {
-      throw new NotFoundException(`Item ${itemId} not found in price list ${priceListId}`);
+      throw new NotFoundException(
+        `Item ${itemId} not found in price list ${priceListId}`,
+      );
     }
 
     if (dto.customPrice !== undefined) item.customPrice = dto.customPrice;
@@ -265,7 +333,9 @@ export class PriceListsService {
   async removeItem(priceListId: number, itemId: number): Promise<void> {
     const item = await this.itemRepo.findOneBy({ id: itemId, priceListId });
     if (!item) {
-      throw new NotFoundException(`Item ${itemId} not found in price list ${priceListId}`);
+      throw new NotFoundException(
+        `Item ${itemId} not found in price list ${priceListId}`,
+      );
     }
     await this.itemRepo.remove(item);
   }
@@ -307,8 +377,12 @@ export class PriceListsService {
       } catch (err) {
         if (err instanceof QueryFailedError) {
           const code = (err as any).code;
-          if (code === '23505') throw new BadRequestException('Duplicate product detected — concurrent request conflict');
-          if (code === '23503') throw new BadRequestException('One or more products not found');
+          if (code === '23505')
+            throw new BadRequestException(
+              'Duplicate product detected — concurrent request conflict',
+            );
+          if (code === '23503')
+            throw new BadRequestException('One or more products not found');
         }
         throw err;
       }
@@ -328,33 +402,37 @@ export class PriceListsService {
     }
 
     try {
-    return await this.dataSource.transaction('SERIALIZABLE', async (em) => {
-      const existing = await em
-        .createQueryBuilder(CustomerPriceList, 'cpl')
-        .innerJoin('cpl.priceList', 'pl')
-        .where('cpl.customerId = :customerId', { customerId: dto.customerId })
-        .andWhere('pl.status = :status', { status: PriceListStatus.Active })
-        .getOne();
+      return await this.dataSource.transaction('SERIALIZABLE', async (em) => {
+        const existing = await em
+          .createQueryBuilder(CustomerPriceList, 'cpl')
+          .innerJoin('cpl.priceList', 'pl')
+          .where('cpl.customerId = :customerId', { customerId: dto.customerId })
+          .andWhere('pl.status = :status', { status: PriceListStatus.Active })
+          .getOne();
 
-      if (existing) {
-        throw new BadRequestException('Customer already has an active price list assigned');
-      }
+        if (existing) {
+          throw new BadRequestException(
+            'Customer already has an active price list assigned',
+          );
+        }
 
-      const duplicate = await em.findOneBy(CustomerPriceList, {
-        customerId: dto.customerId,
-        priceListId,
+        const duplicate = await em.findOneBy(CustomerPriceList, {
+          customerId: dto.customerId,
+          priceListId,
+        });
+        if (duplicate) {
+          throw new BadRequestException(
+            'Customer is already assigned to this price list',
+          );
+        }
+
+        const cpl = em.create(CustomerPriceList, {
+          customerId: dto.customerId,
+          priceListId,
+          assignedBy,
+        });
+        return em.save(CustomerPriceList, cpl);
       });
-      if (duplicate) {
-        throw new BadRequestException('Customer is already assigned to this price list');
-      }
-
-      const cpl = em.create(CustomerPriceList, {
-        customerId: dto.customerId,
-        priceListId,
-        assignedBy,
-      });
-      return em.save(CustomerPriceList, cpl);
-    });
     } catch (err) {
       if (err instanceof QueryFailedError && (err as any).code === '40001') {
         throw new BadRequestException('Concurrent conflict, please retry');
@@ -363,7 +441,10 @@ export class PriceListsService {
     }
   }
 
-  async unassignCustomer(priceListId: number, customerId: number): Promise<void> {
+  async unassignCustomer(
+    priceListId: number,
+    customerId: number,
+  ): Promise<void> {
     const cpl = await this.cplRepo.findOneBy({ priceListId, customerId });
     if (!cpl) {
       throw new NotFoundException(
@@ -373,13 +454,15 @@ export class PriceListsService {
     await this.cplRepo.remove(cpl);
   }
 
-  async getAssignedCustomers(priceListId: number): Promise<Array<{
-    customerId: number;
-    customerName: string;
-    customerEmail: string;
-    assignedAt: Date;
-    assignedBy: string | null;
-  }>> {
+  async getAssignedCustomers(priceListId: number): Promise<
+    Array<{
+      customerId: number;
+      customerName: string;
+      customerEmail: string;
+      assignedAt: Date;
+      assignedBy: string | null;
+    }>
+  > {
     const rows = await this.cplRepo
       .createQueryBuilder('cpl')
       .innerJoinAndSelect('cpl.customer', 'c')
@@ -421,7 +504,9 @@ export class PriceListsService {
       if (item) {
         const effectivePrice =
           item.discount != null
-            ? parseFloat((item.customPrice * (1 - item.discount / 100)).toFixed(4))
+            ? parseFloat(
+                (item.customPrice * (1 - item.discount / 100)).toFixed(4),
+              )
             : item.customPrice;
         return {
           effectivePrice,

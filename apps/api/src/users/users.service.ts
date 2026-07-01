@@ -21,8 +21,30 @@ import type { UpdateMeDto } from './dto/update-me.dto';
 import type { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import type { FindUsersQueryDto } from './dto/pagination.dto';
 
-const FIRST_NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack'];
-const LAST_NAMES = ['Smith', 'Jones', 'Williams', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson'];
+const FIRST_NAMES = [
+  'Alice',
+  'Bob',
+  'Carol',
+  'David',
+  'Eve',
+  'Frank',
+  'Grace',
+  'Henry',
+  'Iris',
+  'Jack',
+];
+const LAST_NAMES = [
+  'Smith',
+  'Jones',
+  'Williams',
+  'Brown',
+  'Davis',
+  'Miller',
+  'Wilson',
+  'Moore',
+  'Taylor',
+  'Anderson',
+];
 
 export interface UserProfile {
   id: number;
@@ -103,7 +125,8 @@ export class UsersService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    const qb = this.repo.createQueryBuilder('u')
+    const qb = this.repo
+      .createQueryBuilder('u')
       .orderBy('u.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -125,7 +148,9 @@ export class UsersService {
     }
 
     if (query.customerId) {
-      qb.andWhere('u.customerId = :customerId', { customerId: query.customerId });
+      qb.andWhere('u.customerId = :customerId', {
+        customerId: query.customerId,
+      });
     }
 
     const [users, total] = await qb.getManyAndCount();
@@ -183,11 +208,21 @@ export class UsersService {
       await this.redis.del(`bl:user:${targetId}`);
     }
 
-    void this.auditLogService.log('User', targetId, 'update', changedFields, performedBy ?? 'system');
+    void this.auditLogService.log(
+      'User',
+      targetId,
+      'update',
+      changedFields,
+      performedBy ?? 'system',
+    );
     return this.toProfile({ ...user, ...patch });
   }
 
-  async adminDeleteUser(adminId: number, targetId: number, performedBy?: string): Promise<void> {
+  async adminDeleteUser(
+    adminId: number,
+    targetId: number,
+    performedBy?: string,
+  ): Promise<void> {
     if (adminId === targetId) {
       throw new BadRequestException('Admin cannot delete their own account');
     }
@@ -198,14 +233,22 @@ export class UsersService {
     await this.repo.update(targetId, { isActive: false });
     await this.redis.del(`rt:${targetId}`);
     await this.redis.set(`bl:user:${targetId}`, '1', this.accessTokenTtl);
-    void this.auditLogService.log('User', targetId, 'status_change', null, performedBy ?? 'system', { from: 'active', to: 'inactive' });
+    void this.auditLogService.log(
+      'User',
+      targetId,
+      'status_change',
+      null,
+      performedBy ?? 'system',
+      { from: 'active', to: 'inactive' },
+    );
   }
 
   getUserImportTemplate(): Buffer {
     const adminIndices = new Set([0, 5, 10, 15, 20]);
     const rows = Array.from({ length: 50 }, (_, i) => ({
       first_name: FIRST_NAMES[i % FIRST_NAMES.length],
-      last_name: LAST_NAMES[Math.floor(i / FIRST_NAMES.length) % LAST_NAMES.length],
+      last_name:
+        LAST_NAMES[Math.floor(i / FIRST_NAMES.length) % LAST_NAMES.length],
       email: `test${i}@example.com`,
       role: adminIndices.has(i) ? 'admin' : 'user',
       status: i % 2 === 0 ? 'active' : 'inactive',
@@ -333,7 +376,11 @@ export class UsersService {
     const dedupedRows: ValidRow[] = [];
     for (const row of validRows) {
       if (seenInFile.has(row.email)) {
-        errors.push({ row: row.rowIndex, email: row.email, reason: 'Duplicate email in file' });
+        errors.push({
+          row: row.rowIndex,
+          email: row.email,
+          reason: 'Duplicate email in file',
+        });
       } else {
         seenInFile.add(row.email);
         dedupedRows.push(row);
@@ -384,7 +431,11 @@ export class UsersService {
           } catch (err: unknown) {
             const e = err as { code?: string };
             if (e?.code === '23505') {
-              errors.push({ row: row.rowIndex, email: row.email, reason: 'Email already exists' });
+              errors.push({
+                row: row.rowIndex,
+                email: row.email,
+                reason: 'Email already exists',
+              });
               skipped++;
             } else {
               throw err;

@@ -11,7 +11,13 @@ import { PriceListsScheduleService } from './price-lists-schedule.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PriceList, PriceListItem, CustomerPriceList, Product, Customer]),
+    TypeOrmModule.forFeature([
+      PriceList,
+      PriceListItem,
+      CustomerPriceList,
+      Product,
+      Customer,
+    ]),
   ],
   controllers: [PriceListsController],
   providers: [PriceListsService, PriceListsScheduleService],

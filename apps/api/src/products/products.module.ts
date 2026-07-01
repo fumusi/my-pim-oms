@@ -10,12 +10,13 @@ import { User } from '../users/entities/user.entity';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Product, Category, User]),
-    MailModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Product, Category, User]), MailModule],
   controllers: [ProductsController],
-  providers: [ProductsService, StockNotificationService, ProductsScheduleService],
+  providers: [
+    ProductsService,
+    StockNotificationService,
+    ProductsScheduleService,
+  ],
   exports: [StockNotificationService, ProductsService],
 })
 export class ProductsModule {}

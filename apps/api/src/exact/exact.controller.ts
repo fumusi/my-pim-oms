@@ -1,5 +1,11 @@
 import { Controller, Get, Post, Query, Res } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -26,7 +32,10 @@ export class ExactController {
     private readonly syncService: ExactSyncService,
     private readonly config: ConfigService,
   ) {
-    this.frontendUrl = this.config.get<string>('APP_URL', 'http://localhost:5173');
+    this.frontendUrl = this.config.get<string>(
+      'APP_URL',
+      'http://localhost:5173',
+    );
   }
 
   @Get('authorize')
@@ -40,8 +49,16 @@ export class ExactController {
   @Get('callback')
   @Public()
   @ApiOperation({ summary: 'Exact Online OAuth callback' })
-  @ApiQuery({ name: 'code', required: false, description: 'OAuth authorization code' })
-  @ApiQuery({ name: 'state', required: false, description: 'OAuth state parameter' })
+  @ApiQuery({
+    name: 'code',
+    required: false,
+    description: 'OAuth authorization code',
+  })
+  @ApiQuery({
+    name: 'state',
+    required: false,
+    description: 'OAuth state parameter',
+  })
   @ApiResponse({ status: 302, description: 'Redirect to frontend' })
   async callback(
     @Query('code') code: string | undefined,
@@ -49,10 +66,14 @@ export class ExactController {
     @Res() res: Response,
   ) {
     if (!code) {
-      return res.redirect(`${this.frontendUrl}/dashboard?exact_error=missing_code`);
+      return res.redirect(
+        `${this.frontendUrl}/dashboard?exact_error=missing_code`,
+      );
     }
     if (!state || !this.authService.validateAndConsumeState(state)) {
-      return res.redirect(`${this.frontendUrl}/dashboard?exact_error=invalid_state`);
+      return res.redirect(
+        `${this.frontendUrl}/dashboard?exact_error=invalid_state`,
+      );
     }
     await this.authService.authCallback(code);
     res.redirect(`${this.frontendUrl}/dashboard?exact_connected=1`);
