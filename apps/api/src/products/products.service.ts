@@ -6,6 +6,7 @@ import { Product } from './entities/product.entity';
 import { Category } from '../categories/entities/category.entity';
 import { ProductStatus } from '../common/enums/product-status.enum';
 import { mapImportRow, TEMPLATE_HEADERS } from './import/import-row.mapper';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
 import type { FindProductsQueryDto } from './dto/find-products-query.dto';
@@ -38,6 +39,7 @@ export class ProductsService {
     private readonly repo: Repository<Product>,
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async findAll(query: FindProductsQueryDto): Promise<PaginatedProducts> {
@@ -110,7 +112,9 @@ export class ProductsService {
     const { categoryId, ...fields } = dto;
     const category = categoryId != null ? await this.resolveCategory(categoryId) : null;
     const product = this.repo.create({ ...fields, category, updatedBy });
-    return this.repo.save(product);
+    const saved = await this.repo.save(product);
+    void this.auditLogService.log('Product', saved.id, 'create', null, updatedBy, { snapshot: { ...saved } });
+    return saved;
   }
 
   async update(id: number, dto: UpdateProductDto, updatedBy: string): Promise<Product> {
@@ -118,15 +122,33 @@ export class ProductsService {
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
     const { categoryId, ...fields } = dto;
+
+    const changedFields: Record<string, { old: unknown; new: unknown }> = {};
+    for (const key of Object.keys(fields)) {
+      const oldVal = (product as unknown as Record<string, unknown>)[key];
+      const newVal = (fields as unknown as Record<string, unknown>)[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changedFields[key] = { old: oldVal, new: newVal };
+      }
+    }
+
     if (categoryId !== undefined) {
-      product.category = categoryId != null ? await this.resolveCategory(categoryId) : null;
+      const newCategory = categoryId != null ? await this.resolveCategory(categoryId) : null;
+      const oldCatId = product.category?.id ?? null;
+      const newCatId = newCategory?.id ?? null;
+      if (oldCatId !== newCatId) {
+        changedFields['categoryId'] = { old: oldCatId, new: newCatId };
+      }
+      product.category = newCategory;
     }
 
     Object.assign(product, fields, { updatedBy });
-    return this.repo.save(product);
+    const saved = await this.repo.save(product);
+    void this.auditLogService.log('Product', id, 'update', changedFields, updatedBy);
+    return saved;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, performedBy: string): Promise<void> {
     const product = await this.repo.findOneBy({ id });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
@@ -136,10 +158,12 @@ export class ProductsService {
       throw new BadRequestException('Cannot delete product referenced in an order');
     }
 
+    const snapshot = { ...product };
     await this.repo.remove(product);
+    void this.auditLogService.log('Product', id, 'delete', null, performedBy, { snapshot });
   }
 
-  async archive(id: number): Promise<Product> {
+  async archive(id: number, performedBy: string): Promise<Product> {
     const product = await this.repo.findOneBy({ id });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
 
@@ -150,18 +174,23 @@ export class ProductsService {
     }
 
     product.archivedAt = new Date();
-    return this.repo.save(product);
+    const saved = await this.repo.save(product);
+    void this.auditLogService.log('Product', id, 'archive', null, performedBy, { snapshot: { ...saved } });
+    return saved;
   }
 
-  async updateStatus(id: number, status: ProductStatus): Promise<Product> {
+  async updateStatus(id: number, status: ProductStatus, performedBy: string): Promise<Product> {
     const product = await this.repo.findOneBy({ id });
     if (!product) throw new NotFoundException(`Product ${id} not found`);
+    const oldStatus = product.status;
     product.status = status;
     product.statusLocked = true;
-    return this.repo.save(product);
+    const saved = await this.repo.save(product);
+    void this.auditLogService.log('Product', id, 'status_change', null, performedBy, { from: oldStatus, to: status });
+    return saved;
   }
 
-  async bulkArchive(ids: number[]): Promise<BulkActionResult> {
+  async bulkArchive(ids: number[], performedBy: string): Promise<BulkActionResult> {
     const products = await this.repo.findBy({ id: In(ids) });
     const foundIds = new Set(products.map((p) => p.id));
     const success: number[] = [];
@@ -174,7 +203,8 @@ export class ProductsService {
         continue;
       }
       product.archivedAt = new Date();
-      await this.repo.save(product);
+      const saved = await this.repo.save(product);
+      void this.auditLogService.log('Product', product.id, 'archive', null, performedBy, { snapshot: { ...saved } });
       success.push(product.id);
     }
 
@@ -185,17 +215,22 @@ export class ProductsService {
     return { success, skipped };
   }
 
-  async bulkUpdateStatus(ids: number[], status: ProductStatus): Promise<BulkActionResult> {
+  async bulkUpdateStatus(ids: number[], status: ProductStatus, performedBy: string): Promise<BulkActionResult> {
     const products = await this.repo.findBy({ id: In(ids) });
     const foundIds = new Set(products.map((p) => p.id));
     const success: number[] = [];
     const skipped: { id: number; reason: string }[] = [];
 
-    const eligibleIds = products.map((p) => p.id);
-    if (eligibleIds.length > 0) {
-      await this.repo.update({ id: In(eligibleIds) }, { status, statusLocked: true });
+    const productIds = products.map((p) => p.id);
+    if (productIds.length > 0) {
+      await this.repo.update({ id: In(productIds) }, { status, statusLocked: true });
     }
-    success.push(...eligibleIds);
+
+    for (const product of products) {
+      void this.auditLogService.log('Product', product.id, 'status_change', null, performedBy, { from: product.status, to: status });
+    }
+
+    success.push(...productIds);
 
     for (const id of ids) {
       if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });
@@ -204,7 +239,7 @@ export class ProductsService {
     return { success, skipped };
   }
 
-  async bulkRemove(ids: number[]): Promise<BulkActionResult> {
+  async bulkRemove(ids: number[], performedBy: string): Promise<BulkActionResult> {
     const products = await this.repo.findBy({ id: In(ids) });
     const foundIds = new Set(products.map((p) => p.id));
     const success: number[] = [];
@@ -216,8 +251,11 @@ export class ProductsService {
         skipped.push({ id: product.id, reason: 'referenced in an order' });
         continue;
       }
+      const snapshot = { ...product };
+      const productId = product.id;
       await this.repo.remove(product);
-      success.push(product.id);
+      void this.auditLogService.log('Product', productId, 'delete', null, performedBy, { snapshot });
+      success.push(productId);
     }
 
     for (const id of ids) {
@@ -373,7 +411,11 @@ export class ProductsService {
 
     if (products.length === 0) return { deactivated: 0 };
 
-    for (const p of products) p.status = ProductStatus.Inactive;
+    for (const p of products) {
+      const oldStatus = p.status;
+      p.status = ProductStatus.Inactive;
+      void this.auditLogService.log('Product', p.id, 'status_change', null, 'system', { from: oldStatus, to: ProductStatus.Inactive });
+    }
     await this.repo.save(products);
 
     Logger.log(`Deactivated ${products.length} expired product(s)`, 'ProductsScheduleService');

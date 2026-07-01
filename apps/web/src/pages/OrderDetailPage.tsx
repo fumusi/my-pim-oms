@@ -13,6 +13,7 @@ import {
 } from '../api/orders'
 import { formatDate, getApiError } from '../utils/format'
 import { ArchiveOrderModal } from '../components/ArchiveOrderModal'
+import { EntityHistory } from '../components/EntityHistory'
 
 export function OrderDetailPage() {
   const { id } = useParams({ from: '/app/orders/$id' })
@@ -351,6 +352,8 @@ export function OrderDetailPage() {
           </table>
         </div>
       </div>
+
+      <EntityHistory entityType="Order" entityId={orderId} />
 
       {archiveOpen && (
         <ArchiveOrderModal

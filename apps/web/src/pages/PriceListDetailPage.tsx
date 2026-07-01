@@ -21,6 +21,7 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { AssignCustomerModal } from '../components/AssignCustomerModal'
 import { PriceListStatusBadge, PriceListActiveNowBadge, PriceListSectionCard } from '../components/PriceListBadges'
 import { formatDate, getApiError, calcEffectivePrice } from '../utils/format'
+import { EntityHistory } from '../components/EntityHistory'
 
 function resolveProductName(item: PriceListItem): string {
   return item.product?.name?.en ?? item.product?.name?.nl ?? `Product #${item.productId}`
@@ -313,6 +314,8 @@ export function PriceListDetailPage() {
           )}
         </PriceListSectionCard>
       )}
+
+      <EntityHistory entityType="PriceList" entityId={priceListId} />
 
       {archiveConfirmOpen && (
         <ConfirmModal

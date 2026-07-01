@@ -14,6 +14,7 @@ import { OrderStatus } from '../common/enums/order-status.enum';
 import { ProductStatus } from '../common/enums/product-status.enum';
 import { Role } from '../common/enums/role.enum';
 import { OrderCalculationService } from './order-calculation.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { UpdateOrderDto } from './dto/update-order.dto';
 import type { FindOrdersQueryDto } from './dto/find-orders-query.dto';
@@ -52,6 +53,7 @@ export class OrdersService {
     private readonly productRepo: Repository<Product>,
     private readonly dataSource: DataSource,
     private readonly calc: OrderCalculationService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async findAll(query: FindOrdersQueryDto): Promise<PaginatedOrders> {
@@ -120,7 +122,7 @@ export class OrdersService {
   }
 
   async create(dto: CreateOrderDto, createdBy: string, callerRole: Role = Role.Admin): Promise<Order> {
-    return this.dataSource.transaction(async (em) => {
+    const result = await this.dataSource.transaction(async (em) => {
       const effectiveDto =
         callerRole === Role.User
           ? {
@@ -243,6 +245,9 @@ export class OrdersService {
       await em.save(Order, savedOrder);
       return savedOrder;
     });
+
+    void this.auditLogService.log('Order', result.id, 'create', null, createdBy, { snapshot: { ...result } });
+    return result;
   }
 
   async update(
@@ -250,7 +255,7 @@ export class OrdersService {
     dto: UpdateOrderDto,
     updatedBy: string,
   ): Promise<Order> {
-    return this.dataSource.transaction(async (em) => {
+    const result = await this.dataSource.transaction(async (em) => {
       const order = await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true, customer: true, shippingAddress: true },
@@ -263,12 +268,25 @@ export class OrdersService {
         );
       }
 
-      if (dto.description !== undefined)
+      const changedFields: Record<string, { old: unknown; new: unknown }> = {};
+      if (dto.description !== undefined) {
+        if (JSON.stringify(order.description) !== JSON.stringify(dto.description ?? null)) {
+          changedFields['description'] = { old: order.description, new: dto.description ?? null };
+        }
         order.description = dto.description ?? null;
-      if (dto.deliveryOption !== undefined)
+      }
+      if (dto.deliveryOption !== undefined) {
+        if (order.deliveryOption !== dto.deliveryOption) {
+          changedFields['deliveryOption'] = { old: order.deliveryOption, new: dto.deliveryOption };
+        }
         order.deliveryOption = dto.deliveryOption;
-      if (dto.trackingUrl !== undefined)
+      }
+      if (dto.trackingUrl !== undefined) {
+        if (JSON.stringify(order.trackingUrl) !== JSON.stringify(dto.trackingUrl ?? null)) {
+          changedFields['trackingUrl'] = { old: order.trackingUrl, new: dto.trackingUrl ?? null };
+        }
         order.trackingUrl = dto.trackingUrl ?? null;
+      }
       if (dto.shippingAddressId !== undefined) {
         const address = await em.findOne(Address, {
           where: { id: dto.shippingAddressId },
@@ -278,20 +296,32 @@ export class OrdersService {
             'Shipping address does not belong to this customer',
           );
         }
+        if (order.shippingAddressId !== dto.shippingAddressId) {
+          changedFields['shippingAddressId'] = { old: order.shippingAddressId, new: dto.shippingAddressId };
+        }
         order.shippingAddressId = dto.shippingAddressId;
       }
-      if (dto.shippingCost !== undefined)
+      if (dto.shippingCost !== undefined) {
+        if (order.nominalShippingCost !== dto.shippingCost) {
+          changedFields['shippingCost'] = { old: order.nominalShippingCost, new: dto.shippingCost };
+        }
         order.nominalShippingCost = dto.shippingCost;
+      }
 
       order.updatedBy = updatedBy;
 
       await this.recalculateAndSaveOrder(order, em);
 
-      return em.findOne(Order, {
+      const updated = await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true, customer: true, shippingAddress: true },
-      }) as Promise<Order>;
+      }) as Order;
+
+      return { order: updated, changedFields };
     });
+
+    void this.auditLogService.log('Order', id, 'update', result.changedFields, updatedBy);
+    return result.order;
   }
 
   async bulkEdit(
@@ -299,7 +329,7 @@ export class OrdersService {
     dto: BulkEditOrderDto,
     updatedBy: string,
   ): Promise<Order> {
-    return this.dataSource.transaction(async (em) => {
+    const order = await this.dataSource.transaction(async (em) => {
       const order = await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true, customer: true, shippingAddress: true },
@@ -434,6 +464,18 @@ export class OrdersService {
       if (!result) throw new NotFoundException(`Order ${id} not found`);
       return result;
     });
+
+    void this.auditLogService.log('Order', id, 'update', null, updatedBy, {
+      snapshot: order.lineItems.map((li) => ({
+        id: li.id,
+        productId: li.productId,
+        sku: li.sku,
+        quantity: li.quantity,
+        discount: li.discount,
+        lineTotalExclVat: li.lineTotalExclVat,
+      })),
+    });
+    return order;
   }
 
   async updateStatus(
@@ -441,7 +483,7 @@ export class OrdersService {
     newStatus: OrderStatus,
     updatedBy: string,
   ): Promise<Order> {
-    return this.dataSource.transaction(async (em) => {
+    const result = await this.dataSource.transaction(async (em) => {
       const order = await em.findOne(Order, {
         where: { id },
         relations: { lineItems: true },
@@ -452,6 +494,8 @@ export class OrdersService {
       if (!allowed.includes(newStatus)) {
         throw new BadRequestException('Invalid status transition');
       }
+
+      const oldStatus = order.status;
 
       if (newStatus === OrderStatus.Completed) {
         for (const li of order.lineItems) {
@@ -474,8 +518,12 @@ export class OrdersService {
 
       order.status = newStatus;
       order.updatedBy = updatedBy;
-      return em.save(Order, order);
+      const saved = await em.save(Order, order);
+      return { order: saved, oldStatus };
     });
+
+    void this.auditLogService.log('Order', id, 'status_change', null, updatedBy, { from: result.oldStatus, to: newStatus });
+    return result.order;
   }
 
   async addLineItem(
@@ -679,7 +727,9 @@ export class OrdersService {
     order.archiveReason = reason;
     order.archivedAt = new Date();
     order.updatedBy = updatedBy;
-    return this.orderRepo.save(order);
+    const saved = await this.orderRepo.save(order);
+    void this.auditLogService.log('Order', id, 'archive', null, updatedBy, { snapshot: { ...saved } });
+    return saved;
   }
 
   private async recalculateAndSaveOrder(order: Order, em: EntityManager): Promise<void> {

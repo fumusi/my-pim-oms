@@ -144,7 +144,7 @@ export class UsersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AdminUpdateUserDto,
   ) {
-    return this.usersService.adminUpdateUser(req.user.sub, id, dto);
+    return this.usersService.adminUpdateUser(req.user.sub, id, dto, req.user.email);
   }
 
   @Delete(':id')
@@ -161,6 +161,6 @@ export class UsersController {
     @Req() req: Request & { user: JwtPayload },
     @Param('id', ParseIntPipe) id: number,
   ) {
-    await this.usersService.adminDeleteUser(req.user.sub, id);
+    await this.usersService.adminDeleteUser(req.user.sub, id, req.user.email);
   }
 }

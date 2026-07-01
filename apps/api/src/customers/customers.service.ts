@@ -14,6 +14,7 @@ import { User } from '../users/entities/user.entity';
 import { PriceList } from '../price-lists/entities/price-list.entity';
 import { CustomerPriceList } from '../price-lists/entities/customer-price-list.entity';
 import { CustomerStatus } from '../common/enums/customer-status.enum';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerDto } from './dto/update-customer.dto';
 import type { FindCustomersQueryDto } from './dto/find-customers-query.dto';
@@ -54,6 +55,7 @@ export class CustomersService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(CustomerPriceList) private readonly cplRepo: Repository<CustomerPriceList>,
     private readonly dataSource: DataSource,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async findAll(query: FindCustomersQueryDto): Promise<PaginatedCustomers> {
@@ -107,7 +109,7 @@ export class CustomersService {
 
   async create(dto: CreateCustomerDto, createdBy: string): Promise<Customer> {
     try {
-      return await this.dataSource.transaction(async (em) => {
+      const savedCustomer = await this.dataSource.transaction(async (em) => {
         const customerNumber = await this.generateCustomerNumber(em);
 
         const customer = em.create(Customer, {
@@ -123,12 +125,12 @@ export class CustomersService {
           createdBy,
           updatedBy: createdBy,
         });
-        const savedCustomer = await em.save(Customer, customer);
+        const saved = await em.save(Customer, customer);
 
         const hasPrimaryAddress = dto.addresses.some((a) => a.isPrimary);
         const addresses = dto.addresses.map((a, i) =>
           em.create(Address, {
-            customerId: savedCustomer.id,
+            customerId: saved.id,
             street: a.street,
             houseNumber: a.houseNumber,
             postalCode: a.postalCode,
@@ -138,13 +140,13 @@ export class CustomersService {
             isPrimary: hasPrimaryAddress ? (a.isPrimary ?? false) : i === 0,
           }),
         );
-        savedCustomer.addresses = await em.save(Address, addresses);
+        saved.addresses = await em.save(Address, addresses);
 
         if (dto.contacts && dto.contacts.length > 0) {
           const hasPrimaryContact = dto.contacts.some((c) => c.isPrimary);
           const contacts = dto.contacts.map((c, i) =>
             em.create(Contact, {
-              customerId: savedCustomer.id,
+              customerId: saved.id,
               firstName: c.firstName,
               lastName: c.lastName,
               email: c.email ?? null,
@@ -152,13 +154,16 @@ export class CustomersService {
               isPrimary: hasPrimaryContact ? (c.isPrimary ?? false) : i === 0,
             }),
           );
-          savedCustomer.contacts = await em.save(Contact, contacts);
+          saved.contacts = await em.save(Contact, contacts);
         } else {
-          savedCustomer.contacts = [];
+          saved.contacts = [];
         }
 
-        return savedCustomer;
+        return saved;
       });
+
+      void this.auditLogService.log('Customer', savedCustomer.id, 'create', null, createdBy, { snapshot: { ...savedCustomer } });
+      return savedCustomer;
     } catch (err: unknown) {
       const pgErr = err as { code?: string; constraint?: string };
       if (pgErr.code === '23505') {
@@ -176,10 +181,23 @@ export class CustomersService {
     if (!customer) throw new NotFoundException(`Customer ${id} not found`);
     const { customerNumber: _cn, status, endDate, ...rest } = dto as Record<string, unknown>;
 
+    const changedFields: Record<string, { old: unknown; new: unknown }> = {};
+    for (const key of Object.keys(rest)) {
+      const oldVal = (customer as unknown as Record<string, unknown>)[key];
+      const newVal = (rest as unknown as Record<string, unknown>)[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changedFields[key] = { old: oldVal, new: newVal };
+      }
+    }
+
     Object.assign(customer, rest);
 
     if (endDate !== undefined) {
-      customer.endDate = endDate ? new Date(endDate as string) : null;
+      const newDate = endDate ? new Date(endDate as string) : null;
+      if (JSON.stringify(customer.endDate) !== JSON.stringify(newDate)) {
+        changedFields['endDate'] = { old: customer.endDate, new: newDate };
+      }
+      customer.endDate = newDate;
     }
 
     if (status !== undefined) {
@@ -190,11 +208,16 @@ export class CustomersService {
           throw new BadRequestException('Cannot activate customer with a past end date');
         }
       }
+      if (customer.status !== (status as CustomerStatus)) {
+        changedFields['status'] = { old: customer.status, new: status };
+      }
       customer.status = status as CustomerStatus;
     }
 
     customer.updatedBy = updatedBy;
-    return this.customerRepo.save(customer);
+    const saved = await this.customerRepo.save(customer);
+    void this.auditLogService.log('Customer', id, 'update', changedFields, updatedBy);
+    return saved;
   }
 
   async updateStatus(id: number, status: CustomerStatus, updatedBy: string): Promise<Customer> {
@@ -209,17 +232,20 @@ export class CustomersService {
       }
     }
 
+    const oldStatus = customer.status;
     customer.status = status;
     customer.updatedBy = updatedBy;
-    return this.customerRepo.save(customer);
+    const saved = await this.customerRepo.save(customer);
+    void this.auditLogService.log('Customer', id, 'status_change', null, updatedBy, { from: oldStatus, to: status });
+    return saved;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, performedBy?: string): Promise<void> {
     // TODO: block if customer has any orders (orders module not yet implemented)
     throw new NotImplementedException('Delete is blocked until order integration is complete');
   }
 
-  async archive(id: number): Promise<Customer> {
+  async archive(id: number, performedBy?: string): Promise<Customer> {
     // TODO: block if customer has active orders (orders module not yet implemented)
     throw new NotImplementedException('Archive is blocked until order integration is complete');
   }

@@ -7,6 +7,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ItemsService, AssignResult } from '../exact/items.service';
 import { CategoryStatus } from '../common/enums/category-status.enum';
 import { ProductsService } from '../products/products.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 export interface CategoryPimProduct {
   id: number;
@@ -37,6 +38,7 @@ export class CategoriesService {
     private readonly categoryRepo: Repository<Category>,
     private readonly itemsService: ItemsService,
     private readonly productsService: ProductsService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async findAll(statusFilter?: CategoryStatus): Promise<CategoryWithCount[]> {
@@ -87,31 +89,49 @@ export class CategoriesService {
 
   async create(data: CreateCategoryDto, updatedBy?: string): Promise<Category> {
     const category = this.categoryRepo.create({ ...data, updatedBy: updatedBy ?? null });
-    return this.categoryRepo.save(category);
+    const saved = await this.categoryRepo.save(category);
+    void this.auditLogService.log('Category', saved.id, 'create', null, updatedBy ?? 'system', { snapshot: { ...saved } });
+    return saved;
   }
 
   async update(id: number, data: UpdateCategoryDto, updatedBy?: string): Promise<Category> {
     const category = await this.categoryRepo.findOneOrFail({ where: { id } });
+
+    const changedFields: Record<string, { old: unknown; new: unknown }> = {};
+    for (const key of Object.keys(data)) {
+      const oldVal = (category as unknown as Record<string, unknown>)[key];
+      const newVal = (data as unknown as Record<string, unknown>)[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changedFields[key] = { old: oldVal, new: newVal };
+      }
+    }
+
     Object.assign(category, data, { updatedBy: updatedBy ?? null });
-    return this.categoryRepo.save(category);
+    const saved = await this.categoryRepo.save(category);
+    void this.auditLogService.log('Category', id, 'update', changedFields, updatedBy ?? 'system');
+    return saved;
   }
 
   async setStatus(id: number, status: CategoryStatus, updatedBy?: string): Promise<Category> {
     // Category save and item deactivation run in one transaction so they can't diverge.
     // NOTE: re-activation does NOT restore products — any product deactivated here stays
     // inactive until manually re-enabled. This is intentional until a pim_status column lands.
-    return this.categoryRepo.manager.transaction(async (em) => {
+    const saved = await this.categoryRepo.manager.transaction(async (em) => {
       const category = await em.findOneOrFail(Category, { where: { id } });
+      const oldStatus = category.status;
       category.status = status;
       category.updatedBy = updatedBy ?? null;
-      const saved = await em.save(category);
+      const result = await em.save(category);
 
       if (status === CategoryStatus.Inactive) {
         await this.itemsService.deactivateByCategoryId(id, em);
       }
 
-      return saved;
+      void this.auditLogService.log('Category', id, 'status_change', null, updatedBy ?? 'system', { from: oldStatus, to: status });
+      return result;
     });
+
+    return saved;
   }
 
   async archive(id: number, updatedBy?: string): Promise<Category> {
@@ -125,18 +145,22 @@ export class CategoriesService {
     }
     category.archivedAt = new Date();
     category.updatedBy = updatedBy ?? null;
-    return this.categoryRepo.save(category);
+    const saved = await this.categoryRepo.save(category);
+    void this.auditLogService.log('Category', id, 'archive', null, updatedBy ?? 'system', { snapshot: { ...saved } });
+    return saved;
   }
 
-  async delete(id: number): Promise<void> {
-    await this.categoryRepo.findOneOrFail({ where: { id } });
+  async delete(id: number, performedBy?: string): Promise<void> {
+    const category = await this.categoryRepo.findOneOrFail({ where: { id } });
     const count = await this.itemsService.countByCategory(id);
     if (count > 0) {
       throw new BadRequestException(
         `Cannot delete category: ${count} product${count === 1 ? '' : 's'} still assigned`,
       );
     }
+    const snapshot = { ...category };
     await this.categoryRepo.delete(id);
+    void this.auditLogService.log('Category', id, 'delete', null, performedBy ?? 'system', { snapshot });
   }
 
   async assignProducts(id: number, productIds: string[]): Promise<AssignResult> {

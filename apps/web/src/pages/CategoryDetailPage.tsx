@@ -21,6 +21,7 @@ import { resolveName, formatDate, getApiError, type Lang } from '../utils/format
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CategoryDrawer } from '../components/CategoryDrawer'
 import { AssignProductsModal } from '../components/AssignProductsModal'
+import { EntityHistory } from '../components/EntityHistory'
 
 export function CategoryDetailPage() {
   const { id } = useParams({ from: '/app/categories/$id' })
@@ -337,6 +338,8 @@ export function CategoryDetailPage() {
           </div>
         )}
       </div>
+
+      <EntityHistory entityType="Category" entityId={categoryId} />
 
       {/* Edit drawer */}
       {drawerOpen && (
