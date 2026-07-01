@@ -65,13 +65,16 @@ export class AuditLogService {
     return { data, total, page, limit };
   }
 
-  findByEntity(entityType: string, entityId: number): Promise<AuditLog[]> {
-    return this.repo
+  async findByEntity(entityType: string, entityId: number): Promise<{ data: AuditLog[]; hasMore: boolean }> {
+    const limit = 100;
+    const data = await this.repo
       .createQueryBuilder('al')
       .where('al.entityType = :entityType', { entityType })
       .andWhere('al.entityId = :entityId', { entityId })
       .orderBy('al.performedAt', 'DESC')
-      .take(100)
+      .take(limit + 1)
       .getMany();
+    const hasMore = data.length > limit;
+    return { data: hasMore ? data.slice(0, limit) : data, hasMore };
   }
 }

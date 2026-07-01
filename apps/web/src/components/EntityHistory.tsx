@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getEntityHistory, type AuditLog } from '../api/audit-logs'
+import { getEntityHistory, type AuditLog, type EntityHistoryResponse } from '../api/audit-logs'
 import { ActionBadge } from './ActionBadge'
 import { AuditDiff, AuditSnapshot } from './AuditDiff'
 import { formatTimestamp } from '../utils/format'
@@ -78,7 +78,7 @@ export function EntityHistory({
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<EntityHistoryResponse>({
     queryKey: ['entity-history', entityType, entityId],
     queryFn: () => getEntityHistory(entityType, entityId),
     enabled: isOpen,
@@ -112,16 +112,16 @@ export function EntityHistory({
             </div>
           )}
 
-          {!isLoading && data && data.length === 0 && (
+          {!isLoading && data && data.data.length === 0 && (
             <p style={{ color: '#6b6e87', margin: 0, fontSize: '0.85rem' }}>No history yet.</p>
           )}
 
-          {!isLoading && data && data.length > 0 && (
+          {!isLoading && data && data.data.length > 0 && (
             <div>
-              {data.map((log) => (
+              {data.data.map((log) => (
                 <HistoryEntry key={log.id} log={log} />
               ))}
-              {data.length === 100 && (
+              {data.hasMore && (
                 <p style={{ color: '#6b6e87', margin: 0, fontSize: '0.78rem' }}>Showing latest 100 entries.</p>
               )}
             </div>

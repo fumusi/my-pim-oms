@@ -34,5 +34,10 @@ export interface AuditLogsQuery {
 export const getAuditLogs = (query: AuditLogsQuery): Promise<AuditLogsResponse> =>
   api.get<AuditLogsResponse>('/audit-logs', { params: query }).then((r) => r.data)
 
-export const getEntityHistory = (entityType: string, entityId: number): Promise<AuditLog[]> =>
-  api.get<AuditLog[]>(`/audit-logs/entity/${entityType}/${entityId}`).then((r) => r.data)
+export interface EntityHistoryResponse {
+  data: AuditLog[]
+  hasMore: boolean
+}
+
+export const getEntityHistory = (entityType: string, entityId: number): Promise<EntityHistoryResponse> =>
+  api.get<EntityHistoryResponse>(`/audit-logs/entity/${entityType}/${entityId}`).then((r) => r.data)

@@ -221,16 +221,16 @@ export class ProductsService {
     const success: number[] = [];
     const skipped: { id: number; reason: string }[] = [];
 
-    const eligibleIds = products.map((p) => p.id);
-    if (eligibleIds.length > 0) {
-      await this.repo.update({ id: In(eligibleIds) }, { status, statusLocked: true });
+    const productIds = products.map((p) => p.id);
+    if (productIds.length > 0) {
+      await this.repo.update({ id: In(productIds) }, { status, statusLocked: true });
     }
 
     for (const product of products) {
       void this.auditLogService.log('Product', product.id, 'status_change', null, performedBy, { from: product.status, to: status });
     }
 
-    success.push(...eligibleIds);
+    success.push(...productIds);
 
     for (const id of ids) {
       if (!foundIds.has(id)) skipped.push({ id, reason: 'not found' });
