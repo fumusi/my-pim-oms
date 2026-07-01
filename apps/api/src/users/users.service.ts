@@ -198,7 +198,7 @@ export class UsersService {
     await this.repo.update(targetId, { isActive: false });
     await this.redis.del(`rt:${targetId}`);
     await this.redis.set(`bl:user:${targetId}`, '1', this.accessTokenTtl);
-    void this.auditLogService.log('User', targetId, 'status_change', null, performedBy ?? 'system', { from: true, to: false });
+    void this.auditLogService.log('User', targetId, 'status_change', null, performedBy ?? 'system', { from: 'active', to: 'inactive' });
   }
 
   getUserImportTemplate(): Buffer {

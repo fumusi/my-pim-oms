@@ -121,6 +121,9 @@ export function EntityHistory({
               {data.map((log) => (
                 <HistoryEntry key={log.id} log={log} />
               ))}
+              {data.length === 100 && (
+                <p style={{ color: '#6b6e87', margin: 0, fontSize: '0.78rem' }}>Showing latest 100 entries.</p>
+              )}
             </div>
           )}
         </div>
