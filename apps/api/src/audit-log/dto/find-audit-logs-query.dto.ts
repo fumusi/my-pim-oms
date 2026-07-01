@@ -6,8 +6,8 @@ const FindAuditLogsQuerySchema = z.object({
   entityId: z.coerce.number().int().positive().optional(),
   action: z.enum(['create', 'update', 'delete', 'archive', 'status_change']).optional(),
   performedBy: z.string().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
+  dateFrom: z.string().date().optional(),
+  dateTo: z.string().date().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

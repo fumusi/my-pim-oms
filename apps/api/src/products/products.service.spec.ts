@@ -433,6 +433,10 @@ describe('ProductsService', () => {
 
       expect(result.success).toEqual([1, 2]);
       expect(result.skipped).toEqual([]);
+      expect(productRepo.update).toHaveBeenCalledWith(
+        { id: In([1, 2]) },
+        { status: ProductStatus.Inactive, statusLocked: true },
+      );
     });
 
     it('marks not-found IDs as skipped', async () => {

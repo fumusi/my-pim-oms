@@ -221,13 +221,14 @@ export class ProductsService {
     const success: number[] = [];
     const skipped: { id: number; reason: string }[] = [];
 
+    const productById = new Map(products.map((p) => [p.id, p]));
     const eligibleIds = products.map((p) => p.id);
     if (eligibleIds.length > 0) {
       await this.repo.update({ id: In(eligibleIds) }, { status, statusLocked: true });
     }
 
-    for (const product of products) {
-      void this.auditLogService.log('Product', product.id, 'status_change', null, performedBy, { from: product.status, to: status });
+    for (const id of eligibleIds) {
+      void this.auditLogService.log('Product', id, 'status_change', null, performedBy, { from: productById.get(id)!.status, to: status });
     }
 
     success.push(...eligibleIds);

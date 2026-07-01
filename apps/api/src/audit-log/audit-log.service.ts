@@ -59,7 +59,7 @@ export class AuditLogService {
     if (action) qb.andWhere('al.action = :action', { action });
     if (performedBy) qb.andWhere('al.performedBy ILIKE :performedBy', { performedBy: `%${performedBy}%` });
     if (dateFrom) qb.andWhere('al.performedAt >= :dateFrom', { dateFrom });
-    if (dateTo) qb.andWhere('al.performedAt < :dateTo', { dateTo: new Date(new Date(dateTo).getTime() + 86400000) });
+    if (dateTo) qb.andWhere("al.performedAt < (:dateTo::date + interval '1 day')", { dateTo });
 
     const [data, total] = await qb.getManyAndCount();
     return { data, total, page, limit };
@@ -71,6 +71,7 @@ export class AuditLogService {
       .where('al.entityType = :entityType', { entityType })
       .andWhere('al.entityId = :entityId', { entityId })
       .orderBy('al.performedAt', 'DESC')
+      .take(100)
       .getMany();
   }
 }
