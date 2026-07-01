@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import {
   getNotifications,
   markAllRead,
@@ -8,6 +9,7 @@ import {
   type Notification,
 } from '../api/notifications'
 import { relativeTime, TYPE_ICONS, entityRoute } from '../utils/notifications'
+import { getApiError } from '../utils/format'
 
 export function NotificationsPage() {
   const [page, setPage] = useState(1)
@@ -27,13 +29,19 @@ export function NotificationsPage() {
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
   }
 
-  async function handleMarkRead(n: Notification) {
-    if (n.isRead) return
-    await markRead(n.id)
-    void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+  async function handleItemClick(n: Notification) {
     const route = entityRoute(n)
-    if (route) {
-      void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
+    if (n.isRead) {
+      if (route) void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
+      return
+    }
+    try {
+      await markRead(n.id)
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      if (route) void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
+    } catch (err) {
+      toast.error(getApiError(err))
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
     }
   }
 
@@ -83,26 +91,29 @@ export function NotificationsPage() {
 
       {data && data.data.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {data.data.map((n) => (
-            <div
-              key={n.id}
-              className={`notification-item${n.isRead ? '' : ' notification-item--unread'}`}
-              style={{ cursor: n.isRead ? 'default' : 'pointer', borderRadius: 8 }}
-              onClick={() => handleMarkRead(n)}
-              role={n.isRead ? undefined : 'button'}
-              tabIndex={n.isRead ? undefined : 0}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !n.isRead) void handleMarkRead(n) }}
-            >
-              <span className="notification-item-icon" aria-hidden="true">
-                {TYPE_ICONS[n.type]}
-              </span>
-              <div className="notification-item-body">
-                <div className="notification-item-title">{n.title}</div>
-                <div className="notification-item-message">{n.message}</div>
-                <div className="notification-item-time">{relativeTime(n.createdAt)}</div>
+          {data.data.map((n) => {
+            const interactive = !n.isRead || !!entityRoute(n)
+            return (
+              <div
+                key={n.id}
+                className={`notification-item${n.isRead ? '' : ' notification-item--unread'}`}
+                style={{ cursor: interactive ? 'pointer' : 'default', borderRadius: 8 }}
+                onClick={() => handleItemClick(n)}
+                role={interactive ? 'button' : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                onKeyDown={(e) => { if (e.key === 'Enter' && interactive) void handleItemClick(n) }}
+              >
+                <span className="notification-item-icon" aria-hidden="true">
+                  {TYPE_ICONS[n.type]}
+                </span>
+                <div className="notification-item-body">
+                  <div className="notification-item-title">{n.title}</div>
+                  <div className="notification-item-message">{n.message}</div>
+                  <div className="notification-item-time">{relativeTime(n.createdAt)}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

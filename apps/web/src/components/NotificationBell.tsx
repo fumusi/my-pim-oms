@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import {
   getNotifications,
   getUnreadCount,
@@ -9,6 +10,7 @@ import {
   type Notification,
 } from '../api/notifications'
 import { relativeTime, TYPE_ICONS, entityRoute } from '../utils/notifications'
+import { getApiError } from '../utils/format'
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false)
@@ -47,13 +49,18 @@ export function NotificationBell() {
   }
 
   async function handleItemClick(n: Notification) {
-    await markRead(n.id)
-    void queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    setOpen(false)
-    const route = entityRoute(n)
-    if (route) {
-      // relatedEntityType is limited to 'Order' | 'Product' today; extend entityRoute if more types are added
-      void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
+    try {
+      await markRead(n.id)
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      setOpen(false)
+      const route = entityRoute(n)
+      if (route) {
+        // relatedEntityType is limited to 'Order' | 'Product' today; extend entityRoute if more types are added
+        void navigate({ to: route, params: { id: String(n.relatedEntityId) } })
+      }
+    } catch (err) {
+      toast.error(getApiError(err))
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
     }
   }
 
